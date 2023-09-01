@@ -59,16 +59,17 @@ func Dirlist(size string, url string) {
 	}
 
 	// util.InitProgressBar()
+	client := &http.Client{}
 	for _, directory := range directories {
 		log.Debugf("%s", directory)
-		resp, err := http.Get(url + "/" + directory)
+		resp, err := client.Get(url + "/" + directory)
 		if err != nil {
 			log.Debugf("Error %s: %s", directory, err)
 			return
 		}
 
 		if resp.StatusCode != 404 {
-			// log url, directory, and status code\
+			// log url, directory, and status code
 			dirlog.Infof("%s [%s]", statusstyle.Render(strconv.Itoa(resp.StatusCode)), directorystyle.Render(directory))
 		}
 	}
