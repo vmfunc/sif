@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/charmbracelet/log"
 )
 
 var style = lipgloss.NewStyle().
@@ -15,5 +17,7 @@ var style = lipgloss.NewStyle().
 	Width(30)
 
 func main() {
-	fmt.Println(style.Render("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/"))
+	fmt.Println(style.Render("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/\n\nhttps://sif.sh - man's best friend"))
+
+	log.Info("Hello World!")
 }
