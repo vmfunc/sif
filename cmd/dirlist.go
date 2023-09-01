@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
@@ -26,7 +27,7 @@ var directorystyle = lipgloss.NewStyle().
 	Bold(true).
 	Underline(true)
 
-func Dirlist(size string, url string) {
+func Dirlist(size string, url string, timeout time.Duration) {
 
 	logger := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "Dirlist 📂",
@@ -59,7 +60,9 @@ func Dirlist(size string, url string) {
 	}
 
 	// util.InitProgressBar()
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: timeout,
+	}
 	for _, directory := range directories {
 		log.Debugf("%s", directory)
 		resp, err := client.Get(url + "/" + directory)

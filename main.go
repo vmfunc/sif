@@ -26,13 +26,19 @@ func main() {
 	fmt.Println(style.Render("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/"))
 	fmt.Println(subline.Render("https://sif.sh - man's best friend"))
 
-	log.Info("Hello World!")
-
 	settings := parseURLs()
+
+	if settings.Debug {
+		log.SetLevel(log.DebugLevel)
+	}
+
 	for _, url := range settings.URLs {
 		log.Infof("Looking up %s...", url)
 		if settings.Dirlist != "none" {
-			cmd.Dirlist(settings.Dirlist, url)
+			cmd.Dirlist(settings.Dirlist, url, settings.Timeout)
+		}
+		if settings.Dnslist != "none" {
+			cmd.Dnslist(settings.Dnslist, url, settings.Timeout)
 		}
 	}
 }

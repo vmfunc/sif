@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"os"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/pflag"
@@ -11,17 +12,28 @@ import (
 type Settings struct {
 	URLs    []string
 	Dirlist string
+	Dnslist string
+	Debug   bool
+	Timeout time.Duration
 }
 
 func parseURLs() Settings {
+	var debug = pflag.BoolP("debug", "d", false, "Enable debug logging")
+
+	var timeout = pflag.DurationP("timeout", "t", 10*time.Second, "General http timeout value - Default is 10 seconds")
+
 	var url = pflag.StringArrayP("url", "u", []string{}, "URL to check")
 	var file = pflag.StringP("file", "f", "", "File that includes URLs to check")
-	var dirlist = pflag.String("dirlist", "none", "Dirlist scan size (small, medium, large)")
+	var dirlist = pflag.String("dirlist", "none", "Directory fuzzing scan size (small, medium, large)")
+	var dnslist = pflag.String("dnslist", "none", "DNS fuzzing scan size (small, medium, large)")
 	pflag.Parse()
 
 	if len(*url) > 0 {
 		return Settings{
+			Debug:   *debug,
+			Timeout: *timeout,
 			Dirlist: *dirlist,
+			Dnslist: *dnslist,
 			URLs:    *url,
 		}
 	} else if *file != "" {
@@ -44,7 +56,10 @@ func parseURLs() Settings {
 		}
 
 		return Settings{
+			Timeout: *timeout,
+			Debug:   *debug,
 			Dirlist: *dirlist,
+			Dnslist: *dnslist,
 			URLs:    urls,
 		}
 	}
