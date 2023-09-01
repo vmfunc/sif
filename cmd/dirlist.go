@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
+	// "github.com/pushfs/sif/util"
 )
 
 const (
@@ -57,6 +58,7 @@ func Dirlist(size string, url string) {
 		directories = append(directories, scanner.Text())
 	}
 
+	// util.InitProgressBar()
 	for _, directory := range directories {
 		log.Debugf("%s", directory)
 		resp, err := http.Get(url + "/" + directory)
