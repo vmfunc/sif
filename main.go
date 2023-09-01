@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
-
 	"github.com/charmbracelet/log"
 )
 
@@ -27,4 +26,9 @@ func main() {
 	fmt.Println(subline.Render("https://sif.sh - man's best friend"))
 
 	log.Info("Hello World!")
+
+	urls := parseURLs()
+	for _, url := range urls {
+		log.Infof("Looking up %s...", url)
+	}
 }
