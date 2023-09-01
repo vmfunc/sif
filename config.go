@@ -8,13 +8,22 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func parseURLs() []string {
+type Settings struct {
+	URLs    []string
+	Dirlist bool
+}
+
+func parseURLs() Settings {
 	var url = pflag.StringArrayP("url", "u", []string{}, "URL to check")
 	var file = pflag.StringP("file", "f", "", "File that includes URLs to check")
+	var dirlist = pflag.Bool("dirlist", false, "")
 	pflag.Parse()
 
-	if *url != nil {
-		return *url
+	if len(*url) > 0 {
+		return Settings{
+			Dirlist: *dirlist,
+			URLs:    *url,
+		}
 	} else if *file != "" {
 		if _, err := os.Stat(*file); err != nil {
 			log.Fatal(err)
@@ -34,8 +43,12 @@ func parseURLs() []string {
 			urls = append(urls, scanner.Text())
 		}
 
-		return urls
+		return Settings{
+			Dirlist: *dirlist,
+			URLs:    urls,
+		}
 	}
 
-	return []string{}
+	log.Fatal("Please specify either a URL or a file containing URLs")
+	return Settings{}
 }

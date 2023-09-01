@@ -27,8 +27,8 @@ func main() {
 
 	log.Info("Hello World!")
 
-	urls := parseURLs()
-	for _, url := range urls {
+	settings := parseURLs()
+	for _, url := range settings.URLs {
 		log.Infof("Looking up %s...", url)
 	}
 }
