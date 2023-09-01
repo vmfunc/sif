@@ -14,6 +14,7 @@ type Settings struct {
 	Dirlist string
 	Dnslist string
 	Debug   bool
+	NoScan  bool
 	Timeout time.Duration
 }
 
@@ -26,6 +27,7 @@ func parseURLs() Settings {
 	var file = pflag.StringP("file", "f", "", "File that includes URLs to check")
 	var dirlist = pflag.String("dirlist", "none", "Directory fuzzing scan size (small, medium, large)")
 	var dnslist = pflag.String("dnslist", "none", "DNS fuzzing scan size (small, medium, large)")
+	var noscan = pflag.Bool("noscan", false, "Do not perform base URL (robots.txt, etc) scanning")
 	pflag.Parse()
 
 	if len(*url) > 0 {
@@ -34,6 +36,7 @@ func parseURLs() Settings {
 			Timeout: *timeout,
 			Dirlist: *dirlist,
 			Dnslist: *dnslist,
+			NoScan:  *noscan,
 			URLs:    *url,
 		}
 	} else if *file != "" {
@@ -60,10 +63,11 @@ func parseURLs() Settings {
 			Debug:   *debug,
 			Dirlist: *dirlist,
 			Dnslist: *dnslist,
+			NoScan:  *noscan,
 			URLs:    urls,
 		}
 	}
 
-	log.Fatal("Please specify either a URL or a file containing URLs")
+	log.Fatal("Please specify either a URL or a file containing URLs, as well as options.\nSee --help for more information.")
 	return Settings{}
 }

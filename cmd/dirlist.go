@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"bufio"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	// "github.com/pushfs/sif/util"
 )
@@ -19,15 +19,9 @@ const (
 	bigFile      = "directory-list-2.3-big.txt"
 )
 
-var statusstyle = lipgloss.NewStyle().
-	Bold(true).
-	Foreground(lipgloss.Color("#00ff1a"))
-
-var directorystyle = lipgloss.NewStyle().
-	Bold(true).
-	Underline(true)
-
 func Dirlist(size string, url string, timeout time.Duration) {
+
+	fmt.Println(separator.Render("📂 Starting " + statusstyle.Render("directory fuzzing") + "..."))
 
 	logger := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "Dirlist 📂",

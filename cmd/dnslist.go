@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"bufio"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	// "github.com/pushfs/sif/util"
 )
@@ -19,11 +19,9 @@ const (
 	dnsBigFile    = "subdomains-10000.txt"
 )
 
-var dnsstyle = lipgloss.NewStyle().
-	Bold(true).
-	Underline(true)
-
 func Dnslist(size string, url string, timeout time.Duration) {
+
+	fmt.Println(separator.Render("📡 Starting " + statusstyle.Render("DNS fuzzing") + "..."))
 
 	logger := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "Dnslist 📡",
