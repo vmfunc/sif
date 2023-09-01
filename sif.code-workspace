@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "sif-runtime",
+			"path": "../sif-runtime"
+		}
+	],
+	"settings": {}
+}

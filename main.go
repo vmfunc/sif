@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
+	"github.com/pushfs/sif/cmd"
 )
 
 var style = lipgloss.NewStyle().
@@ -30,5 +31,8 @@ func main() {
 	settings := parseURLs()
 	for _, url := range settings.URLs {
 		log.Infof("Looking up %s...", url)
+		if settings.Dirlist {
+			cmd.Dirlist(url)
+		}
 	}
 }
