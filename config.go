@@ -10,13 +10,13 @@ import (
 
 type Settings struct {
 	URLs    []string
-	Dirlist bool
+	Dirlist string
 }
 
 func parseURLs() Settings {
 	var url = pflag.StringArrayP("url", "u", []string{}, "URL to check")
 	var file = pflag.StringP("file", "f", "", "File that includes URLs to check")
-	var dirlist = pflag.Bool("dirlist", false, "")
+	var dirlist = pflag.String("dirlist", "none", "Dirlist scan size (small, medium, large)")
 	pflag.Parse()
 
 	if len(*url) > 0 {

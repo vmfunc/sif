@@ -31,8 +31,8 @@ func main() {
 	settings := parseURLs()
 	for _, url := range settings.URLs {
 		log.Infof("Looking up %s...", url)
-		if settings.Dirlist {
-			cmd.Dirlist(url)
+		if settings.Dirlist != "none" {
+			cmd.Dirlist(settings.Dirlist, url)
 		}
 	}
 }

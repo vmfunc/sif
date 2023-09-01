@@ -6,7 +6,15 @@ import (
 	"github.com/charmbracelet/log"
 )
 
-func Dirlist(url string) {
+func Dirlist(size string, url string) {
 	log.Infof("Starting directory scan on %s...", url)
-	fmt.Println(url)
+
+	switch size {
+	case "small":
+		fmt.Println("small")
+	case "medium":
+		fmt.Println("medium")
+	case "large":
+		fmt.Println("large")
+	}
 }
