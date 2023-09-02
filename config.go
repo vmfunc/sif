@@ -24,7 +24,7 @@ func parseURLs() Settings {
 
 	var timeout = pflag.DurationP("timeout", "t", 10*time.Second, "General http timeout value - Default is 10 seconds")
 
-	var logdir = pflag.StringP("logs", "l", "", "Directory to store logs")
+	var logdir = pflag.StringP("log", "l", "", "Directory to store logs")
 
 	var url = pflag.StringArrayP("url", "u", []string{}, "URL to check")
 	var file = pflag.StringP("file", "f", "", "File that includes URLs to check")
