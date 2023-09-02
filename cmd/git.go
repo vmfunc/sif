@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -57,25 +58,32 @@ func Git(url string, timeout time.Duration, logdir string) {
 	client := &http.Client{
 		Timeout: timeout,
 	}
-	for _, repourl := range gitUrls {
-		log.Debugf("%s", repourl)
-		resp, err := client.Get(url + "/" + repourl)
-		if err != nil {
-			log.Debugf("Error %s: %s", repourl, err)
-		}
 
-		if resp.StatusCode != 404 {
-			// log url, directory, and status code
-			gitlog.Infof("%s git found at [%s]", statusstyle.Render(strconv.Itoa(resp.StatusCode)), directorystyle.Render(repourl))
-			if logdir != "" {
-				f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-				if err != nil {
-					log.Errorf("Error creating log file: %s", err)
-					return
-				}
-				defer f.Close()
-				f.WriteString(fmt.Sprintf("%s git found at [%s]\n", strconv.Itoa(resp.StatusCode), repourl))
+	var wg sync.WaitGroup
+	wg.Add(len(gitUrls))
+	for _, repourl := range gitUrls {
+		go func(repourl string) {
+			defer wg.Done()
+
+			log.Debugf("%s", repourl)
+			resp, err := client.Get(url + "/" + repourl)
+			if err != nil {
+				log.Debugf("Error %s: %s", repourl, err)
 			}
-		}
+
+			if resp.StatusCode != 404 {
+				// log url, directory, and status code
+				gitlog.Infof("%s git found at [%s]", statusstyle.Render(strconv.Itoa(resp.StatusCode)), directorystyle.Render(repourl))
+				if logdir != "" {
+					f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+					if err != nil {
+						log.Errorf("Error creating log file: %s", err)
+						return
+					}
+					defer f.Close()
+					f.WriteString(fmt.Sprintf("%s git found at [%s]\n", strconv.Itoa(resp.StatusCode), repourl))
+				}
+			}
+		}(repourl)
 	}
 }

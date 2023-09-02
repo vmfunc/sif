@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -70,26 +71,34 @@ func Dirlist(size string, url string, timeout time.Duration, logdir string) {
 	client := &http.Client{
 		Timeout: timeout,
 	}
-	for _, directory := range directories {
-		log.Debugf("%s", directory)
-		resp, err := client.Get(url + "/" + directory)
-		if err != nil {
-			log.Debugf("Error %s: %s", directory, err)
-			return
-		}
 
-		if resp.StatusCode != 404 {
-			// log url, directory, and status code
-			dirlog.Infof("%s [%s]", statusstyle.Render(strconv.Itoa(resp.StatusCode)), directorystyle.Render(directory))
-			if logdir != "" {
-				f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-				if err != nil {
-					log.Errorf("Error creating log file: %s", err)
-					return
-				}
-				defer f.Close()
-				f.WriteString(fmt.Sprintf("%s [%s]\n", strconv.Itoa(resp.StatusCode), directory))
+	var wg sync.WaitGroup
+	wg.Add(len(directories))
+	for _, directory := range directories {
+		go func(directory string) {
+			defer wg.Done()
+
+			log.Debugf("%s", directory)
+			resp, err := client.Get(url + "/" + directory)
+			if err != nil {
+				log.Debugf("Error %s: %s", directory, err)
+				return
 			}
-		}
+
+			if resp.StatusCode != 404 {
+				// log url, directory, and status code
+				dirlog.Infof("%s [%s]", statusstyle.Render(strconv.Itoa(resp.StatusCode)), directorystyle.Render(directory))
+				if logdir != "" {
+					f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+					if err != nil {
+						log.Errorf("Error creating log file: %s", err)
+						return
+					}
+					defer f.Close()
+					f.WriteString(fmt.Sprintf("%s [%s]\n", strconv.Itoa(resp.StatusCode), directory))
+				}
+			}
+		}(directory)
 	}
+	wg.Wait()
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -61,17 +62,24 @@ func Ports(scope string, url string, timeout time.Duration, logdir string) {
 	}
 
 	var openPorts []string
+	var wg sync.WaitGroup
+	wg.Add(len(ports))
 	for _, port := range ports {
-		log.Debugf("Looking up: %d", port)
-		tcp, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", sanitizedURL, port), timeout)
-		if err != nil {
-			log.Debugf("Error %d: %v", port, err)
-		} else {
-			openPorts = append(openPorts, strconv.Itoa(port))
-			portlog.Infof("%s %s:%s", statusstyle.Render("[tcp]"), sanitizedURL, portstyle.Render(strconv.Itoa(port)))
-			tcp.Close()
-		}
+		go func(port int) {
+			defer wg.Done()
+
+			log.Debugf("Looking up: %d", port)
+			tcp, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", sanitizedURL, port), timeout)
+			if err != nil {
+				log.Debugf("Error %d: %v", port, err)
+			} else {
+				openPorts = append(openPorts, strconv.Itoa(port))
+				portlog.Infof("%s %s:%s", statusstyle.Render("[tcp]"), sanitizedURL, portstyle.Render(strconv.Itoa(port)))
+				tcp.Close()
+			}
+		}(port)
 	}
+	wg.Wait()
 
 	if len(openPorts) > 0 {
 		portlog.Infof("Found %d open ports: %s", len(openPorts), strings.Join(openPorts, ", "))

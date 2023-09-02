@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -71,39 +72,47 @@ func Dnslist(size string, url string, timeout time.Duration, logdir string) {
 	client := &http.Client{
 		Timeout: timeout,
 	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(dns))
 	for _, domain := range dns {
-		log.Debugf("Looking up: %s", domain)
-		_, err := client.Get("http://" + domain + "." + sanitizedURL)
-		if err != nil {
-			log.Debugf("Error %s: %s", domain, err)
-		} else {
-			dnslog.Infof("%s %s.%s", statusstyle.Render("[http]"), dnsstyle.Render(domain), sanitizedURL)
+		go func(domain string) {
+			defer wg.Done()
 
-			if logdir != "" {
-				f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-				if err != nil {
-					log.Errorf("Error creating log file: %s", err)
-					return
-				}
-				defer f.Close()
-				f.WriteString(fmt.Sprintf("[http] %s.%s\n", domain, sanitizedURL))
-			}
-		}
+			log.Debugf("Looking up: %s", domain)
+			_, err := client.Get("http://" + domain + "." + sanitizedURL)
+			if err != nil {
+				log.Debugf("Error %s: %s", domain, err)
+			} else {
+				dnslog.Infof("%s %s.%s", statusstyle.Render("[http]"), dnsstyle.Render(domain), sanitizedURL)
 
-		_, err = client.Get("https://" + domain + "." + sanitizedURL)
-		if err != nil {
-			log.Debugf("Error %s: %s", domain, err)
-		} else {
-			dnslog.Infof("%s %s.%s", statusstyle.Render("[https]"), dnsstyle.Render(domain), sanitizedURL)
-			if logdir != "" {
-				f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-				if err != nil {
-					log.Errorf("Error creating log file: %s", err)
-					return
+				if logdir != "" {
+					f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+					if err != nil {
+						log.Errorf("Error creating log file: %s", err)
+						return
+					}
+					defer f.Close()
+					f.WriteString(fmt.Sprintf("[http] %s.%s\n", domain, sanitizedURL))
 				}
-				defer f.Close()
-				f.WriteString(fmt.Sprintf("[https] %s.%s\n", domain, sanitizedURL))
 			}
-		}
+
+			_, err = client.Get("https://" + domain + "." + sanitizedURL)
+			if err != nil {
+				log.Debugf("Error %s: %s", domain, err)
+			} else {
+				dnslog.Infof("%s %s.%s", statusstyle.Render("[https]"), dnsstyle.Render(domain), sanitizedURL)
+				if logdir != "" {
+					f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+					if err != nil {
+						log.Errorf("Error creating log file: %s", err)
+						return
+					}
+					defer f.Close()
+					f.WriteString(fmt.Sprintf("[https] %s.%s\n", domain, sanitizedURL))
+				}
+			}
+		}(domain)
 	}
+	wg.Wait()
 }
