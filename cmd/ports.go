@@ -16,7 +16,7 @@ import (
 
 const commonPorts = "https://raw.githubusercontent.com/pushfs/sif-runtime/main/ports/top-ports.txt"
 
-func Ports(scope string, url string, timeout time.Duration, logdir string) {
+func Ports(scope string, url string, timeout time.Duration, threads int, logdir string) {
 	fmt.Println(separator.Render("🚪 Starting " + statusstyle.Render("port scanning") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
@@ -63,21 +63,27 @@ func Ports(scope string, url string, timeout time.Duration, logdir string) {
 
 	var openPorts []string
 	var wg sync.WaitGroup
-	wg.Add(len(ports))
-	for _, port := range ports {
-		go func(port int) {
+	wg.Add(threads)
+	for thread := 0; thread < threads; thread++ {
+		go func(thread int) {
 			defer wg.Done()
 
-			log.Debugf("Looking up: %d", port)
-			tcp, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", sanitizedURL, port), timeout)
-			if err != nil {
-				log.Debugf("Error %d: %v", port, err)
-			} else {
-				openPorts = append(openPorts, strconv.Itoa(port))
-				portlog.Infof("%s %s:%s", statusstyle.Render("[tcp]"), sanitizedURL, portstyle.Render(strconv.Itoa(port)))
-				tcp.Close()
+			for i, port := range ports {
+				if i%threads != thread {
+					continue
+				}
+
+				log.Debugf("Looking up: %d", port)
+				tcp, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", sanitizedURL, port), timeout)
+				if err != nil {
+					log.Debugf("Error %d: %v", port, err)
+				} else {
+					openPorts = append(openPorts, strconv.Itoa(port))
+					portlog.Infof("%s %s:%s", statusstyle.Render("[tcp]"), sanitizedURL, portstyle.Render(strconv.Itoa(port)))
+					tcp.Close()
+				}
 			}
-		}(port)
+		}(thread)
 	}
 	wg.Wait()
 

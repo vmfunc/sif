@@ -20,7 +20,7 @@ const (
 	dorkFile = "dork.txt"
 )
 
-func Dork(url string, timeout time.Duration, logdir string) {
+func Dork(url string, timeout time.Duration, threads int, logdir string) {
 
 	fmt.Println(separator.Render("🤓 Starting " + statusstyle.Render("URL Dorking") + "..."))
 
@@ -57,24 +57,31 @@ func Dork(url string, timeout time.Duration, logdir string) {
 
 	// util.InitProgressBar()
 	var wg sync.WaitGroup
-	wg.Add(len(dorks))
-	for _, dork := range dorks {
-		go func(dork string) {
+	wg.Add(threads)
+	for thread := 0; thread < threads; thread++ {
+		go func(thread int) {
 			defer wg.Done()
-			results, _ := googlesearch.Search(nil, fmt.Sprintf("%s %s", dork, sanitizedURL))
-			if len(results) > 0 {
-				dorklog.Infof("%s dork results found for dork [%s]", statusstyle.Render(strconv.Itoa(len(results))), directorystyle.Render(dork))
-				if logdir != "" {
-					f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-					if err != nil {
-						log.Errorf("Error creating log file: %s", err)
-						return
+
+			for i, dork := range dorks {
+				if i%threads != thread {
+					continue
+				}
+
+				results, _ := googlesearch.Search(nil, fmt.Sprintf("%s %s", dork, sanitizedURL))
+				if len(results) > 0 {
+					dorklog.Infof("%s dork results found for dork [%s]", statusstyle.Render(strconv.Itoa(len(results))), directorystyle.Render(dork))
+					if logdir != "" {
+						f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+						if err != nil {
+							log.Errorf("Error creating log file: %s", err)
+							return
+						}
+						defer f.Close()
+						f.WriteString(fmt.Sprintf("%s dork results found for dork [%s]\n", strconv.Itoa(len(results)), dork))
 					}
-					defer f.Close()
-					f.WriteString(fmt.Sprintf("%s dork results found for dork [%s]\n", strconv.Itoa(len(results)), dork))
 				}
 			}
-		}(dork)
+		}(thread)
 	}
 	wg.Wait()
 }

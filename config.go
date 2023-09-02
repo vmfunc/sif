@@ -19,6 +19,7 @@ type Settings struct {
 	Ports   string
 	Dorking bool
 	Git     bool
+	Threads int
 	Timeout time.Duration
 }
 
@@ -35,6 +36,7 @@ func parseURLs() Settings {
 	var dorking = pflag.Bool("dork", false, "Enable Google dorking")
 	var noscan = pflag.Bool("noscan", false, "Do not perform base URL (robots.txt, etc) scanning")
 	var git = pflag.Bool("git", false, "Enable git repository scanning")
+	var threads = pflag.Int("threads", 10, "Number of threads to run scans on")
 	pflag.Parse()
 
 	if len(*url) > 0 {
@@ -48,6 +50,7 @@ func parseURLs() Settings {
 			Dorking: *dorking,
 			Ports:   *ports,
 			LogDir:  *logdir,
+			Threads: *threads,
 			Git:     *git,
 		}
 	} else if *file != "" {
@@ -79,6 +82,7 @@ func parseURLs() Settings {
 			Ports:   *ports,
 			URLs:    urls,
 			LogDir:  *logdir,
+			Threads: *threads,
 			Git:     *git,
 		}
 	}

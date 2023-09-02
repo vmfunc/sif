@@ -81,27 +81,27 @@ func main() {
 		}
 
 		if !settings.NoScan {
-			cmd.Scan(url, settings.Timeout, settings.LogDir)
+			cmd.Scan(url, settings.Timeout, settings.Threads, settings.LogDir)
 		}
 
 		if settings.Dirlist != "none" {
-			cmd.Dirlist(settings.Dirlist, url, settings.Timeout, settings.LogDir)
+			cmd.Dirlist(settings.Dirlist, url, settings.Timeout, settings.Threads, settings.LogDir)
 		}
 
 		if settings.Dnslist != "none" {
-			cmd.Dnslist(settings.Dnslist, url, settings.Timeout, settings.LogDir)
+			cmd.Dnslist(settings.Dnslist, url, settings.Timeout, settings.Threads, settings.LogDir)
 		}
 
 		if settings.Ports != "none" {
-			cmd.Ports(settings.Ports, url, settings.Timeout, settings.LogDir)
+			cmd.Ports(settings.Ports, url, settings.Timeout, settings.Threads, settings.LogDir)
 		}
 
 		if settings.Dorking {
-			cmd.Dork(url, settings.Timeout, settings.LogDir)
+			cmd.Dork(url, settings.Timeout, settings.Threads, settings.LogDir)
 		}
 
 		if settings.Git {
-			cmd.Git(url, settings.Timeout, settings.LogDir)
+			cmd.Git(url, settings.Timeout, settings.Threads, settings.LogDir)
 		}
 
 		// TODO: WHOIS
