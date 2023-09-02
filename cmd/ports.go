@@ -60,21 +60,22 @@ func Ports(scope string, url string, timeout time.Duration, logdir string) {
 		return
 	}
 
+	var openPorts []string
 	for _, port := range ports {
 		log.Debugf("Looking up: %d", port)
 		tcp, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", sanitizedURL, port), timeout)
 		if err != nil {
 			log.Debugf("Error %d: %v", port, err)
 		} else {
+			openPorts = append(openPorts, strconv.Itoa(port))
 			portlog.Infof("%s %s:%s", statusstyle.Render("[tcp]"), sanitizedURL, portstyle.Render(strconv.Itoa(port)))
 			tcp.Close()
 		}
-		udp, err := net.DialTimeout("udp", fmt.Sprintf("%s:%d", sanitizedURL, port), timeout)
-		if err != nil {
-			log.Debugf("Error %d: %v", port, err)
-		} else {
-			portlog.Infof("%s %s:%s", statusstyle.Render("[udp]"), sanitizedURL, portstyle.Render(strconv.Itoa(port)))
-			defer udp.Close()
-		}
+	}
+
+	if len(openPorts) > 0 {
+		portlog.Infof("Found %d open ports: %s", len(openPorts), strings.Join(openPorts, ", "))
+	} else {
+		portlog.Error("Found no open ports")
 	}
 }
