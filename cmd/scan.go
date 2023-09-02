@@ -17,6 +17,18 @@ func Scan(url string, timeout time.Duration, logdir string) {
 
 	fmt.Println(separator.Render("🐾 Starting " + statusstyle.Render("base url scanning") + "..."))
 
+	sanitizedURL := strings.Split(url, "://")[1]
+
+	if logdir != "" {
+		f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			log.Errorf("Error creating log file: %s", err)
+			return
+		}
+		defer f.Close()
+		f.WriteString(fmt.Sprintf("\n\n--------------\nStarting URL scanning\n--------------\n"))
+	}
+
 	logger := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "Scan 👁️‍🗨️",
 	})
@@ -42,7 +54,7 @@ func Scan(url string, timeout time.Duration, logdir string) {
 
 		for _, robot := range robotsData {
 
-			if robot == "" || strings.HasPrefix(robot, "#") || strings.HasPrefix(robot, "Allow: ") || strings.HasPrefix(robot, "User-agent: ") || strings.HasPrefix(robot, "Sitemap: ") {
+			if robot == "" || strings.HasPrefix(robot, "#") || strings.HasPrefix(robot, "Disallow: ") || strings.HasPrefix(robot, "User-agent: ") || strings.HasPrefix(robot, "Sitemap: ") {
 				continue
 			}
 
@@ -55,6 +67,15 @@ func Scan(url string, timeout time.Duration, logdir string) {
 
 			if resp.StatusCode != 404 {
 				scanlog.Infof("%s from robots: [%s]", statusstyle.Render(strconv.Itoa(resp.StatusCode)), directorystyle.Render(sanitizedRobot))
+				if logdir != "" {
+					f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+					if err != nil {
+						log.Errorf("Error creating log file: %s", err)
+						return
+					}
+					defer f.Close()
+					f.WriteString(fmt.Sprintf("%s from robots: [%s]\n", strconv.Itoa(resp.StatusCode), sanitizedRobot))
+				}
 			}
 		}
 	}
