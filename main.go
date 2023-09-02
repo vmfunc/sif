@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
@@ -43,20 +45,45 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	}
 
+	if settings.LogDir != "" {
+		if _, err := os.Stat(settings.LogDir); os.IsNotExist(err) {
+			os.Mkdir(settings.LogDir, 0755)
+		}
+	}
+
 	for _, url := range settings.URLs {
 
 		log.Infof("📡Starting scan on %s...", url)
 
+		if settings.LogDir != "" {
+			sanitizedURL := strings.Split(url, "://")[1]
+			if _, err := os.Stat(settings.LogDir + "/" + sanitizedURL + ".log"); os.IsNotExist(err) {
+				f, err := os.OpenFile(settings.LogDir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+				if err != nil {
+					log.Errorf("Error creating log file: %s", err)
+					return
+				}
+				defer f.Close()
+			}
+			f, err := os.OpenFile(settings.LogDir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+			if err != nil {
+				log.Errorf("Error creating log file: %s", err)
+				return
+			}
+			defer f.Close()
+			f.WriteString(fmt.Sprintf("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/    \n\nsif log file for %s\nhttps://sif.sh\n\n", url))
+		}
+
 		if !settings.NoScan {
-			cmd.Scan(url, settings.Timeout)
+			cmd.Scan(url, settings.Timeout, settings.LogDir)
 		}
 
 		if settings.Dirlist != "none" {
-			cmd.Dirlist(settings.Dirlist, url, settings.Timeout)
+			cmd.Dirlist(settings.Dirlist, url, settings.Timeout, settings.LogDir)
 		}
 
 		if settings.Dnslist != "none" {
-			cmd.Dnslist(settings.Dnslist, url, settings.Timeout)
+			cmd.Dnslist(settings.Dnslist, url, settings.Timeout, settings.LogDir)
 		}
 
 		// TODO: WHOIS

@@ -14,6 +14,7 @@ type Settings struct {
 	Dirlist string
 	Dnslist string
 	Debug   bool
+	LogDir  string
 	NoScan  bool
 	Timeout time.Duration
 }
@@ -22,6 +23,8 @@ func parseURLs() Settings {
 	var debug = pflag.BoolP("debug", "d", false, "Enable debug logging")
 
 	var timeout = pflag.DurationP("timeout", "t", 10*time.Second, "General http timeout value - Default is 10 seconds")
+
+	var logdir = pflag.StringP("logs", "l", "", "Directory to store logs")
 
 	var url = pflag.StringArrayP("url", "u", []string{}, "URL to check")
 	var file = pflag.StringP("file", "f", "", "File that includes URLs to check")
@@ -38,6 +41,7 @@ func parseURLs() Settings {
 			Dnslist: *dnslist,
 			NoScan:  *noscan,
 			URLs:    *url,
+			LogDir:  *logdir,
 		}
 	} else if *file != "" {
 		if _, err := os.Stat(*file); err != nil {
@@ -65,6 +69,7 @@ func parseURLs() Settings {
 			Dnslist: *dnslist,
 			NoScan:  *noscan,
 			URLs:    urls,
+			LogDir:  *logdir,
 		}
 	}
 

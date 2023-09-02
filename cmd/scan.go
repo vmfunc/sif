@@ -13,7 +13,7 @@ import (
 	// "github.com/pushfs/sif/util"
 )
 
-func Scan(url string, timeout time.Duration) {
+func Scan(url string, timeout time.Duration, logdir string) {
 
 	fmt.Println(separator.Render("🐾 Starting " + statusstyle.Render("base url scanning") + "..."))
 
