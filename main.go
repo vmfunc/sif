@@ -90,6 +90,10 @@ func main() {
 			cmd.Dnslist(settings.Dnslist, url, settings.Timeout, settings.LogDir)
 		}
 
+		if settings.Ports != "none" {
+			cmd.Ports(settings.Ports, url, settings.Timeout, settings.LogDir)
+		}
+
 		// TODO: WHOIS
 
 		fmt.Println()

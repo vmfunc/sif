@@ -17,3 +17,7 @@ var directorystyle = lipgloss.NewStyle().
 var dnsstyle = lipgloss.NewStyle().
 	Bold(true).
 	Underline(true)
+
+var portstyle = lipgloss.NewStyle().
+	Bold(true).
+	Underline(true)
