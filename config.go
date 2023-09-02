@@ -17,6 +17,7 @@ type Settings struct {
 	LogDir  string
 	NoScan  bool
 	Ports   string
+	Dorking bool
 	Timeout time.Duration
 }
 
@@ -30,6 +31,7 @@ func parseURLs() Settings {
 	var dnslist = pflag.String("dnslist", "none", "DNS fuzzing scan size (small, medium, large)")
 	var ports = pflag.StringP("ports", "p", "none", "Scan common ports")
 	pflag.Lookup("ports").NoOptDefVal = "common"
+	var dorking = pflag.Bool("dork", false, "Enable Google dorking")
 	var noscan = pflag.Bool("noscan", false, "Do not perform base URL (robots.txt, etc) scanning")
 	pflag.Parse()
 
@@ -41,6 +43,7 @@ func parseURLs() Settings {
 			Dnslist: *dnslist,
 			NoScan:  *noscan,
 			URLs:    *url,
+			Dorking: *dorking,
 			Ports:   *ports,
 			LogDir:  *logdir,
 		}
@@ -69,6 +72,7 @@ func parseURLs() Settings {
 			Dirlist: *dirlist,
 			Dnslist: *dnslist,
 			NoScan:  *noscan,
+			Dorking: *dorking,
 			Ports:   *ports,
 			URLs:    urls,
 			LogDir:  *logdir,

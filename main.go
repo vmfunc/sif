@@ -69,12 +69,14 @@ func main() {
 				}
 				defer f.Close()
 			}
+
 			f, err := os.OpenFile(settings.LogDir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 			if err != nil {
 				log.Errorf("Error creating log file: %s", err)
 				return
 			}
 			defer f.Close()
+
 			f.WriteString(fmt.Sprintf("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/    \n\nsif log file for %s\nhttps://sif.sh\n\n", url))
 		}
 
@@ -92,6 +94,10 @@ func main() {
 
 		if settings.Ports != "none" {
 			cmd.Ports(settings.Ports, url, settings.Timeout, settings.LogDir)
+		}
+
+		if settings.Dorking {
+			cmd.Dork(url, settings.Timeout, settings.LogDir)
 		}
 
 		// TODO: WHOIS
