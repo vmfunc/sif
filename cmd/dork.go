@@ -21,7 +21,7 @@ const (
 
 func Dork(url string, timeout time.Duration, logdir string) {
 
-	fmt.Println(separator.Render("📂 Starting " + statusstyle.Render("URL Dorking") + "..."))
+	fmt.Println(separator.Render("🤓 Starting " + statusstyle.Render("URL Dorking") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 

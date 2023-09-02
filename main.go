@@ -100,6 +100,10 @@ func main() {
 			cmd.Dork(url, settings.Timeout, settings.LogDir)
 		}
 
+		if settings.Git {
+			cmd.Git(url, settings.Timeout, settings.LogDir)
+		}
+
 		// TODO: WHOIS
 
 		fmt.Println()

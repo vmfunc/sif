@@ -54,7 +54,7 @@ func Scan(url string, timeout time.Duration, logdir string) {
 
 		for _, robot := range robotsData {
 
-			if robot == "" || strings.HasPrefix(robot, "#") || strings.HasPrefix(robot, "Disallow: ") || strings.HasPrefix(robot, "User-agent: ") || strings.HasPrefix(robot, "Sitemap: ") {
+			if robot == "" || strings.HasPrefix(robot, "#") || strings.HasPrefix(robot, "User-agent: ") || strings.HasPrefix(robot, "Sitemap: ") {
 				continue
 			}
 
