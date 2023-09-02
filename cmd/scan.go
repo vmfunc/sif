@@ -68,6 +68,7 @@ func Scan(url string, timeout time.Duration, logdir string) {
 				resp, err := client.Get(url + "/" + sanitizedRobot)
 				if err != nil {
 					log.Debugf("Error %s: %s", sanitizedRobot, err)
+					return
 				}
 
 				if resp.StatusCode != 404 {
