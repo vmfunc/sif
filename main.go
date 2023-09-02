@@ -52,6 +52,10 @@ func main() {
 	}
 
 	for _, url := range settings.URLs {
+		if !strings.Contains(url, "://") {
+			log.Warnf("URL %s must contain leading protocol. Skipping...", url)
+			continue
+		}
 
 		log.Infof("📡Starting scan on %s...", url)
 
