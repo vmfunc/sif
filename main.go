@@ -51,6 +51,9 @@ func main() {
 		}
 	}
 
+	// initialize array to store all the log file names
+	logFiles := make([]string, 0)
+
 	for _, url := range settings.URLs {
 		if !strings.Contains(url, "://") {
 			log.Warnf("URL %s must contain leading protocol. Skipping...", url)
@@ -78,6 +81,7 @@ func main() {
 			defer f.Close()
 
 			f.WriteString(fmt.Sprintf("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/    \n\nsif log file for %s\nhttps://sif.sh\n\n", url))
+			logFiles = append(logFiles, settings.LogDir+"/"+sanitizedURL+".log")
 		}
 
 		if !settings.NoScan {
@@ -107,6 +111,11 @@ func main() {
 		// TODO: WHOIS
 
 		fmt.Println()
-		fmt.Println(style.Render("🐾 All scans completed!\n\n📂 Outputs saved to files:"))
+	}
+
+	if settings.LogDir != "" {
+		fmt.Println(style.Render(fmt.Sprintf("🌿 All scans completed!\n📂 Output saved to files: %s\n", strings.Join(logFiles, ", "))))
+	} else {
+		fmt.Println(style.Render(fmt.Sprintf("🌿 All scans completed!\n")))
 	}
 }
