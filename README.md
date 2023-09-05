@@ -1,23 +1,25 @@
+```
+       _____________
+__________(_)__  __/
+__  ___/_  /__  /_  
+_(__  )_  / _  __/  
+/____/ /_/  /_/     
+```
+*a blazing-fast pentesting (recon/exploitation) suite written in Go 🐾*
 
-<div align="center">
+## Features
+- 📂 Directory/file fuzzing/scanning
+- 📡 DNS subdomain enumeration
+- 🐾 Common Web scanning
+- 🖥️ Port/service scanning
+- 🦠 Vulnerability scanning
+  - Support for pre-existing nuclei templates
+  - Metasploit emulation for execution
+- 🔎 Automated Google dorking
+- 💘 Shodan integration
 
-<img src="assets/banner.png">
+## Contributing and support
 
-</div>
+Please join [#sif:irc.libera.chat](https://web.libera.chat/gamja/?channels=#sif) to discuss sif development and to ask questions. Feel free to open an issue on GitHub requesting an addition to sif or asking for help with an issue.
 
-
-## Contributing / Support
-
-Contributions are always welcome!
-
-See `contributing.md` for ways to get started.
-
-You can join us on different platforms
-
-- IRC: [#sif: libera.chat](https://web.libera.chat/gamja/?channels=#sif)
-
-## Authors
-
-- [@pushfs](https://www.github.com/pushfs)
-- [@solfisher](https://www.github.com/solfisher)
-
+Contributions are welcome! Make sure to read `CONTRIBUTING.md` before submitting a pull request.
