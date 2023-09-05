@@ -37,13 +37,16 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 
 	client := &http.Client{
 		Timeout: timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	resp, err := client.Get(url + "/robots.txt")
 	if err != nil {
 		log.Debugf("Error: %s", err)
 	}
-	if resp.StatusCode != 404 {
+	if resp.StatusCode != 404 && resp.StatusCode != 301 && resp.StatusCode != 302 && resp.StatusCode != 307 {
 		scanlog.Infof("file [%s] found", statusstyle.Render("robots.txt"))
 
 		var robotsData []string
