@@ -68,7 +68,7 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 						continue
 					}
 
-					sanitizedRobot := strings.Split(robot, ": ")[1]
+					_, sanitizedRobot, _ := strings.Cut(robot, ": ")
 					log.Debugf("%s", robot)
 					resp, err := client.Get(url + "/" + sanitizedRobot)
 					if err != nil {
