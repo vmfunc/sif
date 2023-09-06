@@ -46,6 +46,7 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 	if err != nil {
 		log.Debugf("Error: %s", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 404 && resp.StatusCode != 301 && resp.StatusCode != 302 && resp.StatusCode != 307 {
 		scanlog.Infof("file [%s] found", statusstyle.Render("robots.txt"))
 

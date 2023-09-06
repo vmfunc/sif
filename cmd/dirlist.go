@@ -63,6 +63,7 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 		log.Errorf("Error downloading directory list: %s", err)
 		return
 	}
+	defer resp.Body.Close()
 	var directories []string
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)

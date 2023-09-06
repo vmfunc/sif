@@ -44,6 +44,7 @@ func Ports(scope string, url string, timeout time.Duration, threads int, logdir 
 			log.Errorf("Error downloading ports list: %s", err)
 			return
 		}
+		defer resp.Body.Close()
 		scanner := bufio.NewScanner(resp.Body)
 		scanner.Split(bufio.ScanLines)
 		for scanner.Scan() {

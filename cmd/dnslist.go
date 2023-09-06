@@ -51,6 +51,7 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 		log.Errorf("Error downloading DNS list: %s", err)
 		return
 	}
+	defer resp.Body.Close()
 	var dns []string
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)

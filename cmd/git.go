@@ -47,6 +47,7 @@ func Git(url string, timeout time.Duration, threads int, logdir string) {
 		log.Errorf("Error downloading git list: %s", err)
 		return
 	}
+	defer resp.Body.Close()
 	var gitUrls []string
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)

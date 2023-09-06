@@ -48,6 +48,7 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) {
 		log.Errorf("Error downloading dork list: %s", err)
 		return
 	}
+	defer resp.Body.Close()
 	var dorks []string
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
