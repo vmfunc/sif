@@ -108,6 +108,10 @@ func main() {
 			cmd.Git(url, settings.Timeout, settings.Threads, settings.LogDir)
 		}
 
+		if settings.Nuclei {
+			cmd.Nuclei(url, settings.Threads, settings.LogDir)
+		}
+
 		// TODO: WHOIS
 
 		fmt.Println()

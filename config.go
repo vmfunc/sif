@@ -20,6 +20,7 @@ type Settings struct {
 	Dorking bool
 	Git     bool
 	Threads int
+	Nuclei  bool
 	Timeout time.Duration
 }
 
@@ -37,6 +38,7 @@ func parseURLs() Settings {
 	var noscan = pflag.Bool("noscan", false, "Do not perform base URL (robots.txt, etc) scanning")
 	var git = pflag.Bool("git", false, "Enable git repository scanning")
 	var threads = pflag.Int("threads", 10, "Number of threads to run scans on")
+	var nuclei = pflag.Bool("nuclei", false, "Scan for vulnerabilities using nuclei templates")
 	pflag.Parse()
 
 	if len(*url) > 0 {
@@ -52,6 +54,7 @@ func parseURLs() Settings {
 			LogDir:  *logdir,
 			Threads: *threads,
 			Git:     *git,
+			Nuclei:  *nuclei,
 		}
 	} else if *file != "" {
 		if _, err := os.Stat(*file); err != nil {
@@ -84,6 +87,7 @@ func parseURLs() Settings {
 			LogDir:  *logdir,
 			Threads: *threads,
 			Git:     *git,
+			Nuclei:  *nuclei,
 		}
 	}
 
