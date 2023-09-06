@@ -21,5 +21,7 @@
 go.work
 
 # logs for testing
-
 logs
+
+# nix build output
+result
