@@ -57,9 +57,6 @@ func Ports(scope string, url string, timeout time.Duration, threads int, logdir 
 		for i := range ports {
 			ports[i] = i
 		}
-	default:
-		log.Errorf("Invalid ports scope %s. Please choose either common or full", portstyle.Render(scope))
-		return
 	}
 
 	var openPorts []string

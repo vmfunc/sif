@@ -39,9 +39,6 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 		list = dnsURL + dnsMediumFile
 	case "large":
 		list = dnsURL + dnsBigFile
-	default:
-		log.Errorf("Invalid dnslist size %s. Please choose from small, medium, or large", portstyle.Render(size))
-		return
 	}
 
 	dnslog.Infof("Starting %s DNS listing", size)

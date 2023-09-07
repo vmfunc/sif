@@ -51,9 +51,6 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 		list = directoryURL + mediumFile
 	case "large":
 		list = directoryURL + bigFile
-	default:
-		log.Errorf("Invalid dirlist size %s. Please choose from small, medium, or large", portstyle.Render(size))
-		return
 	}
 
 	dirlog.Infof("Starting %s directory listing", size)
