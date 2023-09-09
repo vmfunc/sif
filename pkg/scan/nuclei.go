@@ -1,214 +1,110 @@
 package scan
 
 import (
-	"bufio"
+	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/config"
+	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/disk"
+	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/loader"
+	"github.com/projectdiscovery/nuclei/v2/pkg/core"
+	"github.com/projectdiscovery/nuclei/v2/pkg/core/inputs"
+	"github.com/projectdiscovery/nuclei/v2/pkg/output"
+	"github.com/projectdiscovery/nuclei/v2/pkg/parsers"
+	"github.com/projectdiscovery/nuclei/v2/pkg/protocols"
+	"github.com/projectdiscovery/nuclei/v2/pkg/protocols/common/contextargs"
+	"github.com/projectdiscovery/nuclei/v2/pkg/protocols/common/hosterrorscache"
+	"github.com/projectdiscovery/nuclei/v2/pkg/protocols/common/interactsh"
+	"github.com/projectdiscovery/nuclei/v2/pkg/protocols/common/protocolinit"
+	"github.com/projectdiscovery/nuclei/v2/pkg/protocols/common/protocolstate"
+	"github.com/projectdiscovery/nuclei/v2/pkg/reporting"
+	"github.com/projectdiscovery/nuclei/v2/pkg/testutils"
+	"github.com/projectdiscovery/nuclei/v2/pkg/types"
+	"github.com/projectdiscovery/ratelimit"
+	"github.com/pushfs/sif/internal/nuclei/format"
+	"github.com/pushfs/sif/internal/nuclei/templates"
 	"github.com/pushfs/sif/internal/styles"
-	"github.com/pushfs/sif/pkg/logger"
-	"gopkg.in/yaml.v3"
 )
 
-const (
-	nucleiURL  = "https://raw.githubusercontent.com/projectdiscovery/nuclei-templates/v9.6.2/"
-	nucleiFile = "templates-checksum.txt"
-)
-
-// only process attributes that can be used, with little to no metadata.
-// there is no need to run any enum matching, because we trust nuclei-templates to have the proper
-// value types, and we take the templates straight from their repository.
-type Template struct {
-	ID   string
-	Info struct {
-		Severity string
-	}
-	HTTP []struct {
-		Path                          []string
-		Raw                           []string
-		Attack                        string
-		Method                        string
-		Body                          string
-		Payloads                      map[string]interface{}
-		Headers                       map[string]string
-		RaceCount                     int
-		MaxRedirects                  int
-		PipelineCurrentConnections    int
-		PipelineRequestsPerConnection int
-		Threads                       int
-		MaxSize                       int
-		Fuzzing                       []string
-		CookieReuse                   bool
-		ReadAll                       bool
-		Redirects                     bool
-		HostRedirects                 bool
-		Pipeline                      bool
-		Unsafe                        bool
-		Race                          bool
-		ReqCondition                  bool
-		StopAtFirstMatch              bool
-		SkipVariablesCheck            bool
-		IterateAll                    bool
-		DigestUsername                string
-		DigestPassword                string
-		DisablePathAutomerge          bool
-	}
-	DNS []struct {
-		Type              string
-		Retries           int
-		Trace             bool
-		TraceMaxRecursion int
-		Attack            string
-		Payloads          map[string]interface{}
-		Recursion         bool
-		Resolvers         []string
-	}
-	File []struct {
-		Extensions  []string
-		DenyList    []string
-		MaxSize     string
-		Archive     bool
-		MIMEType    bool
-		NoRecursive bool
-	}
-	TCP []struct {
-		Host     []string
-		Attack   string
-		Payloads map[string]interface{}
-		Inputs   []struct {
-			Data string
-			Type string
-			Read int
-		}
-		ReadSize int
-		ReadAll  bool
-	}
-	Headless []struct {
-		Attack   string
-		Payloads map[string]interface{}
-		Steps    []struct {
-			Args   map[string]string
-			Action string
-		}
-		UserAgent        string
-		CustomUserAgent  string
-		StopAtFirstMatch bool
-		Fuzzing          []struct {
-			Type      string
-			Part      string
-			Mode      string
-			Keys      []string
-			KeysRegex []string
-			Values    []string
-			Fuzz      []string
-		}
-		CookieReuse bool
-	}
-	SSL []struct {
-		Address      string
-		MinVersion   string
-		MaxVersion   string
-		CipherSuites []string
-		ScanMode     string
-	}
-	Websocket []struct {
-		Address string
-		Inputs  []struct {
-			Data string
-		}
-		Headers  map[string]string
-		Attack   string
-		Payloads map[string]interface{}
-	}
-	Whois []struct {
-		Query  string
-		Server string
-	}
-	SelfContained    bool
-	StopAtFirstMatch bool
-	Signature        string
-	Variables        map[string]string
-	Constants        map[string]interface{}
-}
-
-func Nuclei(url string, threads int, logdir string) {
+func Nuclei(url string, timeout time.Duration, threads int, logdir string) {
 	fmt.Println(styles.Separator.Render("⚛️ Starting " + styles.Status.Render("nuclei template scanning") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
-	if logdir != "" {
-		if err := logger.WriteHeader(sanitizedURL, logdir, "nuclei port scanning"); err != nil {
-			log.Errorf("Error creating log file: %v", err)
-			return
+	nucleilog := log.NewWithOptions(os.Stderr, log.Options{
+		Prefix: "nuclei ⚛️",
+	}).With("url", url)
+
+	// Apply threads, timeout, log settings
+	options := types.DefaultOptions()
+	options.TemplateThreads = threads
+	options.Timeout = int(timeout.Seconds())
+
+	// Get templates
+	templates.Install(nucleilog)
+	pwd, _ := os.Getwd()
+	config.DefaultConfig.SetTemplatesDir(pwd)
+	catalog := disk.NewCatalog(pwd)
+
+	// Custom output
+	outputWriter := testutils.NewMockOutputWriter()
+	outputWriter.WriteCallback = func(event *output.ResultEvent) {
+		if event.Matched != "" {
+			nucleilog.Infof(format.FormatLine(event))
+
+			// TODO: metasploit
 		}
 	}
 
-	logger := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "nuclei ⚛️",
-	})
-	nucleilog := logger.With("url", url)
+	cache := hosterrorscache.New(30, hosterrorscache.DefaultMaxHostsCount, nil)
+	defer cache.Close()
 
-	// We don't set timeout because it is specified by nuclei templates.
-	// This &http.Client is only used for fetching the templates themselves from GitHub.
-	client := &http.Client{}
+	progressClient := &testutils.MockProgressClient{}
+	reportingClient, _ := reporting.New(&reporting.Options{}, "")
+	defer reportingClient.Close()
 
-	resp, err := client.Get(nucleiURL + nucleiFile)
+	interactOpts := interactsh.DefaultOptions(outputWriter, reportingClient, progressClient)
+	interactClient, err := interactsh.New(interactOpts)
 	if err != nil {
-		log.Errorf("Error downloading nuclei template list: %v", err)
-		return
+		log.Fatalf("Could not create interact client: %s\n", err)
 	}
-	defer resp.Body.Close()
-	var templateFiles []string
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		templateFiles = append(templateFiles, scanner.Text())
+	defer interactClient.Close()
+
+	protocolstate.Init(options)
+	protocolinit.Init(options)
+
+	executorOpts := protocols.ExecutorOptions{
+		Output:       outputWriter,
+		Progress:     progressClient,
+		Catalog:      catalog,
+		Options:      options,
+		IssuesClient: reportingClient,
+		RateLimiter:  ratelimit.New(context.Background(), 150, time.Second),
+		Interactsh:   interactClient,
+		ResumeCfg:    types.NewResumeCfg(),
 	}
+	engine := core.New(options)
+	engine.SetExecuterOptions(executorOpts)
 
-	var wg sync.WaitGroup
-	wg.Add(threads)
-	for thread := 0; thread < threads; thread++ {
-		go func(thread int) {
-			defer wg.Done()
-
-			for i, templateFile := range templateFiles {
-				if i%threads != thread {
-					continue
-				}
-
-				if !strings.Contains(templateFile, ".yaml:") {
-					continue
-				}
-
-				templateFile = strings.Split(templateFile, ":")[0]
-				resp, err := client.Get(nucleiURL + templateFile)
-				if err != nil {
-					nucleilog.Errorf("Error downloading nuclei template: %v", err)
-					continue
-				}
-				defer resp.Body.Close()
-				data, _ := io.ReadAll(resp.Body)
-
-				template := Template{}
-				err = yaml.Unmarshal(data, &template)
-				if err != nil {
-					nucleilog.Errorf("Error reading nuclei template: %v", err)
-					nucleilog.Errorf(string(data))
-					continue
-				}
-
-				if template.Info.Severity == "undefined" || template.Info.Severity == "info" || template.Info.Severity == "unknown" {
-					continue
-				}
-
-				log.Info(template.ID)
-			}
-		}(thread)
+	workflowLoader, err := parsers.NewLoader(&executorOpts)
+	if err != nil {
+		nucleilog.Fatalf("Could not create workflow loader: %s\n", err)
 	}
-	wg.Wait()
+	executorOpts.WorkflowLoader = workflowLoader
+
+	store, err := loader.New(loader.NewConfig(options, catalog, executorOpts))
+	if err != nil {
+		nucleilog.Fatalf("Could not create loader client: %s\n", err)
+	}
+	store.Load()
+
+	inputArgs := []*contextargs.MetaInput{{Input: sanitizedURL}}
+	input := &inputs.SimpleInputProvider{Inputs: inputArgs}
+
+	_ = engine.Execute(store.Templates(), input)
+	engine.WorkPool().Wait()
 }

@@ -31,3 +31,17 @@ var (
 			PaddingLeft(15).
 			Width(60)
 )
+
+var (
+	SeverityLow = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00ff00"))
+
+	SeverityMedium = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#ffff00"))
+
+	SeverityHigh = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#ff8800"))
+
+	SeverityCritical = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#ff0000"))
+)

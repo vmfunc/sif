@@ -105,7 +105,7 @@ func (app *App) Run() error {
 		}
 
 		if app.settings.Nuclei {
-			scan.Nuclei(url, app.settings.Threads, app.settings.LogDir)
+			scan.Nuclei(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 		}
 
 		// TODO: WHOIS

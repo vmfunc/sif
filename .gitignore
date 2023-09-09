@@ -25,3 +25,6 @@ logs
 
 # nix build output
 result
+
+# nuclei templates
+nuclei-templates
