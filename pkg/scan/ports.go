@@ -1,4 +1,4 @@
-package cmd
+package scan
 
 import (
 	"bufio"
@@ -12,22 +12,21 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/pushfs/sif/internal/styles"
+	"github.com/pushfs/sif/pkg/logger"
 )
 
 const commonPorts = "https://raw.githubusercontent.com/pushfs/sif-runtime/main/ports/top-ports.txt"
 
 func Ports(scope string, url string, timeout time.Duration, threads int, logdir string) {
-	fmt.Println(separator.Render("🚪 Starting " + statusstyle.Render("port scanning") + "..."))
+	fmt.Println(styles.Separator.Render("🚪 Starting " + styles.Status.Render("port scanning") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 	if logdir != "" {
-		f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			log.Errorf("Error creating log file: %s", err)
+		if err := logger.WriteHeader(sanitizedURL, logdir, scope+" port scanning"); err != nil {
+			log.Errorf("Error creating log file: %v", err)
 			return
 		}
-		defer f.Close()
-		f.WriteString(fmt.Sprintf("\n\n--------------\nStarting %s port scanning\n--------------\n", scope))
 	}
 
 	portlog := log.NewWithOptions(os.Stderr, log.Options{
@@ -77,7 +76,7 @@ func Ports(scope string, url string, timeout time.Duration, threads int, logdir 
 					log.Debugf("Error %d: %v", port, err)
 				} else {
 					openPorts = append(openPorts, strconv.Itoa(port))
-					portlog.Infof("%s %s:%s", statusstyle.Render("[tcp]"), sanitizedURL, portstyle.Render(strconv.Itoa(port)))
+					portlog.Infof("%s %s:%s", styles.Status.Render("[tcp]"), sanitizedURL, styles.Highlight.Render(strconv.Itoa(port)))
 					tcp.Close()
 				}
 			}

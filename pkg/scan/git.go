@@ -1,4 +1,4 @@
-package cmd
+package scan
 
 import (
 	"bufio"
@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	// "github.com/pushfs/sif/util"
+	"github.com/pushfs/sif/internal/styles"
+	"github.com/pushfs/sif/pkg/logger"
 )
 
 const (
@@ -21,24 +22,20 @@ const (
 
 func Git(url string, timeout time.Duration, threads int, logdir string) {
 
-	fmt.Println(separator.Render("🌿 Starting " + statusstyle.Render("git repository scanning") + "..."))
+	fmt.Println(styles.Separator.Render("🌿 Starting " + styles.Status.Render("git repository scanning") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
-		f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			log.Errorf("Error creating log file: %s", err)
+		if err := logger.WriteHeader(sanitizedURL, logdir, "git directory fuzzing"); err != nil {
+			log.Errorf("Error creating log file: %v", err)
 			return
 		}
-		defer f.Close()
-		f.WriteString("\n\n--------------\nStarting git repository scanning\n--------------\n")
 	}
 
-	logger := log.NewWithOptions(os.Stderr, log.Options{
+	gitlog := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "Git 🌿",
-	})
-	gitlog := logger.With("url", url)
+	}).With("url", url)
 
 	gitlog.Infof("Starting repository scanning")
 
@@ -79,15 +76,9 @@ func Git(url string, timeout time.Duration, threads int, logdir string) {
 
 				if resp.StatusCode != 404 {
 					// log url, directory, and status code
-					gitlog.Infof("%s git found at [%s]", statusstyle.Render(strconv.Itoa(resp.StatusCode)), directorystyle.Render(repourl))
+					gitlog.Infof("%s git found at [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(repourl))
 					if logdir != "" {
-						f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-						if err != nil {
-							log.Errorf("Error creating log file: %s", err)
-							return
-						}
-						defer f.Close()
-						f.WriteString(fmt.Sprintf("%s git found at [%s]\n", strconv.Itoa(resp.StatusCode), repourl))
+						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s git found at [%s]\n", strconv.Itoa(resp.StatusCode), repourl))
 					}
 				}
 			}

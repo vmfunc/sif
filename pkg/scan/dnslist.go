@@ -1,4 +1,4 @@
-package cmd
+package scan
 
 import (
 	"bufio"
@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	// "github.com/pushfs/sif/util"
+	"github.com/pushfs/sif/internal/styles"
+	"github.com/pushfs/sif/pkg/logger"
 )
 
 const (
@@ -22,13 +23,11 @@ const (
 
 func Dnslist(size string, url string, timeout time.Duration, threads int, logdir string) {
 
-	fmt.Println(separator.Render("📡 Starting " + statusstyle.Render("DNS fuzzing") + "..."))
+	fmt.Println(styles.Separator.Render("📡 Starting " + styles.Status.Render("DNS fuzzing") + "..."))
 
-	logger := log.NewWithOptions(os.Stderr, log.Options{
+	dnslog := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "Dnslist 📡",
-	})
-
-	dnslog := logger.With("url", url)
+	}).With("url", url)
 
 	var list string
 
@@ -56,18 +55,13 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 		dns = append(dns, scanner.Text())
 	}
 
-	// util.InitProgressBar()
-
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
-		f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			log.Errorf("Error creating log file: %s", err)
+		if err := logger.WriteHeader(sanitizedURL, logdir, size+" subdomain fuzzing"); err != nil {
+			log.Errorf("Error creating log file: %v", err)
 			return
 		}
-		defer f.Close()
-		f.WriteString(fmt.Sprintf("\n\n--------------\nStarting %s DNS listing\n--------------\n", size))
 	}
 
 	client := &http.Client{
@@ -90,7 +84,7 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 				if err != nil {
 					log.Debugf("Error %s: %s", domain, err)
 				} else {
-					dnslog.Infof("%s %s.%s", statusstyle.Render("[http]"), dnsstyle.Render(domain), sanitizedURL)
+					dnslog.Infof("%s %s.%s", styles.Status.Render("[http]"), styles.Highlight.Render(domain), sanitizedURL)
 
 					if logdir != "" {
 						f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -107,15 +101,9 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 				if err != nil {
 					log.Debugf("Error %s: %s", domain, err)
 				} else {
-					dnslog.Infof("%s %s.%s", statusstyle.Render("[https]"), dnsstyle.Render(domain), sanitizedURL)
+					dnslog.Infof("%s %s.%s", styles.Status.Render("[https]"), styles.Highlight.Render(domain), sanitizedURL)
 					if logdir != "" {
-						f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-						if err != nil {
-							log.Errorf("Error creating log file: %s", err)
-							return
-						}
-						defer f.Close()
-						f.WriteString(fmt.Sprintf("[https] %s.%s\n", domain, sanitizedURL))
+						logger.Write(sanitizedURL, logdir, fmt.Sprintf("[https] %s.%s\n", domain, sanitizedURL))
 					}
 				}
 			}

@@ -1,4 +1,4 @@
-package cmd
+package scan
 
 import (
 	"bufio"
@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	"github.com/charmbracelet/log"
+	"github.com/pushfs/sif/internal/styles"
+	"github.com/pushfs/sif/pkg/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -135,18 +137,15 @@ type Template struct {
 }
 
 func Nuclei(url string, threads int, logdir string) {
-	fmt.Println(separator.Render("⚛️ Starting " + statusstyle.Render("nuclei template scanning") + "..."))
+	fmt.Println(styles.Separator.Render("⚛️ Starting " + styles.Status.Render("nuclei template scanning") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
-		f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			log.Errorf("Error creating log file: %s", err)
+		if err := logger.WriteHeader(sanitizedURL, logdir, "nuclei port scanning"); err != nil {
+			log.Errorf("Error creating log file: %v", err)
 			return
 		}
-		defer f.Close()
-		f.WriteString(fmt.Sprintf("\n\n--------------\nStarting nuclei template scanning...\n--------------\n"))
 	}
 
 	logger := log.NewWithOptions(os.Stderr, log.Options{

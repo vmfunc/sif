@@ -1,8 +1,6 @@
-package main
+package config
 
 import (
-	"bufio"
-	"os"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -10,7 +8,6 @@ import (
 )
 
 type Settings struct {
-	URLs    []string
 	Dirlist string
 	Dnslist string
 	Debug   bool
@@ -22,6 +19,8 @@ type Settings struct {
 	Threads int
 	Nuclei  bool
 	Timeout time.Duration
+	URLs    goflags.StringSlice
+	File    string
 }
 
 const (
@@ -37,17 +36,15 @@ const (
 	Full
 )
 
-func parseURLs() Settings {
+func Parse() *Settings {
 	settings := &Settings{}
 
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription("a blazing-fast pentesting (recon/exploitation) suite")
 
-	var urls goflags.StringSlice
-	var file string
 	flagSet.CreateGroup("target", "Targets",
-		flagSet.StringSliceVarP(&urls, "urls", "u", nil, "List of URLs to check (comma-separated)", goflags.FileCommaSeparatedStringSliceOptions),
-		flagSet.StringVarP(&file, "file", "f", "", "File that includes URLs to check"),
+		flagSet.StringSliceVarP(&settings.URLs, "urls", "u", nil, "List of URLs to check (comma-separated)", goflags.FileCommaSeparatedStringSliceOptions),
+		flagSet.StringVarP(&settings.File, "file", "f", "", "File that includes URLs to check"),
 	)
 
 	listSizes := goflags.AllowdTypes{"small": Small, "medium": Medium, "large": Large, "none": Nil}
@@ -73,28 +70,5 @@ func parseURLs() Settings {
 		log.Fatalf("Could not parse flags: %s", err)
 	}
 
-	if len(urls) > 0 {
-		settings.URLs = urls
-	} else if file != "" {
-		if _, err := os.Stat(file); err != nil {
-			log.Fatal(err)
-		}
-		log.Infof("Reading file %s", file)
-
-		data, err := os.Open(file)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer data.Close()
-
-		scanner := bufio.NewScanner(data)
-		scanner.Split(bufio.ScanLines)
-		for scanner.Scan() {
-			settings.URLs = append(settings.URLs, scanner.Text())
-		}
-	} else {
-		log.Fatal("Please specify either a URL or a file containing URLs, as well as options.\nSee -help for more information.")
-	}
-
-	return *settings
+	return settings
 }

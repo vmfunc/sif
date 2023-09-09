@@ -1,4 +1,4 @@
-package cmd
+package scan
 
 import (
 	"bufio"
@@ -11,29 +11,26 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	// "github.com/pushfs/sif/util"
+	"github.com/pushfs/sif/internal/styles"
+	"github.com/pushfs/sif/pkg/logger"
 )
 
 func Scan(url string, timeout time.Duration, threads int, logdir string) {
 
-	fmt.Println(separator.Render("🐾 Starting " + statusstyle.Render("base url scanning") + "..."))
+	fmt.Println(styles.Separator.Render("🐾 Starting " + styles.Status.Render("base url scanning") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
-		f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			log.Errorf("Error creating log file: %s", err)
+		if err := logger.WriteHeader(sanitizedURL, logdir, "URL scanning"); err != nil {
+			log.Errorf("Error creating log file: %v", err)
 			return
 		}
-		defer f.Close()
-		f.WriteString(fmt.Sprintf("\n\n--------------\nStarting URL scanning\n--------------\n"))
 	}
 
-	logger := log.NewWithOptions(os.Stderr, log.Options{
+	scanlog := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "Scan 👁️‍🗨️",
-	})
-	scanlog := logger.With("url", url)
+	}).With("url", url)
 
 	client := &http.Client{
 		Timeout: timeout,
@@ -48,7 +45,7 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 404 && resp.StatusCode != 301 && resp.StatusCode != 302 && resp.StatusCode != 307 {
-		scanlog.Infof("file [%s] found", statusstyle.Render("robots.txt"))
+		scanlog.Infof("file [%s] found", styles.Status.Render("robots.txt"))
 
 		var robotsData []string
 		scanner := bufio.NewScanner(resp.Body)
@@ -81,15 +78,9 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 					}
 
 					if resp.StatusCode != 404 {
-						scanlog.Infof("%s from robots: [%s]", statusstyle.Render(strconv.Itoa(resp.StatusCode)), directorystyle.Render(sanitizedRobot))
+						scanlog.Infof("%s from robots: [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(sanitizedRobot))
 						if logdir != "" {
-							f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-							if err != nil {
-								log.Errorf("Error creating log file: %s", err)
-								return
-							}
-							defer f.Close()
-							f.WriteString(fmt.Sprintf("%s from robots: [%s]\n", strconv.Itoa(resp.StatusCode), sanitizedRobot))
+							logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s from robots: [%s]\n", strconv.Itoa(resp.StatusCode), sanitizedRobot))
 						}
 					}
 				}

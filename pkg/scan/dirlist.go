@@ -1,4 +1,4 @@
-package cmd
+package scan
 
 import (
 	"bufio"
@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	// "github.com/pushfs/sif/util"
+	"github.com/pushfs/sif/internal/styles"
+	"github.com/pushfs/sif/pkg/logger"
 )
 
 const (
@@ -23,24 +24,20 @@ const (
 
 func Dirlist(size string, url string, timeout time.Duration, threads int, logdir string) {
 
-	fmt.Println(separator.Render("📂 Starting " + statusstyle.Render("directory fuzzing") + "..."))
+	fmt.Println(styles.Separator.Render("📂 Starting " + styles.Status.Render("directory fuzzing") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
-		f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			log.Errorf("Error creating log file: %s", err)
+		if err := logger.WriteHeader(sanitizedURL, logdir, size+" directory fuzzing"); err != nil {
+			log.Errorf("Error creating log file: %v", err)
 			return
 		}
-		defer f.Close()
-		f.WriteString(fmt.Sprintf("\n\n--------------\nStarting %s directory fuzzing\n--------------\n", size))
 	}
 
-	logger := log.NewWithOptions(os.Stderr, log.Options{
+	dirlog := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "Dirlist 📂",
-	})
-	dirlog := logger.With("url", url)
+	}).With("url", url)
 
 	var list string
 
@@ -68,7 +65,6 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 		directories = append(directories, scanner.Text())
 	}
 
-	// util.InitProgressBar()
 	client := &http.Client{
 		Timeout: timeout,
 	}
@@ -93,15 +89,9 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 
 				if resp.StatusCode != 404 {
 					// log url, directory, and status code
-					dirlog.Infof("%s [%s]", statusstyle.Render(strconv.Itoa(resp.StatusCode)), directorystyle.Render(directory))
+					dirlog.Infof("%s [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(directory))
 					if logdir != "" {
-						f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-						if err != nil {
-							log.Errorf("Error creating log file: %s", err)
-							return
-						}
-						defer f.Close()
-						f.WriteString(fmt.Sprintf("%s [%s]\n", strconv.Itoa(resp.StatusCode), directory))
+						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s [%s]\n", strconv.Itoa(resp.StatusCode), directory))
 					}
 				}
 			}

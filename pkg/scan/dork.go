@@ -1,4 +1,4 @@
-package cmd
+package scan
 
 import (
 	"bufio"
@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/pushfs/sif/internal/styles"
+	"github.com/pushfs/sif/pkg/logger"
 	googlesearch "github.com/rocketlaunchr/google-search"
-	// "github.com/pushfs/sif/util"
 )
 
 const (
@@ -22,24 +23,20 @@ const (
 
 func Dork(url string, timeout time.Duration, threads int, logdir string) {
 
-	fmt.Println(separator.Render("🤓 Starting " + statusstyle.Render("URL Dorking") + "..."))
+	fmt.Println(styles.Separator.Render("🤓 Starting " + styles.Status.Render("URL Dorking") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
-		f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			log.Errorf("Error creating log file: %s", err)
+		if err := logger.WriteHeader(sanitizedURL, logdir, "URL dorking"); err != nil {
+			log.Errorf("Error creating log file: %v", err)
 			return
 		}
-		defer f.Close()
-		f.WriteString(fmt.Sprintf("\n\n--------------\nStarting URL dorking...\n--------------\n"))
 	}
 
-	logger := log.NewWithOptions(os.Stderr, log.Options{
+	dorklog := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "Dorking 🤓",
-	})
-	dorklog := logger.With("url", url)
+	}).With("url", url)
 
 	dorklog.Infof("Starting URL dorking...")
 
@@ -70,15 +67,9 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) {
 
 				results, _ := googlesearch.Search(nil, fmt.Sprintf("%s %s", dork, sanitizedURL))
 				if len(results) > 0 {
-					dorklog.Infof("%s dork results found for dork [%s]", statusstyle.Render(strconv.Itoa(len(results))), directorystyle.Render(dork))
+					dorklog.Infof("%s dork results found for dork [%s]", styles.Status.Render(strconv.Itoa(len(results))), styles.Highlight.Render(dork))
 					if logdir != "" {
-						f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-						if err != nil {
-							log.Errorf("Error creating log file: %s", err)
-							return
-						}
-						defer f.Close()
-						f.WriteString(fmt.Sprintf("%s dork results found for dork [%s]\n", strconv.Itoa(len(results)), dork))
+						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s dork results found for dork [%s]\n", strconv.Itoa(len(results)), dork))
 					}
 				}
 			}
