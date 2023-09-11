@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/pushfs/sif/internal/styles"
-	"github.com/pushfs/sif/pkg/logger"
+	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/pkg/logger"
 )
 
 func Scan(url string, timeout time.Duration, threads int, logdir string) {

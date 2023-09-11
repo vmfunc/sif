@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
-	"github.com/pushfs/sif/internal/styles"
-	"github.com/pushfs/sif/pkg/config"
-	"github.com/pushfs/sif/pkg/logger"
-	"github.com/pushfs/sif/pkg/scan"
+	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/pkg/config"
+	"github.com/dropalldatabases/sif/pkg/logger"
+	"github.com/dropalldatabases/sif/pkg/scan"
 )
 
 // App is a client instance. It is first initialised using New and then ran

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/projectdiscovery/nuclei/v2/pkg/output"
-	"github.com/pushfs/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/styles"
 )
 
 func FormatLine(event *output.ResultEvent) string {

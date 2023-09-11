@@ -1,4 +1,4 @@
-module github.com/pushfs/sif
+module github.com/dropalldatabases/sif
 
 go 1.20
 

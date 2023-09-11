@@ -25,9 +25,9 @@ import (
 	"github.com/projectdiscovery/nuclei/v2/pkg/testutils"
 	"github.com/projectdiscovery/nuclei/v2/pkg/types"
 	"github.com/projectdiscovery/ratelimit"
-	"github.com/pushfs/sif/internal/nuclei/format"
-	"github.com/pushfs/sif/internal/nuclei/templates"
-	"github.com/pushfs/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/nuclei/format"
+	"github.com/dropalldatabases/sif/internal/nuclei/templates"
+	"github.com/dropalldatabases/sif/internal/styles"
 )
 
 func Nuclei(url string, timeout time.Duration, threads int, logdir string) {

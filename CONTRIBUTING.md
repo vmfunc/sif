@@ -4,12 +4,12 @@ Thank you for taking the time to contribute to sif! All contributions are valued
 If you want to contribute but don't know where to start, worry not; there is no shortage of things to do.  
 Even if you don't know any Go, don't let that stop you from trying to contribute! We're here to help.
 
-*By contributing to this repository, you agree to adhere to the sif [Code of Conduct](https://github.com/pushfs/sif/blob/main/CODE_OF_CONDUCT.md). Not doing so may result in a ban.*
+*By contributing to this repository, you agree to adhere to the sif [Code of Conduct](https://github.com/dropalldatabases/sif/blob/main/CODE_OF_CONDUCT.md). Not doing so may result in a ban.*
 
 ## How can I help?
 
 Here are some ways to get started:
-- Have a look at our [issue tracker](https://github.com/pushfs/sif/issues).
+- Have a look at our [issue tracker](https://github.com/dropalldatabases/sif/issues).
 - If you've encountered a bug, discuss it with us, [report it](#reporting-issues).
 - Once you've found a bug you believe you can fix, open a [pull request](#contributing-code) for it.
 - Alternatively, consider [packaging sif for your distribution](#packaging).

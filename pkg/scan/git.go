@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/pushfs/sif/internal/styles"
-	"github.com/pushfs/sif/pkg/logger"
+	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/pkg/logger"
 )
 
 const (
-	gitURL  = "https://raw.githubusercontent.com/pushfs/sif-runtime/main/git/"
+	gitURL  = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/git/"
 	gitFile = "git.txt"
 )
 

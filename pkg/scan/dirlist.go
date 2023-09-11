@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/pushfs/sif/internal/styles"
-	"github.com/pushfs/sif/pkg/logger"
+	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/pkg/logger"
 )
 
 const (
-	directoryURL = "https://raw.githubusercontent.com/pushfs/sif-runtime/main/dirlist/"
+	directoryURL = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/dirlist/"
 	smallFile    = "directory-list-2.3-small.txt"
 	mediumFile   = "directory-list-2.3-medium.txt"
 	bigFile      = "directory-list-2.3-big.txt"

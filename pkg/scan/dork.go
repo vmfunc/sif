@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/pushfs/sif/internal/styles"
-	"github.com/pushfs/sif/pkg/logger"
+	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/pkg/logger"
 	googlesearch "github.com/rocketlaunchr/google-search"
 )
 
 const (
-	dorkURL  = "https://raw.githubusercontent.com/pushfs/sif-runtime/main/dork/"
+	dorkURL  = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/dork/"
 	dorkFile = "dork.txt"
 )
 
