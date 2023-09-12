@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/nuclei/format"
+	"github.com/dropalldatabases/sif/internal/nuclei/templates"
+	"github.com/dropalldatabases/sif/internal/styles"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/config"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/disk"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/loader"
@@ -25,9 +28,6 @@ import (
 	"github.com/projectdiscovery/nuclei/v2/pkg/testutils"
 	"github.com/projectdiscovery/nuclei/v2/pkg/types"
 	"github.com/projectdiscovery/ratelimit"
-	"github.com/dropalldatabases/sif/internal/nuclei/format"
-	"github.com/dropalldatabases/sif/internal/nuclei/templates"
-	"github.com/dropalldatabases/sif/internal/styles"
 )
 
 func Nuclei(url string, timeout time.Duration, threads int, logdir string) {

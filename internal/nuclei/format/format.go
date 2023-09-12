@@ -3,8 +3,8 @@ package format
 import (
 	"fmt"
 
-	"github.com/projectdiscovery/nuclei/v2/pkg/output"
 	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/projectdiscovery/nuclei/v2/pkg/output"
 )
 
 func FormatLine(event *output.ResultEvent) string {
