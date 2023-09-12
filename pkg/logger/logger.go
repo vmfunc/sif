@@ -16,7 +16,7 @@ func Init(dir string) error {
 	return nil
 }
 
-func CreateFile(logFiles []string, url string, dir string) error {
+func CreateFile(logFiles *[]string, url string, dir string) error {
 	sanitizedURL := strings.Split(url, "://")[1]
 	if _, err := os.Stat(dir + "/" + sanitizedURL + ".log"); os.IsNotExist(err) {
 		f, err := os.OpenFile(dir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -34,7 +34,7 @@ func CreateFile(logFiles []string, url string, dir string) error {
 	defer f.Close()
 
 	f.WriteString(fmt.Sprintf("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/    \n\nsif log file for %s\nhttps://sif.sh\n\n", url))
-	logFiles = append(logFiles, dir+"/"+sanitizedURL+".log")
+	*logFiles = append(*logFiles, dir+"/"+sanitizedURL+".log")
 
 	return nil
 }

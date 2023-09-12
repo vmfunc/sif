@@ -75,7 +75,7 @@ func (app *App) Run() error {
 		log.Infof("📡Starting scan on %s...", url)
 
 		if app.settings.LogDir != "" {
-			if err := logger.CreateFile(app.logFiles, url, app.settings.LogDir); err != nil {
+			if err := logger.CreateFile(&app.logFiles, url, app.settings.LogDir); err != nil {
 				return err
 			}
 		}
