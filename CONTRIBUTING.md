@@ -22,7 +22,7 @@ If you like the project, but don't have time to contribute, that's okay too! Her
 
 ## Reporting issues
 
-If you believe you've found a bug, or you have a new feature to request, please hop on the [IRC channel](https://web.libera.chat/gamja/?channels=#sif) first to discuss it.  
+If you believe you've found a bug, or you have a new feature to request, please hop on the [Discord server](https://discord.gg/dropalldatabases) first to discuss it.  
 This way, if it's an easy fix, we could help you solve it more quickly, and if it's a feature request we could workshop it together into something more mature.
 
 When opening an issue, please use the search tool and make sure that the issue has not been discussed before. In the case of a bug report, run sif with the `-d/-debug` flag for full debug logs.

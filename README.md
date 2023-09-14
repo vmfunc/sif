@@ -16,8 +16,7 @@ _(__  )_  / _  __/
 ![Go version](https://img.shields.io/github/go-mod/go-version/dropalldatabases/sif)
 [![Go Report Card](https://goreportcard.com/badge/github.com/dropalldatabases/sif)](https://goreportcard.com/report/github.com/dropalldatabases/sif)
 [![Version](https://img.shields.io/github/v/tag/dropalldatabases/sif)](https://github.com/dropalldatabases/sif/tags)
-[![GPL-3.0 license](https://img.shields.io/github/license/dropalldatabases/sif)](https://github.com/dropalldatabases/sif/blob/main/LICENSE)
-[![Chat on IRC](https://img.shields.io/badge/chat-%23sif%3Airc.libera.chat-brightgreen)](https://web.libera.chat/gamja/?channels=#sif)
+[![Chat on Discord](https://img.shields.io/discord/1102315948452614165)](https://discord.gg/dropalldatabases)
 </div>
 
 ## Features
@@ -33,6 +32,6 @@ _(__  )_  / _  __/
 
 ## Contributing and support
 
-Please join [#sif:irc.libera.chat](https://web.libera.chat/gamja/?channels=#sif) to discuss sif development and to ask questions. Feel free to open an issue on GitHub requesting an addition to sif or asking for help with an issue.
+Please join [our Discord server](https://discord.gg/dropalldatabases) to discuss sif development and to ask questions. Feel free to open an issue on GitHub requesting an addition to sif or asking for help with an issue.
 
 Contributions are welcome! Make sure to read `CONTRIBUTING.md` before submitting a pull request.
