@@ -12,6 +12,7 @@ import (
 	"github.com/dropalldatabases/sif/pkg/config"
 	"github.com/dropalldatabases/sif/pkg/logger"
 	"github.com/dropalldatabases/sif/pkg/scan"
+	"github.com/dropalldatabases/sif/pkg/utils"
 )
 
 // App is a client instance. It is first initialised using New and then ran
@@ -28,6 +29,11 @@ type App struct {
 // Errors if no targets are supplied through URLs or File.
 func New(settings *config.Settings) (*App, error) {
 	app := &App{settings: settings}
+
+	if !settings.ApiMode {
+		fmt.Println(styles.Box.Render("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/    \n"))
+		fmt.Println(styles.Subheading.Render("\nhttps://sif.sh\nman's best friend\n\ncopyright (c) 2023-2024 lunchcat and contributors.\n\n"))
+	}
 
 	if len(settings.URLs) > 0 {
 		app.targets = settings.URLs
@@ -96,16 +102,8 @@ func (app *App) Run() error {
 			scan.Ports(app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 		}
 
-		if app.settings.Dorking {
-			scan.Dork(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-		}
-
-		if app.settings.Git {
-			scan.Git(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-		}
-
-		if app.settings.Nuclei {
-			scan.Nuclei(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if app.settings.ApiMode {
+			utils.ReturnApiOutput()
 		}
 
 		// TODO: WHOIS
