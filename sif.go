@@ -102,6 +102,10 @@ func (app *App) Run() error {
 			scan.Ports(app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 		}
 
+		if app.settings.Whois {
+			scan.Whois(url, app.settings.LogDir)
+		}
+
 		if app.settings.ApiMode {
 			utils.ReturnApiOutput()
 		}
