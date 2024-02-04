@@ -20,6 +20,9 @@
 # Go workspace file
 go.work
 
+# sif binary
+sif
+
 # logs for testing
 logs
 
