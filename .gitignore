@@ -21,7 +21,7 @@
 go.work
 
 # sif binary
-sif
+/sif
 
 # logs for testing
 logs
