@@ -21,6 +21,7 @@ type Settings struct {
 	Timeout time.Duration
 	URLs    goflags.StringSlice
 	File    string
+	ApiMode bool
 }
 
 const (
@@ -64,6 +65,10 @@ func Parse() *Settings {
 		flagSet.DurationVarP(&settings.Timeout, "timeout", "t", 10*time.Second, "HTTP request timeout"),
 		flagSet.StringVarP(&settings.LogDir, "log", "l", "", "Directory to store logs in"),
 		flagSet.IntVar(&settings.Threads, "threads", 10, "Number of threads to run scans on"),
+	)
+
+	flagSet.CreateGroup("api", "API",
+		flagSet.BoolVar(&settings.ApiMode, "api", false, "Enable API mode. Only useful for internal lunchcat usage"),
 	)
 
 	if err := flagSet.Parse(); err != nil {
