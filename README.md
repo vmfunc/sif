@@ -32,6 +32,6 @@ _(__  )_  / _  __/
 
 ## Contributing and support
 
-Please join [our Discord server](https://discord.gg/dropalldatabases) to discuss sif development and to ask questions. Feel free to open an issue on GitHub requesting an addition to sif or asking for help with an issue.
+Please join [our Discord server](https://discord.gg/S2MQG68m8e) to discuss sif development and to ask questions. Feel free to open an issue on GitHub requesting an addition to sif or asking for help with an issue.
 
 Contributions are welcome! Make sure to read `CONTRIBUTING.md` before submitting a pull request.
