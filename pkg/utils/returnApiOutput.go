@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func returnApiOutput() {
+func ReturnApiOutput() {
 	const data = `{"key": "value"}`
 	fmt.Println(data)
 }
