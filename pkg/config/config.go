@@ -16,6 +16,7 @@ type Settings struct {
 	Ports   string
 	Dorking bool
 	Git     bool
+	Whois   bool
 	Threads int
 	Nuclei  bool
 	Timeout time.Duration
@@ -58,6 +59,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.Git, "git", false, "Enable git repository scanning"),
 		flagSet.BoolVar(&settings.Nuclei, "nuclei", false, "Enable scanning using nuclei templates"),
 		flagSet.BoolVar(&settings.NoScan, "noscan", false, "Do not perform base URL (robots.txt, etc) scanning"),
+		flagSet.BoolVar(&settings.Whois, "whois", false, "Enable WHOIS lookup"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",
