@@ -1,6 +1,3 @@
-# SIF IS UNDER ACTIVE DEVELOPEMENT ⚠️⚠️⚠️
-sif is not yet ready for release. please do not submit any issues until v1 is out. feel free to contact [hytracer](https://hytracer.ink) or [sfr](https://sfr.gay) if you'd like to help out!
-
 <pre align="center">
        _____________
 __________(_)__  __/
