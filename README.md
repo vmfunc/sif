@@ -13,7 +13,7 @@ _(__  )_  / _  __/
 ![Go version](https://img.shields.io/github/go-mod/go-version/dropalldatabases/sif)
 [![Go Report Card](https://goreportcard.com/badge/github.com/dropalldatabases/sif)](https://goreportcard.com/report/github.com/dropalldatabases/sif)
 [![Version](https://img.shields.io/github/v/tag/dropalldatabases/sif)](https://github.com/dropalldatabases/sif/tags)
-[![Chat on Discord](https://img.shields.io/discord/1102315948452614165)](https://discord.gg/dropalldatabases)
+[![Chat on Discord](https://img.shields.io/discord/1202922721969705010)](https://discord.gg/wvnHM6pG)
 </div>
 
 ## Features
