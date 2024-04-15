@@ -106,6 +106,11 @@ func (app *App) Run() error {
 			scan.Whois(url, app.settings.LogDir)
 		}
 
+		// func Git(url string, timeout time.Duration, threads int, logdir string)
+		if app.settings.Git {
+			scan.Git(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		}
+
 		if app.settings.ApiMode {
 			utils.ReturnApiOutput()
 		}
