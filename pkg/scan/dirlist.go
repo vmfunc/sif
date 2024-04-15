@@ -87,7 +87,7 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 					return
 				}
 
-				if resp.StatusCode != 404 {
+				if resp.StatusCode != 404 && resp.StatusCode != 403 {
 					// log url, directory, and status code
 					dirlog.Infof("%s [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(directory))
 					if logdir != "" {
