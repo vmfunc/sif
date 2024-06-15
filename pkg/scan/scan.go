@@ -15,6 +15,24 @@ import (
 	"github.com/dropalldatabases/sif/pkg/logger"
 )
 
+func fetchRobotsTXT(url string, client *http.Client) (*http.Response, error) {
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode == http.StatusMovedPermanently {
+		redirectURL := resp.Header.Get("Location")
+		if redirectURL == "" {
+			return nil, fmt.Errorf("redirect location is empty")
+		}
+		resp.Body.Close()
+		return fetchRobotsTXT(redirectURL, client)
+	}
+
+	return resp, nil
+}
+
 func Scan(url string, timeout time.Duration, threads int, logdir string) {
 
 	fmt.Println(styles.Separator.Render("🐾 Starting " + styles.Status.Render("base url scanning") + "..."))
@@ -39,11 +57,13 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 		},
 	}
 
-	resp, err := client.Get(url + "/robots.txt")
+	resp, err := fetchRobotsTXT(url+"/robots.txt", client)
 	if err != nil {
-		log.Debugf("Error: %s", err)
+		log.Debugf("Error fetching robots.txt: %s", err)
+		return
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != 404 && resp.StatusCode != 301 && resp.StatusCode != 302 && resp.StatusCode != 307 {
 		scanlog.Infof("file [%s] found", styles.Status.Render("robots.txt"))
 
