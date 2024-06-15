@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-  "io"
-	"net/http"
 	"os"
 	"strings"
 
@@ -62,33 +60,6 @@ func New(settings *config.Settings) (*App, error) {
 	return app, nil
 }
 
-func fetchRobotsTXT(url string) (string, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusMovedPermanently {
-		redirectURL := resp.Header.Get("Location")
-		if redirectURL == "" {
-			return "", errors.New("redirect location is empty")
-		}
-		return fetchRobotsTXT(redirectURL)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return "", errors.New(fmt.Sprintf("failed to fetch robots.txt: %s", resp.Status))
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return string(body), nil
-}
-
 // Run runs the pentesting suite, with the targets specified, according to the
 // settings specified.
 func (app *App) Run() error {
@@ -116,12 +87,6 @@ func (app *App) Run() error {
 		}
 
 		if !app.settings.NoScan {
-			robotsTxt, err := fetchRobotsTXT(fmt.Sprintf("%s/robots.txt", url))
-			if err != nil {
-				log.Errorf("Failed to fetch robots.txt for %s: %v", url, err)
-			} else {
-				log.Infof("robots.txt content for %s:\n%s", url, robotsTxt)
-			}
 			scan.Scan(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 		}
 
