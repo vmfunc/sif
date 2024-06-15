@@ -15,26 +15,27 @@ import (
 	"github.com/dropalldatabases/sif/pkg/logger"
 )
 
-func fetchRobotsTXT(url string, client *http.Client) (*http.Response, error) {
+func fetchRobotsTXT(url string, client *http.Client) *http.Response {
 	resp, err := client.Get(url)
 	if err != nil {
-		return nil, err
+		log.Debugf("Error fetching robots.txt: %s", err)
+		return nil
 	}
 
 	if resp.StatusCode == http.StatusMovedPermanently {
 		redirectURL := resp.Header.Get("Location")
 		if redirectURL == "" {
-			return nil, fmt.Errorf("redirect location is empty")
+			log.Debugf("Redirect location is empty for %s", url)
+			return nil
 		}
 		resp.Body.Close()
 		return fetchRobotsTXT(redirectURL, client)
 	}
 
-	return resp, nil
+	return resp
 }
 
 func Scan(url string, timeout time.Duration, threads int, logdir string) {
-
 	fmt.Println(styles.Separator.Render("🐾 Starting " + styles.Status.Render("base url scanning") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
@@ -57,9 +58,8 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 		},
 	}
 
-	resp, err := fetchRobotsTXT(url+"/robots.txt", client)
-	if err != nil {
-		log.Debugf("Error fetching robots.txt: %s", err)
+	resp := fetchRobotsTXT(url+"/robots.txt", client)
+	if resp == nil {
 		return
 	}
 	defer resp.Body.Close()
@@ -90,12 +90,13 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 					}
 
 					_, sanitizedRobot, _ := strings.Cut(robot, ": ")
-					log.Debugf("%s", robot)
+					scanlog.Debugf("%s", robot)
 					resp, err := client.Get(url + "/" + sanitizedRobot)
 					if err != nil {
-						log.Debugf("Error %s: %s", sanitizedRobot, err)
-						return
+						scanlog.Debugf("Error %s: %s", sanitizedRobot, err)
+						continue
 					}
+					defer resp.Body.Close()
 
 					if resp.StatusCode != 404 {
 						scanlog.Infof("%s from robots: [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(sanitizedRobot))
