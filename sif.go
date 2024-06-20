@@ -111,6 +111,10 @@ func (app *App) Run() error {
 			scan.Git(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 		}
 
+		if app.settings.Nuclei {
+			scan.Nuclei(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		}
+
 		if app.settings.ApiMode {
 			utils.ReturnApiOutput()
 		}
