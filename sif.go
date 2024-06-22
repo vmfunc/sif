@@ -12,6 +12,7 @@ import (
 	"github.com/dropalldatabases/sif/pkg/config"
 	"github.com/dropalldatabases/sif/pkg/logger"
 	"github.com/dropalldatabases/sif/pkg/scan"
+	"github.com/dropalldatabases/sif/pkg/scan/js"
 	"github.com/dropalldatabases/sif/pkg/utils"
 )
 
@@ -114,6 +115,8 @@ func (app *App) Run() error {
 		if app.settings.Nuclei {
 			scan.Nuclei(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 		}
+
+		js.JavascriptScan(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 
 		if app.settings.ApiMode {
 			utils.ReturnApiOutput()
