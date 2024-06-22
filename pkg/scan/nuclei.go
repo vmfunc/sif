@@ -30,7 +30,7 @@ import (
 	"github.com/projectdiscovery/ratelimit"
 )
 
-func Nuclei(url string, timeout time.Duration, threads int, logdir string) {
+func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]output.ResultEvent, error) {
 	fmt.Println(styles.Separator.Render("⚛️ Starting " + styles.Status.Render("nuclei template scanning") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
@@ -50,12 +50,14 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) {
 	config.DefaultConfig.SetTemplatesDir(pwd)
 	catalog := disk.NewCatalog(pwd)
 
+	results := []output.ResultEvent{}
 	// Custom output
 	outputWriter := testutils.NewMockOutputWriter()
 	outputWriter.WriteCallback = func(event *output.ResultEvent) {
 		if event.Matched != "" {
 			nucleilog.Infof(format.FormatLine(event))
 
+			results = append(results, *event)
 			// TODO: metasploit
 		}
 	}
@@ -70,7 +72,7 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) {
 	interactOpts := interactsh.DefaultOptions(outputWriter, reportingClient, progressClient)
 	interactClient, err := interactsh.New(interactOpts)
 	if err != nil {
-		log.Fatalf("Could not create interact client: %s\n", err)
+		return nil, err
 	}
 	defer interactClient.Close()
 
@@ -92,13 +94,13 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) {
 
 	workflowLoader, err := parsers.NewLoader(&executorOpts)
 	if err != nil {
-		nucleilog.Fatalf("Could not create workflow loader: %s\n", err)
+		return nil, err
 	}
 	executorOpts.WorkflowLoader = workflowLoader
 
 	store, err := loader.New(loader.NewConfig(options, catalog, executorOpts))
 	if err != nil {
-		nucleilog.Fatalf("Could not create loader client: %s\n", err)
+		return nil, err
 	}
 	store.Load()
 
@@ -107,4 +109,6 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) {
 
 	_ = engine.Execute(store.Templates(), input)
 	engine.WorkPool().Wait()
+
+	return results, nil
 }

@@ -8,21 +8,22 @@ import (
 )
 
 type Settings struct {
-	Dirlist string
-	Dnslist string
-	Debug   bool
-	LogDir  string
-	NoScan  bool
-	Ports   string
-	Dorking bool
-	Git     bool
-	Whois   bool
-	Threads int
-	Nuclei  bool
-	Timeout time.Duration
-	URLs    goflags.StringSlice
-	File    string
-	ApiMode bool
+	Dirlist    string
+	Dnslist    string
+	Debug      bool
+	LogDir     string
+	NoScan     bool
+	Ports      string
+	Dorking    bool
+	Git        bool
+	Whois      bool
+	Threads    int
+	Nuclei     bool
+	JavaScript bool
+	Timeout    time.Duration
+	URLs       goflags.StringSlice
+	File       string
+	ApiMode    bool
 }
 
 const (
@@ -60,6 +61,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.Nuclei, "nuclei", false, "Enable scanning using nuclei templates"),
 		flagSet.BoolVar(&settings.NoScan, "noscan", false, "Do not perform base URL (robots.txt, etc) scanning"),
 		flagSet.BoolVar(&settings.Whois, "whois", false, "Enable WHOIS lookup"),
+		flagSet.BoolVar(&settings.JavaScript, "js", false, "Enable JavaScript scans"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",

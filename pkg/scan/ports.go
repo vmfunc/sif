@@ -18,14 +18,14 @@ import (
 
 const commonPorts = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/ports/top-ports.txt"
 
-func Ports(scope string, url string, timeout time.Duration, threads int, logdir string) {
-	fmt.Println(styles.Separator.Render("🚪 Starting " + styles.Status.Render("port scanning") + "..."))
+func Ports(scope string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
+	log.Printf(styles.Separator.Render("🚪 Starting " + styles.Status.Render("port scanning") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, scope+" port scanning"); err != nil {
 			log.Errorf("Error creating log file: %v", err)
-			return
+			return nil, err
 		}
 	}
 
@@ -41,7 +41,7 @@ func Ports(scope string, url string, timeout time.Duration, threads int, logdir 
 		resp, err := http.Get(commonPorts)
 		if err != nil {
 			log.Errorf("Error downloading ports list: %s", err)
-			return
+			return nil, err
 		}
 		defer resp.Body.Close()
 		scanner := bufio.NewScanner(resp.Body)
@@ -89,4 +89,6 @@ func Ports(scope string, url string, timeout time.Duration, threads int, logdir 
 	} else {
 		portlog.Error("Found no open ports")
 	}
+
+	return openPorts, nil
 }

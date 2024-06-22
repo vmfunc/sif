@@ -2,6 +2,7 @@ package sif
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,8 +13,7 @@ import (
 	"github.com/dropalldatabases/sif/pkg/config"
 	"github.com/dropalldatabases/sif/pkg/logger"
 	"github.com/dropalldatabases/sif/pkg/scan"
-	"github.com/dropalldatabases/sif/pkg/scan/js"
-	"github.com/dropalldatabases/sif/pkg/utils"
+	jsscan "github.com/dropalldatabases/sif/pkg/scan/js"
 )
 
 // App is a client instance. It is first initialised using New and then ran
@@ -22,6 +22,16 @@ type App struct {
 	settings *config.Settings
 	targets  []string
 	logFiles []string
+}
+
+type UrlResult struct {
+	Url     string `json:"url"`
+	Results []ModuleResult
+}
+
+type ModuleResult struct {
+	Id   string      `json:"id"`
+	Data interface{} `json:"data"`
 }
 
 // New creates a new App struct by parsing the configuration options,
@@ -68,6 +78,10 @@ func (app *App) Run() error {
 		log.SetLevel(log.DebugLevel)
 	}
 
+	if app.settings.ApiMode {
+		log.SetLevel(5)
+	}
+
 	if app.settings.LogDir != "" {
 		if err := logger.Init(app.settings.LogDir); err != nil {
 			return err
@@ -81,6 +95,8 @@ func (app *App) Run() error {
 
 		log.Infof("📡Starting scan on %s...", url)
 
+		moduleResults := []ModuleResult{}
+
 		if app.settings.LogDir != "" {
 			if err := logger.CreateFile(&app.logFiles, url, app.settings.LogDir); err != nil {
 				return err
@@ -92,15 +108,30 @@ func (app *App) Run() error {
 		}
 
 		if app.settings.Dirlist != "none" {
-			scan.Dirlist(app.settings.Dirlist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.Dirlist(app.settings.Dirlist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running directory scan: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"dirlist", result})
+			}
 		}
 
 		if app.settings.Dnslist != "none" {
-			scan.Dnslist(app.settings.Dnslist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.Dnslist(app.settings.Dnslist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running dns scan: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"dnslist", result})
+			}
 		}
 
 		if app.settings.Ports != "none" {
-			scan.Ports(app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.Ports(app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running port scan: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"portscan", result})
+			}
 		}
 
 		if app.settings.Whois {
@@ -109,26 +140,52 @@ func (app *App) Run() error {
 
 		// func Git(url string, timeout time.Duration, threads int, logdir string)
 		if app.settings.Git {
-			scan.Git(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.Git(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running Git module: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"git", result})
+			}
 		}
 
 		if app.settings.Nuclei {
-			scan.Nuclei(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.Nuclei(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running Nuclei module: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"nuclei", result})
+			}
 		}
 
-		js.JavascriptScan(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if app.settings.JavaScript {
+			result, err := jsscan.JavascriptScan(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running JS module: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"js", result})
+			}
+		}
 
 		if app.settings.ApiMode {
-			utils.ReturnApiOutput()
-		}
+			result := UrlResult{
+				Url:     url,
+				Results: moduleResults,
+			}
 
-		// TODO: WHOIS
+			marshalled, err := json.Marshal(result)
+			if err != nil {
+				log.Fatalf("failed to marshal result: %s", err)
+			}
+			fmt.Println(string(marshalled))
+		}
 	}
 
-	if app.settings.LogDir != "" {
-		fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n📂 Output saved to files: %s\n", strings.Join(app.logFiles, ", "))))
-	} else {
-		fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n")))
+	if !app.settings.ApiMode {
+		if app.settings.LogDir != "" {
+			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n📂 Output saved to files: %s\n", strings.Join(app.logFiles, ", "))))
+		} else {
+			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n")))
+		}
 	}
 
 	return nil

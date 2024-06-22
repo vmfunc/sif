@@ -22,7 +22,12 @@ const (
 	bigFile      = "directory-list-2.3-big.txt"
 )
 
-func Dirlist(size string, url string, timeout time.Duration, threads int, logdir string) {
+type DirectoryResult struct {
+	Url        string `json:"url"`
+	StatusCode int    `json:"status_code"`
+}
+
+func Dirlist(size string, url string, timeout time.Duration, threads int, logdir string) ([]DirectoryResult, error) {
 
 	fmt.Println(styles.Separator.Render("📂 Starting " + styles.Status.Render("directory fuzzing") + "..."))
 
@@ -31,7 +36,7 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, size+" directory fuzzing"); err != nil {
 			log.Errorf("Error creating log file: %v", err)
-			return
+			return nil, err
 		}
 	}
 
@@ -55,7 +60,7 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 	resp, err := http.Get(list)
 	if err != nil {
 		log.Errorf("Error downloading directory list: %s", err)
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
 	var directories []string
@@ -71,6 +76,8 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 
 	var wg sync.WaitGroup
 	wg.Add(threads)
+
+	results := []DirectoryResult{}
 	for thread := 0; thread < threads; thread++ {
 		go func(thread int) {
 			defer wg.Done()
@@ -93,9 +100,17 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 					if logdir != "" {
 						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s [%s]\n", strconv.Itoa(resp.StatusCode), directory))
 					}
+
+					result := DirectoryResult{
+						Url:        resp.Request.URL.String(),
+						StatusCode: resp.StatusCode,
+					}
+					results = append(results, result)
 				}
 			}
 		}(thread)
 	}
 	wg.Wait()
+
+	return results, nil
 }

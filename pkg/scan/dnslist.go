@@ -21,7 +21,7 @@ const (
 	dnsBigFile    = "subdomains-10000.txt"
 )
 
-func Dnslist(size string, url string, timeout time.Duration, threads int, logdir string) {
+func Dnslist(size string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
 
 	fmt.Println(styles.Separator.Render("📡 Starting " + styles.Status.Render("DNS fuzzing") + "..."))
 
@@ -45,7 +45,7 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 	resp, err := http.Get(list)
 	if err != nil {
 		log.Errorf("Error downloading DNS list: %s", err)
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
 	var dns []string
@@ -60,7 +60,7 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, size+" subdomain fuzzing"); err != nil {
 			log.Errorf("Error creating log file: %v", err)
-			return
+			return nil, err
 		}
 	}
 
@@ -70,6 +70,8 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 
 	var wg sync.WaitGroup
 	wg.Add(threads)
+
+	urls := []string{}
 	for thread := 0; thread < threads; thread++ {
 		go func(thread int) {
 			defer wg.Done()
@@ -80,10 +82,11 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 				}
 
 				log.Debugf("Looking up: %s", domain)
-				_, err := client.Get("http://" + domain + "." + sanitizedURL)
+				resp, err := client.Get("http://" + domain + "." + sanitizedURL)
 				if err != nil {
 					log.Debugf("Error %s: %s", domain, err)
 				} else {
+					urls = append(urls, resp.Request.URL.String())
 					dnslog.Infof("%s %s.%s", styles.Status.Render("[http]"), styles.Highlight.Render(domain), sanitizedURL)
 
 					if logdir != "" {
@@ -97,10 +100,11 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 					}
 				}
 
-				_, err = client.Get("https://" + domain + "." + sanitizedURL)
+				resp, err = client.Get("https://" + domain + "." + sanitizedURL)
 				if err != nil {
 					log.Debugf("Error %s: %s", domain, err)
 				} else {
+					urls = append(urls, resp.Request.URL.String())
 					dnslog.Infof("%s %s.%s", styles.Status.Render("[https]"), styles.Highlight.Render(domain), sanitizedURL)
 					if logdir != "" {
 						logger.Write(sanitizedURL, logdir, fmt.Sprintf("[https] %s.%s\n", domain, sanitizedURL))
@@ -110,4 +114,6 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 		}(thread)
 	}
 	wg.Wait()
+
+	return urls, nil
 }

@@ -21,7 +21,12 @@ const (
 	dorkFile = "dork.txt"
 )
 
-func Dork(url string, timeout time.Duration, threads int, logdir string) {
+type DorkResult struct {
+	Url   string `json:"url"`
+	Count int    `json:"count"`
+}
+
+func Dork(url string, timeout time.Duration, threads int, logdir string) ([]DorkResult, error) {
 
 	fmt.Println(styles.Separator.Render("🤓 Starting " + styles.Status.Render("URL Dorking") + "..."))
 
@@ -30,7 +35,7 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) {
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "URL dorking"); err != nil {
 			log.Errorf("Error creating log file: %v", err)
-			return
+			return nil, err
 		}
 	}
 
@@ -43,7 +48,7 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) {
 	resp, err := http.Get(dorkURL + dorkFile)
 	if err != nil {
 		log.Errorf("Error downloading dork list: %s", err)
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
 	var dorks []string
@@ -56,6 +61,8 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) {
 	// util.InitProgressBar()
 	var wg sync.WaitGroup
 	wg.Add(threads)
+
+	dorkResults := []DorkResult{}
 	for thread := 0; thread < threads; thread++ {
 		go func(thread int) {
 			defer wg.Done()
@@ -71,9 +78,18 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) {
 					if logdir != "" {
 						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s dork results found for dork [%s]\n", strconv.Itoa(len(results)), dork))
 					}
+
+					result := DorkResult{
+						Url:   dork,
+						Count: len(results),
+					}
+
+					dorkResults = append(dorkResults, result)
 				}
 			}
 		}(thread)
 	}
 	wg.Wait()
+
+	return dorkResults, nil
 }

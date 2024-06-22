@@ -2,10 +2,10 @@ package js
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -16,15 +16,24 @@ import (
 	urlutil "github.com/projectdiscovery/utils/url"
 )
 
-func JavascriptScan(url string, timeout time.Duration, threads int, logdir string) {
+type JavascriptScanResult struct {
+	SupabaseResults      []supabaseScanResult `json:"supabase_results"`
+	FoundEnvironmentVars map[string]string    `json:"environment_variables"`
+}
+
+func JavascriptScan(url string, timeout time.Duration, threads int, logdir string) (*JavascriptScanResult, error) {
+	jslog := log.NewWithOptions(os.Stderr, log.Options{
+		Prefix: "🚧 JavaScript",
+	}).With("url", url)
+
 	baseUrl, err := urlutil.Parse(url)
 	if err != nil {
-		return
+		return nil, err
 	}
 	resp, err := http.Get(url)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -37,13 +46,13 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 
 	doc, err := htmlquery.Parse(strings.NewReader(html))
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	var scripts []string
 	nodes, err := htmlquery.QueryAll(doc, "//script/@src")
 	if err != nil {
-		return
+		return nil, err
 	}
 	for _, node := range nodes {
 		var src = htmlquery.InnerText(node)
@@ -61,9 +70,10 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 
 	for _, script := range scripts {
 		if strings.Contains(script, "/_buildManifest.js") {
+			jslog.Infof("Detected Next.JS pages router! Getting all scripts from %s", script)
 			nextScripts, err := frameworks.GetPagesRouterScripts(script)
 			if err != nil {
-				return
+				return nil, err
 			}
 
 			for _, nextScript := range nextScripts {
@@ -75,10 +85,11 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 		}
 	}
 
-	log.Debugf("Got all scripts: %s, now running scans on them", scripts)
+	jslog.Infof("Got %d scripts, now running scans on them", len(scripts))
 
+	var supabaseResults []supabaseScanResult
 	for _, script := range scripts {
-		log.Debugf("Scanning %s", script)
+		jslog.Infof("Scanning %s", script)
 		resp, err := http.Get(script)
 		if err != nil {
 			fmt.Println(err)
@@ -92,19 +103,22 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 		}
 		content := string(bodyBytes)
 
-		supabaseResults, err := ScanSupabase(content)
+		jslog.Infof("Running supabase scanner on %s", script)
+		scriptSupabaseResults, err := ScanSupabase(content, script)
 
 		if err != nil {
-			log.Debugf("Error while scanning supabase: %s", err)
+			jslog.Errorf("Error while scanning supabase: %s", err)
 		}
 
-		if supabaseResults != nil {
-			marshalled, err := json.Marshal(supabaseResults)
-			if err != nil {
-				continue
-			}
-
-			log.Debugf("Supabase results: %s", marshalled)
+		if scriptSupabaseResults != nil {
+			supabaseResults = append(supabaseResults, scriptSupabaseResults...)
 		}
 	}
+
+	result := JavascriptScanResult{
+		SupabaseResults:      supabaseResults,
+		FoundEnvironmentVars: map[string]string{},
+	}
+
+	return &result, nil
 }

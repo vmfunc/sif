@@ -20,7 +20,7 @@ const (
 	gitFile = "git.txt"
 )
 
-func Git(url string, timeout time.Duration, threads int, logdir string) {
+func Git(url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
 
 	fmt.Println(styles.Separator.Render("🌿 Starting " + styles.Status.Render("git repository scanning") + "..."))
 
@@ -29,7 +29,7 @@ func Git(url string, timeout time.Duration, threads int, logdir string) {
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "git directory fuzzing"); err != nil {
 			log.Errorf("Error creating log file: %v", err)
-			return
+			return nil, err
 		}
 	}
 
@@ -42,7 +42,7 @@ func Git(url string, timeout time.Duration, threads int, logdir string) {
 	resp, err := http.Get(gitURL + gitFile)
 	if err != nil {
 		log.Errorf("Error downloading git list: %s", err)
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
 	var gitUrls []string
@@ -59,6 +59,8 @@ func Git(url string, timeout time.Duration, threads int, logdir string) {
 
 	var wg sync.WaitGroup
 	wg.Add(threads)
+
+	foundUrls := []string{}
 	for thread := 0; thread < threads; thread++ {
 		go func(thread int) {
 			defer wg.Done()
@@ -74,15 +76,19 @@ func Git(url string, timeout time.Duration, threads int, logdir string) {
 					log.Debugf("Error %s: %s", repourl, err)
 				}
 
-				if resp.StatusCode != 404 {
+				if resp.StatusCode == 200 && !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
 					// log url, directory, and status code
 					gitlog.Infof("%s git found at [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(repourl))
 					if logdir != "" {
 						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s git found at [%s]\n", strconv.Itoa(resp.StatusCode), repourl))
 					}
+
+					foundUrls = append(foundUrls, resp.Request.URL.String())
 				}
 			}
 		}(thread)
 	}
 	wg.Wait()
+
+	return foundUrls, nil
 }

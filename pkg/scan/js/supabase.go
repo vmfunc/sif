@@ -10,6 +10,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"os"
 	"regexp"
 	"slices"
 	"strconv"
@@ -92,7 +93,10 @@ func GetSupabaseJsonResponse(projectId string, path string, apikey string, auth 
 	return data.(map[string]interface{}), nil
 }
 
-func ScanSupabase(jsContent string) ([]supabaseScanResult, error) {
+func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) {
+	supabaselog := log.NewWithOptions(os.Stderr, log.Options{
+		Prefix: "🚧 JavaScript > Supabase ⚡️",
+	}).With("url", jsUrl)
 
 	jwtRegex, err := regexp.Compile("[\"|'|`](ey[A-Za-z0-9_-]{2,}(?:\\.[A-Za-z0-9_-]{2,}){2})[\"|'|`]")
 
@@ -118,15 +122,15 @@ func ScanSupabase(jsContent string) ([]supabaseScanResult, error) {
 
 		decoded, err := base64.RawStdEncoding.DecodeString(body)
 		if err != nil {
-			log.Debugf("Failed to decode JWT %s: %s", body, err)
+			supabaselog.Debugf("Failed to decode JWT %s: %s", body, err)
 			continue
 		}
 
-		log.Debugf("JWT body: %s", decoded)
+		supabaselog.Debugf("JWT body: %s", decoded)
 		var supabaseJwt *supabaseJwtBody
 		err = json.Unmarshal([]byte(decoded), &supabaseJwt)
 		if err != nil {
-			log.Debugf("Failed to json parse JWT %s: %s", jwt, err)
+			supabaselog.Debugf("Failed to json parse JWT %s: %s", jwt, err)
 			continue
 		}
 
@@ -134,22 +138,22 @@ func ScanSupabase(jsContent string) ([]supabaseScanResult, error) {
 			continue
 		}
 
-		log.Debugf("Found valid supabase project %s with role %s", *supabaseJwt.ProjectId, *supabaseJwt.Role)
+		supabaselog.Infof("Found valid supabase project %s with role %s", *supabaseJwt.ProjectId, *supabaseJwt.Role)
 		client := http.Client{}
 
 		req, err := http.NewRequest("POST", "https://"+*supabaseJwt.ProjectId+".supabase.co/auth/v1/signup", bytes.NewBufferString(`{"email":"automated`+strconv.Itoa(int(time.Now().Unix()))+`@sif.sh","password":"automatedacct"}`))
 		if err != nil {
-			log.Debugf("1 %s", err)
+			supabaselog.Errorf("Error while creating HTTP req for creating user: %s", err)
+			continue
 		}
 		req.Header.Set("apikey", jwt)
 
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Debugf("2 %s", err)
-
+			supabaselog.Errorf("Error while sending request to create user: %s", err)
+			continue
 		}
 
-		log.Debugf("%d", resp.StatusCode)
 		var auth string
 		if resp.StatusCode == http.StatusOK {
 			body, err := io.ReadAll(resp.Body)
@@ -165,7 +169,7 @@ func ScanSupabase(jsContent string) ([]supabaseScanResult, error) {
 			}
 
 			auth = data["access_token"].(string)
-			log.Debugf("Created account with JWT %s", auth)
+			supabaselog.Infof("Created account with JWT %s", auth)
 		}
 
 		var collections = []supabaseCollection{}
@@ -199,10 +203,12 @@ func ScanSupabase(jsContent string) ([]supabaseScanResult, error) {
 			}
 
 			samples := sampleObj["array"].([]interface{})
-
-			for _, sample := range samples {
-				log.Debugf("%s", sample)
+			marshalled, err := json.Marshal(samples)
+			if err != nil {
+				supabaselog.Errorf("Failed to marshal sample data for %s: %s", k, err)
 			}
+
+			supabaselog.Infof("Got sample (1000 entries) for collection %s: %s", k, string(marshalled))
 
 			limitedSample := samples[0:int(math.Min(float64(len(samples)), 10))]
 
