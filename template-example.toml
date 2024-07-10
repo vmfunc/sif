@@ -1,8 +1,8 @@
 [scans]
 scans = [
-    "scan1",
-    "scan2",
-    "scan3"
+    "whois",
+    "dork",
+    "dirlist common"
 ]
 
 [config]
