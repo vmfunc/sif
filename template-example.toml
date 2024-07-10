@@ -1,0 +1,10 @@
+[scans]
+scans = [
+    "scan1",
+    "scan2",
+    "scan3"
+]
+
+[config]
+logging = true
+threads = 10
