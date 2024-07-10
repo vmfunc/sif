@@ -24,6 +24,7 @@ type Settings struct {
 	URLs       goflags.StringSlice
 	File       string
 	ApiMode    bool
+	Template   string
 }
 
 const (
@@ -69,6 +70,7 @@ func Parse() *Settings {
 		flagSet.DurationVarP(&settings.Timeout, "timeout", "t", 10*time.Second, "HTTP request timeout"),
 		flagSet.StringVarP(&settings.LogDir, "log", "l", "", "Directory to store logs in"),
 		flagSet.IntVar(&settings.Threads, "threads", 10, "Number of threads to run scans on"),
+		flagSet.StringVar(&settings.Template, "template", "", "Sif runtime template to use"),
 	)
 
 	flagSet.CreateGroup("api", "API",
