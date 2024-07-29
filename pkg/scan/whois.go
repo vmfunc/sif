@@ -16,7 +16,7 @@ func Whois(url string, logdir string) {
 
 	sanitizedURL := strings.Split(url, "://")[1]
 	if logdir != "" {
-		if err := logger.WriteHeader(sanitizedURL, logdir, " port scanning"); err != nil {
+		if err := logger.WriteHeader(sanitizedURL, logdir, " WHOIS scanning"); err != nil {
 			log.Errorf("Error creating log file: %v", err)
 			return
 		}
