@@ -1,3 +1,6 @@
+# Copyright (c) 2024 vmfunc, xyzeva, lunchcat, and contributors
+# SPDX-License-Identifier: MIT
+
 .POSIX:
 .SUFFIXES:
 
@@ -7,10 +10,43 @@ GOFLAGS ?=
 PREFIX ?= /usr/local
 BINDIR ?= bin
 
+define COPYRIGHT_ASCII
+╭────────────────────────────────────────────────────────────╮
+│                           _____________                    │
+│                    __________(_)__  __/                    │
+│                    __  ___/_  /__  /_                      │
+│                    _(__  )_  / _  __/                      │
+│                    /____/ /_/  /_/                         │
+│                                                            │
+╰────────────────────────────────────────────────────────────╯
+Copyright (c) 2024 vmfunc, xyzeva, lunchcat, and contributors
+
+
+endef
+export COPYRIGHT_ASCII
+
+define SUPPORT_MESSAGE
+
+
+╭────────────────────────────────────────────────────────────╮
+│                                                            │
+│  🌟 Enjoying sif? Please consider:                         │
+│                                                            │
+│  • Starring our repo: https://github.com/lunchcat/sif      │
+│  • Supporting the devs: https://lunchcat.dev               │
+│                                                            │
+│  Your support helps us continue improving sif!             │
+│                                                            │
+╰────────────────────────────────────────────────────────────╯
+endef
+export SUPPORT_MESSAGE
+
 all: check_go_version sif
 	@echo "✅ All tasks completed successfully! 🎉"
+	@echo "$$SUPPORT_MESSAGE"
 
 check_go_version:
+	@echo "$$COPYRIGHT_ASCII"
 	@echo "🔍 Checking Go version..."
 	@$(GO) version | grep -q "go1\.23\." || (echo "❌ Error: Please install the latest version of Go" && exit 1)
 	@echo "✅ Go version check passed!"
@@ -21,11 +57,13 @@ sif: check_go_version
 	@echo "✅ sif built successfully! 🚀"
 
 clean:
+	@echo "$$COPYRIGHT_ASCII"
 	@echo "🧹 Cleaning up..."
 	$(RM) -rf sif
 	@echo "✨ Cleanup complete!"
 
 install: check_go_version
+	@echo "$$COPYRIGHT_ASCII"
 	@echo "📦 Installing sif..."
 	@if [ "$$(uname)" != "Linux" ] && [ "$$(uname)" != "Darwin" ]; then \
 		echo "❌ Error: This installation script is for UNIX systems only."; \
@@ -36,6 +74,7 @@ install: check_go_version
 	@echo "✅ sif installed successfully! 🎊"
 
 uninstall:
+	@echo "$$COPYRIGHT_ASCII"
 	@echo "🗑️ Uninstalling sif..."
 	@if [ "$$(uname)" != "Linux" ] && [ "$$(uname)" != "Darwin" ]; then \
 		echo "❌ Error: This uninstallation script is for UNIX systems only."; \
