@@ -116,13 +116,28 @@ func (app *App) Run() error {
 			}
 		}
 
+		var dnsResults []string
+
 		if app.settings.Dnslist != "none" {
 			result, err := scan.Dnslist(app.settings.Dnslist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 			if err != nil {
 				log.Errorf("Error while running dns scan: %s", err)
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"dnslist", result})
+				dnsResults = result // Store the DNS results
 			}
+
+			// Only run subdomain takeover check if DNS scan is enabled
+			if app.settings.SubdomainTakeover {
+				result, err := scan.SubdomainTakeover(url, dnsResults, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+				if err != nil {
+					log.Errorf("Error while running Subdomain Takeover Vulnerability Check: %s", err)
+				} else {
+					moduleResults = append(moduleResults, ModuleResult{"subdomain_takeover", result})
+				}
+			}
+		} else if app.settings.SubdomainTakeover {
+			log.Warnf("Subdomain Takeover check is enabled but DNS scan is disabled. Skipping Subdomain Takeover check.")
 		}
 
 		if app.settings.Ports != "none" {
@@ -190,6 +205,16 @@ func (app *App) Run() error {
 				log.Errorf("Error while running C3 Scan: %s", err)
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"cloudstorage", result})
+			}
+		}
+
+		if app.settings.SubdomainTakeover {
+			// Pass the dnsResults to the SubdomainTakeover function
+			result, err := scan.SubdomainTakeover(url, dnsResults, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running Subdomain Takeover Vulnerability Check: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"subdomain_takeover", result})
 			}
 		}
 

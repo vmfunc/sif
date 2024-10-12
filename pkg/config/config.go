@@ -28,6 +28,7 @@ type Settings struct {
 	CMS        bool
 	Headers    bool
 	CloudStorage bool
+	SubdomainTakeover bool
 }
 
 const (
@@ -69,6 +70,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.CMS, "cms", false, "Enable CMS detection"),
 		flagSet.BoolVar(&settings.Headers, "headers", false, "Enable HTTP Header Analysis"),
 		flagSet.BoolVar(&settings.CloudStorage, "c3", false, "Enable C3 Misconfiguration Scan"),
+		flagSet.BoolVar(&settings.SubdomainTakeover, "st", false, "Enable Subdomain Takeover Check"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",

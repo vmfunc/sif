@@ -31,6 +31,7 @@ _(__  )_  / _  __/
 - 📦 CMS detection
 - 🔍 HTTP Header Analysis
 - ☁️ C3 Misconfiguration Scanner
+- 🔍 Subdomain Takeover Checks
 
 ## Contributing and support
 
