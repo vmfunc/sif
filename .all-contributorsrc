@@ -1,4 +1,21 @@
 {
   "projectName": "sif",
-  "projectOwner": "lunchcat"
+  "projectOwner": "lunchcat",
+  "files": [
+    "README.md"
+  ],
+  "commitType": "docs",
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "vmfunc",
+      "name": "mel",
+      "avatar_url": "https://avatars.githubusercontent.com/u/59031302?v=4",
+      "profile": "https://vmfunc.re",
+      "contributions": [
+        "maintenance"
+      ]
+    }
+  ]
 }
