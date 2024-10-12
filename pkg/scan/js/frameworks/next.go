@@ -1,4 +1,29 @@
 /*
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                  SIF                                         ║
+║                                                                              ║
+║        Blazing-fast pentesting suite written in Go                           ║
+║                                                                              ║
+║        Copyright (c) 2023-2024 vmfunc, xyzeva, lunchcat contributors         ║
+║                    and other sif contributors.                               ║
+║                                                                              ║
+║                                                                              ║
+║        Use of this tool is restricted to research and educational            ║
+║        purposes only. Usage in a production environment outside              ║
+║        of these categories is strictly prohibited.                           ║
+║                                                                              ║
+║        Any person or entity wishing to use this tool outside of              ║
+║        research or educational purposes must purchase a license              ║
+║        from https://lunchcat.dev                                             ║
+║                                                                              ║
+║        For more information, visit: https://github.com/lunchcat/sif          ║ 
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+*/
+
+
+/*
 	What we are doing is abusing a internal file in Next.js pages router called
 	_buildManifest.js which lists all routes and script files ever referenced in
 	the application within next.js, this allows us to optimise and not bruteforce

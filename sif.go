@@ -1,3 +1,6 @@
+// Package sif provides the main functionality for the SIF (Security Information Finder) tool.
+// It handles the initialization, configuration, and execution of various security scanning modules.
+
 package sif
 
 import (
@@ -16,8 +19,8 @@ import (
 	jsscan "github.com/dropalldatabases/sif/pkg/scan/js"
 )
 
-// App is a client instance. It is first initialised using New and then ran
-// using Run, which starts the whole app process.
+// App represents the main application structure for sif.
+// It encapsulates the configuration settings, target URLs, and logging information.
 type App struct {
 	settings *config.Settings
 	targets  []string

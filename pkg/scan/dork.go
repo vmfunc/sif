@@ -1,3 +1,30 @@
+/*
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                  SIF                                         ║
+║                                                                              ║
+║        Blazing-fast pentesting suite written in Go                           ║
+║                                                                              ║
+║        Copyright (c) 2023-2024 vmfunc, xyzeva, lunchcat contributors         ║
+║                    and other sif contributors.                               ║
+║                                                                              ║
+║                                                                              ║
+║        Use of this tool is restricted to research and educational            ║
+║        purposes only. Usage in a production environment outside              ║
+║        of these categories is strictly prohibited.                           ║
+║                                                                              ║
+║        Any person or entity wishing to use this tool outside of              ║
+║        research or educational purposes must purchase a license              ║
+║        from https://lunchcat.dev                                             ║
+║                                                                              ║
+║        For more information, visit: https://github.com/lunchcat/sif          ║ 
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+*/
+
+// Package scan provides various security scanning functionalities for web applications.
+// This file handles Google dorking operations.
+
 package scan
 
 import (
@@ -21,11 +48,24 @@ const (
 	dorkFile = "dork.txt"
 )
 
+// DorkResult represents the result of a Google dork search.
 type DorkResult struct {
-	Url   string `json:"url"`
-	Count int    `json:"count"`
+	Url   string `json:"url"`   // The URL found by the dork
+	Count int    `json:"count"` // The number of times this URL was found
 }
 
+// Dork performs Google dorking operations on the target URL.
+// It uses a predefined list of dorks to search for potentially sensitive information.
+//
+// Parameters:
+//   - url: The target URL to dork
+//   - timeout: Maximum duration for each dork search
+//   - threads: Number of concurrent threads to use
+//   - logdir: Directory to store log files (empty string for no logging)
+//
+// Returns:
+//   - []DorkResult: A slice of results from the dorking operation
+//   - error: Any error encountered during the dorking process
 func Dork(url string, timeout time.Duration, threads int, logdir string) ([]DorkResult, error) {
 
 	fmt.Println(styles.Separator.Render("🤓 Starting " + styles.Status.Render("URL Dorking") + "..."))

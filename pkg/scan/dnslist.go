@@ -1,3 +1,27 @@
+/*
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                  SIF                                         ║
+║                                                                              ║
+║        Blazing-fast pentesting suite written in Go                           ║
+║                                                                              ║
+║        Copyright (c) 2023-2024 vmfunc, xyzeva, lunchcat contributors         ║
+║                    and other sif contributors.                               ║
+║                                                                              ║
+║                                                                              ║
+║        Use of this tool is restricted to research and educational            ║
+║        purposes only. Usage in a production environment outside              ║
+║        of these categories is strictly prohibited.                           ║
+║                                                                              ║
+║        Any person or entity wishing to use this tool outside of              ║
+║        research or educational purposes must purchase a license              ║
+║        from https://lunchcat.dev                                             ║
+║                                                                              ║
+║        For more information, visit: https://github.com/lunchcat/sif          ║ 
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+*/
+
 package scan
 
 import (
@@ -21,6 +45,18 @@ const (
 	dnsBigFile    = "subdomains-10000.txt"
 )
 
+// Dnslist performs DNS subdomain enumeration on the target domain.
+//
+// Parameters:
+//   - size: determines the size of the subdomain list to use ("small", "medium", or "large")
+//   - url: the target URL to scan
+//   - timeout: maximum duration for each DNS lookup
+//   - threads: number of concurrent threads to use
+//   - logdir: directory to store log files (empty string for no logging)
+//
+// Returns:
+//   - []string: a slice of discovered subdomains
+//   - error: any error encountered during the enumeration
 func Dnslist(size string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
 
 	fmt.Println(styles.Separator.Render("📡 Starting " + styles.Status.Render("DNS fuzzing") + "..."))

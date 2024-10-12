@@ -1,3 +1,33 @@
+/*
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                  SIF                                         ║
+║                                                                              ║
+║        Blazing-fast pentesting suite written in Go                           ║
+║                                                                              ║
+║        Copyright (c) 2023-2024 vmfunc, xyzeva, lunchcat contributors         ║
+║                    and other sif contributors.                               ║
+║                                                                              ║
+║                                                                              ║
+║        Use of this tool is restricted to research and educational            ║
+║        purposes only. Usage in a production environment outside              ║
+║        of these categories is strictly prohibited.                           ║
+║                                                                              ║
+║        Any person or entity wishing to use this tool outside of              ║
+║        research or educational purposes must purchase a license              ║
+║        from https://lunchcat.dev                                             ║
+║                                                                              ║
+║        For more information, visit: https://github.com/lunchcat/sif          ║ 
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+*/
+
+
+// The scan package provides a collection of security scanning functions.
+//
+// Each scanning function typically returns a slice of custom result structures and an error.
+// The package utilizes concurrent operations to improve scanning performance and provides
+// options for logging and timeout management.
 package scan
 
 import (
@@ -35,6 +65,14 @@ func fetchRobotsTXT(url string, client *http.Client) *http.Response {
 	return resp
 }
 
+// Scan performs a basic URL scan, including checks for robots.txt and other common endpoints.
+// It logs the results and doesn't return any values.
+//
+// Parameters:
+//   - url: the target URL to scan
+//   - timeout: maximum duration for the scan
+//   - threads: number of concurrent threads to use
+//   - logdir: directory to store log files (empty string for no logging)
 func Scan(url string, timeout time.Duration, threads int, logdir string) {
 	fmt.Println(styles.Separator.Render("🐾 Starting " + styles.Status.Render("base url scanning") + "..."))
 

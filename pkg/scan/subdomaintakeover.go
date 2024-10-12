@@ -14,12 +14,26 @@ import (
 	"github.com/dropalldatabases/sif/pkg/logger"
 )
 
+// SubdomainTakeoverResult represents the outcome of a subdomain takeover vulnerability check.
+// It includes the subdomain tested, whether it's vulnerable, and the potentially vulnerable service.
 type SubdomainTakeoverResult struct {
 	Subdomain string `json:"subdomain"`
 	Vulnerable bool `json:"vulnerable"`
 	Service string `json:"service,omitempty"`
 }
 
+// SubdomainTakeover checks for potential subdomain takeover vulnerabilities.
+//
+// Parameters:
+//   - url: the target URL to scan
+//   - dnsResults: a slice of subdomains to check (typically from Dnslist function)
+//   - timeout: maximum duration for each subdomain check
+//   - threads: number of concurrent threads to use
+//   - logdir: directory to store log files (empty string for no logging)
+//
+// Returns:
+//   - []SubdomainTakeoverResult: a slice of results for each checked subdomain
+//   - error: any error encountered during the scan
 func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, threads int, logdir string) ([]SubdomainTakeoverResult, error) {
 	fmt.Println(styles.Separator.Render("🔍 Starting " + styles.Status.Render("Subdomain Takeover Vulnerability Check") + "..."))
 
