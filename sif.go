@@ -65,7 +65,7 @@ func New(settings *config.Settings) (*App, error) {
 			app.targets = append(app.targets, scanner.Text())
 		}
 	} else {
-		return app, errors.New("target(s) must be supplied with -u or -f")
+		return app, errors.New("target(s) must be supplied with -u or -f\n\nSee 'sif -h' for more information")
 	}
 
 	return app, nil
