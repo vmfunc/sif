@@ -34,6 +34,47 @@
       "contributions": [
         "platform"
       ]
+    },
+    {
+      "login": "macdoos",
+      "name": "macdoos",
+      "avatar_url": "https://avatars.githubusercontent.com/u/127897805?v=4",
+      "profile": "https://github.com/macdoos",
+      "contributions": [
+      ]
+    },
+    {
+      "login": "D3adPlays",
+      "name": "Matthieu Witrowiez",
+      "avatar_url": "https://avatars.githubusercontent.com/u/75166283?v=4",
+      "profile": "https://epitech.eu",
+      "contributions": [
+        "ideas"
+      ]
+    },
+      "login": "tessa-u-k",
+      "name": "tessa ",
+      "avatar_url": "https://avatars.githubusercontent.com/u/109355732?v=4",
+      "profile": "https://github.com/tessa-u-k",
+      "contributions": [
+        "infra",
+        "question",
+        "userTesting"
+      ]
+    },
+    {
+      "login": "xyzeva",
+      "name": "Eva",
+      "avatar_url": "https://avatars.githubusercontent.com/u/133499694?v=4",
+      "profile": "https://github.com/xyzeva",
+      "contributions": [
+        "blog",
+        "content",
+        "research",
+        "security",
+        "test",
+        "code"
+      ]
     }
   ]
 }
