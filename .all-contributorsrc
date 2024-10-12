@@ -14,7 +14,16 @@
       "avatar_url": "https://avatars.githubusercontent.com/u/59031302?v=4",
       "profile": "https://vmfunc.re",
       "contributions": [
-        "maintenance"
+        "maintenance",
+        "mentoring",
+        "projectManagement",
+        "security",
+        "test",
+        "business",
+        "code",
+        "design",
+        "financial",
+        "ideas"
       ]
     }
   ]
