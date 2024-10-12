@@ -83,7 +83,7 @@ jobs:
 
             @${{ env.COMMIT_AUTHOR }}, your changes have been included in this release.
           draft: false
-          prerelease: true
+          prerelease: false
 
       - name: Upload Windows Release Asset
         uses: actions/upload-release-asset@v1
