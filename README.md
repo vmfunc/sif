@@ -43,6 +43,7 @@ _(__  )_  / _  __/
   <tbody>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://vmfunc.re"><img src="https://avatars.githubusercontent.com/u/59031302?v=4?s=100" width="100px;" alt="mel"/><br /><sub><b>mel</b></sub></a><br /><a href="#maintenance-vmfunc" title="Maintenance">🚧</a> <a href="#mentoring-vmfunc" title="Mentoring">🧑‍🏫</a> <a href="#projectManagement-vmfunc" title="Project Management">📆</a> <a href="#security-vmfunc" title="Security">🛡️</a> <a href="#test-vmfunc" title="Tests">⚠️</a> <a href="#business-vmfunc" title="Business development">💼</a> <a href="#code-vmfunc" title="Code">💻</a> <a href="#design-vmfunc" title="Design">🎨</a> <a href="#financial-vmfunc" title="Financial">💵</a> <a href="#ideas-vmfunc" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/tessa-u-k"><img src="https://avatars.githubusercontent.com/u/109355732?v=4?s=100" width="100px;" alt="tessa "/><br /><sub><b>tessa </b></sub></a><br /><a href="#infra-tessa-u-k" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="#question-tessa-u-k" title="Answering Questions">💬</a> <a href="#userTesting-tessa-u-k" title="User Testing">📓</a></td>
     </tr>
   </tbody>
 </table>
