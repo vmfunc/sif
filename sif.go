@@ -184,6 +184,15 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.CloudStorage {
+			result, err := scan.CloudStorage(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running C3 Scan: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"cloudstorage", result})
+			}
+		}
+
 		if app.settings.ApiMode {
 			result := UrlResult{
 				Url:     url,

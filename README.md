@@ -30,6 +30,7 @@ _(__  )_  / _  __/
 - 💘 Shodan integration
 - 📦 CMS detection
 - 🔍 HTTP Header Analysis
+- ☁️ C3 Misconfiguration Scanner
 
 ## Contributing and support
 

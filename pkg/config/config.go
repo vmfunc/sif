@@ -27,6 +27,7 @@ type Settings struct {
 	Template   string
 	CMS        bool
 	Headers    bool
+	CloudStorage bool
 }
 
 const (
@@ -67,6 +68,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.JavaScript, "js", false, "Enable JavaScript scans"),
 		flagSet.BoolVar(&settings.CMS, "cms", false, "Enable CMS detection"),
 		flagSet.BoolVar(&settings.Headers, "headers", false, "Enable HTTP Header Analysis"),
+		flagSet.BoolVar(&settings.CloudStorage, "c3", false, "Enable C3 Misconfiguration Scan"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",
