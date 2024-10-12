@@ -42,7 +42,7 @@ _(__  )_  / _  __/
 <table>
   <tbody>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://vmfunc.re"><img src="https://avatars.githubusercontent.com/u/59031302?v=4?s=100" width="100px;" alt="mel"/><br /><sub><b>mel</b></sub></a><br /><a href="#maintenance-vmfunc" title="Maintenance">🚧</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://vmfunc.re"><img src="https://avatars.githubusercontent.com/u/59031302?v=4?s=100" width="100px;" alt="mel"/><br /><sub><b>mel</b></sub></a><br /><a href="#maintenance-vmfunc" title="Maintenance">🚧</a> <a href="#mentoring-vmfunc" title="Mentoring">🧑‍🏫</a> <a href="#projectManagement-vmfunc" title="Project Management">📆</a> <a href="#security-vmfunc" title="Security">🛡️</a> <a href="#test-vmfunc" title="Tests">⚠️</a> <a href="#business-vmfunc" title="Business development">💼</a> <a href="#code-vmfunc" title="Code">💻</a> <a href="#design-vmfunc" title="Design">🎨</a> <a href="#financial-vmfunc" title="Financial">💵</a> <a href="#ideas-vmfunc" title="Ideas, Planning, & Feedback">🤔</a></td>
     </tr>
   </tbody>
 </table>
