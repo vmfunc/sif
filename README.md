@@ -14,33 +14,32 @@
 
 ## 📖 Table of Contents
 
-- [Features](#-features)
+- [Modules](#-modules)
 - [Installation](#-installation)
 - [Quick Start](#-quick-start)
 - [Usage](#-usage)
-- [Modules](#-modules)
 - [Performance](#-performance)
 - [Contributing](#-contributing)
 - [Contributors](#-contributors)
 - [Acknowledgements](#-acknowledgements)
 
-## 🚀 Features
+## 🧩 Modules
 
-sif is a comprehensive pentesting suite designed for efficiency and ease of use. Our key features include:
+sif is built with a modular architecture, allowing for easy extension and customization. Some of our key modules include:
 
-- 📂 **Directory/file fuzzing/scanning**: Quickly discover hidden directories and files
-- 📡 **DNS subdomain enumeration**: Uncover subdomains associated with target domains
-- 🐾 **Common Web scanning**: Identify common web vulnerabilities and misconfigurations
-- 🖥️ **Port/service scanning**: Detect open ports and running services on target systems
-- 🦠 **Vulnerability scanning**:
+- 📂 Directory/file fuzzing/scanning
+- 📡 DNS subdomain enumeration
+- 🐾 Common Web scanning
+- 🖥️ Port/service scanning
+- 🦠 Vulnerability scanning
   - Support for pre-existing nuclei templates
   - Metasploit emulation for execution
-- 🔎 **Automated Google dorking**: Leverage search engines for information gathering
-- 💘 **Shodan integration**: Harness the power of Shodan for additional reconnaissance
-- 📦 **CMS detection**: Identify content management systems used by target websites
-- 🔍 **HTTP Header Analysis**: Analyze HTTP headers for potential security issues
-- ☁️ **C3 Misconfiguration Scanner**: Detect common cloud configuration vulnerabilities
-- 🔍 **Subdomain Takeover Checks**: Identify potential subdomain takeover vulnerabilities
+- 🔎 Automated Google dorking
+- 💘 Shodan integration
+- 📦 CMS detection
+- 🔍 HTTP Header Analysis
+- ☁️ C3 Misconfiguration Scanner
+- 🔍 Subdomain Takeover Checks
 
 ## 📦 Installation
 
@@ -102,24 +101,6 @@ sif offers a wide range of commands and options to customize your pentesting wor
 ```
 
 For a complete list of commands and options, run `./sif -h`.
-
-## 🧩 Modules
-
-sif is built with a modular architecture, allowing for easy extension and customization. Some of our key modules include:
-
-- 📂 Directory/file fuzzing/scanning
-- 📡 DNS subdomain enumeration
-- 🐾 Common Web scanning
-- 🖥️ Port/service scanning
-- 🦠 Vulnerability scanning
-  - Support for pre-existing nuclei templates
-  - Metasploit emulation for execution
-- 🔎 Automated Google dorking
-- 💘 Shodan integration
-- 📦 CMS detection
-- 🔍 HTTP Header Analysis
-- ☁️ C3 Misconfiguration Scanner
-- 🔍 Subdomain Takeover Checks
 
 ## ⚡ Performance
 
