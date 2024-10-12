@@ -1,12 +1,6 @@
-<pre align="center">
-       _____________
-__________(_)__  __/
-__  ___/_  /__  /_  
-_(__  )_  / _  __/  
-/____/ /_/  /_/     
-</pre>
-
-<h4 align="center">a blazing-fast pentesting (recon/exploitation) suite written in Go 🐾</h4>
+<div align="center">
+<img src="https://github.com/lunchcat/sif/blob/main/assets/banner.png?raw=true">
+</div>
 
 <div align="center">
 
@@ -18,7 +12,100 @@ _(__  )_  / _  __/
 
 </div>
 
-## Features
+## 📖 Table of Contents
+
+- [Features](#-features)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Usage](#-usage)
+- [Modules](#-modules)
+- [Performance](#-performance)
+- [Contributing](#-contributing)
+- [Contributors](#-contributors)
+- [Acknowledgements](#-acknowledgements)
+
+## 🚀 Features
+
+sif is a comprehensive pentesting suite designed for efficiency and ease of use. Our key features include:
+
+- 📂 **Directory/file fuzzing/scanning**: Quickly discover hidden directories and files
+- 📡 **DNS subdomain enumeration**: Uncover subdomains associated with target domains
+- 🐾 **Common Web scanning**: Identify common web vulnerabilities and misconfigurations
+- 🖥️ **Port/service scanning**: Detect open ports and running services on target systems
+- 🦠 **Vulnerability scanning**:
+  - Support for pre-existing nuclei templates
+  - Metasploit emulation for execution
+- 🔎 **Automated Google dorking**: Leverage search engines for information gathering
+- 💘 **Shodan integration**: Harness the power of Shodan for additional reconnaissance
+- 📦 **CMS detection**: Identify content management systems used by target websites
+- 🔍 **HTTP Header Analysis**: Analyze HTTP headers for potential security issues
+- ☁️ **C3 Misconfiguration Scanner**: Detect common cloud configuration vulnerabilities
+- 🔍 **Subdomain Takeover Checks**: Identify potential subdomain takeover vulnerabilities
+
+## 📦 Installation
+
+### Using pre-built binaries
+
+Visit our [Releases](https://github.com/dropalldatabases/sif/releases) page to download the latest pre-built binary for your operating system.
+
+### Building from source
+
+1. Ensure you have Go 1.23+ installed on your system.
+2. Clone the repository:
+   ```
+   git clone https://github.com/lunchcat/sif.git
+   cd sif
+   ```
+3. Build using the Makefile:
+   ```
+   make
+   ```
+4. The binary will be available in the root directory.
+
+## 🚀 Quick Start
+
+1. Run a basic scan:
+   ```
+   ./sif -u example.com
+   ```
+2. For more options and advanced usage, refer to the help command:
+   ```
+   ./sif -h
+   ```
+
+## 🛠 Usage
+
+sif offers a wide range of commands and options to customize your pentesting workflow. Here are some common usage examples:
+
+- Directory fuzzing
+
+```
+./sif -u http://example.com -dirlist medium
+```
+
+- Subdomain enumeration
+
+```
+./sif -u http://example.com -dnslist medium
+```
+
+- Supabase/Firebase and C3 Vulnerability scanning
+
+```
+./sif -u https://example.com -js -c3
+```
+
+- Port scanning
+  
+```
+./sif -u https://example.com -ports common
+```
+
+For a complete list of commands and options, run `./sif -h`.
+
+## 🧩 Modules
+
+sif is built with a modular architecture, allowing for easy extension and customization. Some of our key modules include:
 
 - 📂 Directory/file fuzzing/scanning
 - 📡 DNS subdomain enumeration
@@ -34,7 +121,28 @@ _(__  )_  / _  __/
 - ☁️ C3 Misconfiguration Scanner
 - 🔍 Subdomain Takeover Checks
 
-## Contributors
+## ⚡ Performance
+
+sif is designed for high performance and efficiency:
+
+- Written in Go for excellent concurrency and speed
+- Optimized algorithms for minimal resource usage
+- Supports multi-threading for faster scans
+- Efficient caching mechanisms to reduce redundant operations
+
+## 🤝 Contributing
+
+We welcome contributions from the community! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting a pull request.
+
+Areas we're particularly interested in:
+- New scanning modules
+- Performance improvements
+- Documentation enhancements
+- Bug fixes and error handling improvements
+
+## 🌟 Contributors
+
+Thanks to these wonderful people who have contributed to sif:
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
@@ -57,8 +165,19 @@ _(__  )_  / _  __/
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
-## Contributing and support
+## 🙏 Acknowledgements
 
-Please join [our Discord server](https://discord.gg/uzQv4YbJ8W) to discuss sif development and to ask questions. Feel free to open an issue on GitHub requesting an addition to sif or asking for help with an issue.
+We'd like to thank the following projects and communities for their inspiration and support:
 
-Contributions are welcome! Make sure to read `CONTRIBUTING.md` before submitting a pull request.
+- [ProjectDiscovery](https://projectdiscovery.io/) for their amazing open-source security tools
+- [Shodan](https://www.shodan.io/)
+- [Malcore](https://www.malcore.io/), for providing us direct API support at Lunchcat.
+
+---
+
+<div align="center">
+  <strong>Happy Hunting! 🐾</strong>
+  <p>
+    <sub>Built with ❤️ by the lunchcat team and contributors worldwide</sub>
+  </p>
+</div>
