@@ -19,7 +19,7 @@ jobs:
         run: make
       - name: Run Sif with features
         run: |
-          ./sif -u https://google.com -dnslist small -dirlist small -ports common -dork -git -whois -cms
+          ./sif -u https://google.com -dnslist small -dirlist small -dork -git -whois -cms
           if [ $? -eq 0 ]; then
             echo "Sif ran successfully"
           else
