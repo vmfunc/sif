@@ -41,7 +41,7 @@ jobs:
           GOOS=linux GOARCH=arm64 go build -o sif-linux-arm64 ./cmd/sif
 
       - name: Set release version
-        run: echo "RELEASE_VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+        run: echo "RELEASE_VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Get commit info
         run: |
