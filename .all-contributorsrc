@@ -25,6 +25,15 @@
         "financial",
         "ideas"
       ]
+    },
+    {
+      "login": "projectdiscovery",
+      "name": "ProjectDiscovery",
+      "avatar_url": "https://avatars.githubusercontent.com/u/50994705?v=4",
+      "profile": "https://projectdiscovery.io",
+      "contributions": [
+        "platform"
+      ]
     }
   ]
 }
