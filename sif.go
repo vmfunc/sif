@@ -166,6 +166,15 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.CMS {
+			result, err := scan.CMS(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running CMS detection: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, ModuleResult{"cms", result})
+			}
+		}
+
 		if app.settings.ApiMode {
 			result := UrlResult{
 				Url:     url,

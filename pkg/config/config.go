@@ -25,6 +25,7 @@ type Settings struct {
 	File       string
 	ApiMode    bool
 	Template   string
+	CMS        bool
 }
 
 const (
@@ -63,6 +64,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.NoScan, "noscan", false, "Do not perform base URL (robots.txt, etc) scanning"),
 		flagSet.BoolVar(&settings.Whois, "whois", false, "Enable WHOIS lookup"),
 		flagSet.BoolVar(&settings.JavaScript, "js", false, "Enable JavaScript scans"),
+		flagSet.BoolVar(&settings.CMS, "cms", false, "Enable CMS detection"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",

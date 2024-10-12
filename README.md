@@ -14,9 +14,11 @@ _(__  )_  / _  __/
 [![Go Report Card](https://goreportcard.com/badge/github.com/dropalldatabases/sif)](https://goreportcard.com/report/github.com/dropalldatabases/sif)
 [![Version](https://img.shields.io/github/v/tag/dropalldatabases/sif)](https://github.com/dropalldatabases/sif/tags)
 [![Chat on Discord](https://img.shields.io/discord/1202922721969705010)](https://discord.gg/uzQv4YbJ8W)
+
 </div>
 
 ## Features
+
 - 📂 Directory/file fuzzing/scanning
 - 📡 DNS subdomain enumeration
 - 🐾 Common Web scanning
@@ -26,6 +28,7 @@ _(__  )_  / _  __/
   - Metasploit emulation for execution
 - 🔎 Automated Google dorking
 - 💘 Shodan integration
+- 📦 CMS detection
 
 ## Contributing and support
 
