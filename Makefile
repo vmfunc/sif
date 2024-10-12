@@ -27,12 +27,20 @@ clean:
 
 install: check_go_version
 	@echo "📦 Installing sif..."
+	@if [ "$$(uname)" != "Linux" ] && [ "$$(uname)" != "Darwin" ]; then \
+		echo "❌ Error: This installation script is for UNIX systems only."; \
+		exit 1; \
+	fi
 	mkdir -p $(DESTDIR)$(PREFIX)/$(BINDIR)
 	cp -f sif $(DESTDIR)$(PREFIX)/$(BINDIR)
 	@echo "✅ sif installed successfully! 🎊"
 
 uninstall:
 	@echo "🗑️ Uninstalling sif..."
+	@if [ "$$(uname)" != "Linux" ] && [ "$$(uname)" != "Darwin" ]; then \
+		echo "❌ Error: This uninstallation script is for UNIX systems only."; \
+		exit 1; \
+	fi
 	$(RM) $(DESTDIR)$(PREFIX)/$(BINDIR)/sif
 	@echo "✅ sif uninstalled successfully!"
 
