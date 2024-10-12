@@ -175,6 +175,15 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.Headers {
+			result, err := scan.Headers(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running HTTP Header Analysis: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"headers", result})
+			}
+		}
+
 		if app.settings.ApiMode {
 			result := UrlResult{
 				Url:     url,

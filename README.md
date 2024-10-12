@@ -29,6 +29,7 @@ _(__  )_  / _  __/
 - 🔎 Automated Google dorking
 - 💘 Shodan integration
 - 📦 CMS detection
+- 🔍 HTTP Header Analysis
 
 ## Contributing and support
 

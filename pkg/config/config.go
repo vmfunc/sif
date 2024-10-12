@@ -26,6 +26,7 @@ type Settings struct {
 	ApiMode    bool
 	Template   string
 	CMS        bool
+	Headers    bool
 }
 
 const (
@@ -65,6 +66,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.Whois, "whois", false, "Enable WHOIS lookup"),
 		flagSet.BoolVar(&settings.JavaScript, "js", false, "Enable JavaScript scans"),
 		flagSet.BoolVar(&settings.CMS, "cms", false, "Enable CMS detection"),
+		flagSet.BoolVar(&settings.Headers, "headers", false, "Enable HTTP Header Analysis"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",
