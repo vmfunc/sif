@@ -31,8 +31,8 @@ install: check_go_version
 		echo "❌ Error: This installation script is for UNIX systems only."; \
 		exit 1; \
 	fi
-	mkdir -p $(DESTDIR)$(PREFIX)/$(BINDIR)
-	cp -f sif $(DESTDIR)$(PREFIX)/$(BINDIR)
+	mkdir -p $(DESTDIR)$(PREFIX)/$(BINDIR) || (echo "🔒 Permission denied. Trying with sudo..." && sudo mkdir -p $(DESTDIR)$(PREFIX)/$(BINDIR))
+	cp -f sif $(DESTDIR)$(PREFIX)/$(BINDIR) || (echo "🔒 Permission denied. Trying with sudo..." && sudo cp -f sif $(DESTDIR)$(PREFIX)/$(BINDIR))
 	@echo "✅ sif installed successfully! 🎊"
 
 uninstall:
@@ -41,7 +41,7 @@ uninstall:
 		echo "❌ Error: This uninstallation script is for UNIX systems only."; \
 		exit 1; \
 	fi
-	$(RM) $(DESTDIR)$(PREFIX)/$(BINDIR)/sif
+	$(RM) $(DESTDIR)$(PREFIX)/$(BINDIR)/sif || (echo "🔒 Permission denied. Trying with sudo..." && sudo $(RM) $(DESTDIR)$(PREFIX)/$(BINDIR)/sif)
 	@echo "✅ sif uninstalled successfully!"
 
 .PHONY: all check_go_version sif clean install uninstall
