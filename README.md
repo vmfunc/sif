@@ -13,7 +13,8 @@ _(__  )_  / _  __/
 ![Go version](https://img.shields.io/github/go-mod/go-version/dropalldatabases/sif)
 [![Go Report Card](https://goreportcard.com/badge/github.com/dropalldatabases/sif)](https://goreportcard.com/report/github.com/dropalldatabases/sif)
 [![Version](https://img.shields.io/github/v/tag/dropalldatabases/sif)](https://github.com/dropalldatabases/sif/tags)
-[![Chat on Discord](https://img.shields.io/discord/1202922721969705010)](https://discord.gg/uzQv4YbJ8W)
+
+[![All Contributors](https://img.shields.io/github/all-contributors/lunchcat/sif?color=ee8449&style=flat-square)](#contributors)
 
 </div>
 
@@ -32,6 +33,17 @@ _(__  )_  / _  __/
 - 🔍 HTTP Header Analysis
 - ☁️ C3 Misconfiguration Scanner
 - 🔍 Subdomain Takeover Checks
+
+## Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 ## Contributing and support
 
