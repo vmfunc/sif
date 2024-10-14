@@ -91,6 +91,8 @@ func (app *App) Run() error {
 		}
 	}
 
+	scansRun := []string{}
+
 	for _, url := range app.targets {
 		if !strings.Contains(url, "://") {
 			return errors.New(fmt.Sprintf("URL %s must include leading protocol", url))
@@ -108,6 +110,7 @@ func (app *App) Run() error {
 
 		if !app.settings.NoScan {
 			scan.Scan(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			scansRun = append(scansRun, "Basic Scan")
 		}
 
 		if app.settings.Dirlist != "none" {
@@ -116,6 +119,7 @@ func (app *App) Run() error {
 				log.Errorf("Error while running directory scan: %s", err)
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"dirlist", result})
+				scansRun = append(scansRun, "Directory Listing")
 			}
 		}
 
@@ -128,6 +132,7 @@ func (app *App) Run() error {
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"dnslist", result})
 				dnsResults = result // Store the DNS results
+				scansRun = append(scansRun, "DNS Scan")
 			}
 
 			// Only run subdomain takeover check if DNS scan is enabled
@@ -137,6 +142,7 @@ func (app *App) Run() error {
 					log.Errorf("Error while running Subdomain Takeover Vulnerability Check: %s", err)
 				} else {
 					moduleResults = append(moduleResults, ModuleResult{"subdomain_takeover", result})
+					scansRun = append(scansRun, "Subdomain Takeover")
 				}
 			}
 		} else if app.settings.SubdomainTakeover {
@@ -149,11 +155,13 @@ func (app *App) Run() error {
 				log.Errorf("Error while running port scan: %s", err)
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"portscan", result})
+				scansRun = append(scansRun, "Port Scan")
 			}
 		}
 
 		if app.settings.Whois {
 			scan.Whois(url, app.settings.LogDir)
+			scansRun = append(scansRun, "Whois")
 		}
 
 		// func Git(url string, timeout time.Duration, threads int, logdir string)
@@ -163,6 +171,7 @@ func (app *App) Run() error {
 				log.Errorf("Error while running Git module: %s", err)
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"git", result})
+				scansRun = append(scansRun, "Git")
 			}
 		}
 
@@ -172,6 +181,7 @@ func (app *App) Run() error {
 				log.Errorf("Error while running Nuclei module: %s", err)
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"nuclei", result})
+				scansRun = append(scansRun, "Nuclei")
 			}
 		}
 
@@ -181,6 +191,7 @@ func (app *App) Run() error {
 				log.Errorf("Error while running JS module: %s", err)
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"js", result})
+				scansRun = append(scansRun, "JS")
 			}
 		}
 
@@ -188,6 +199,7 @@ func (app *App) Run() error {
 			result, err := scan.CMS(url, app.settings.Timeout, app.settings.LogDir)
 			if err != nil {
 				log.Errorf("Error while running CMS detection: %s", err)
+				scansRun = append(scansRun, "CMS")
 			} else if result != nil {
 				moduleResults = append(moduleResults, ModuleResult{"cms", result})
 			}
@@ -199,6 +211,7 @@ func (app *App) Run() error {
 				log.Errorf("Error while running HTTP Header Analysis: %s", err)
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"headers", result})
+				scansRun = append(scansRun, "HTTP Headers")
 			}
 		}
 
@@ -208,6 +221,7 @@ func (app *App) Run() error {
 				log.Errorf("Error while running C3 Scan: %s", err)
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"cloudstorage", result})
+				scansRun = append(scansRun, "Cloud Storage")
 			}
 		}
 
@@ -218,6 +232,7 @@ func (app *App) Run() error {
 				log.Errorf("Error while running Subdomain Takeover Vulnerability Check: %s", err)
 			} else {
 				moduleResults = append(moduleResults, ModuleResult{"subdomain_takeover", result})
+				scansRun = append(scansRun, "Subdomain Takeover")
 			}
 		}
 
@@ -236,10 +251,14 @@ func (app *App) Run() error {
 	}
 
 	if !app.settings.ApiMode {
+		scansRunList := "  • " + strings.Join(scansRun, "\n  • ")
 		if app.settings.LogDir != "" {
-			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n📂 Output saved to files: %s\n", strings.Join(app.logFiles, ", "))))
+			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n📂 Output saved to files: %s\n\n🔍 Ran scans:\n%s", 
+				strings.Join(app.logFiles, ", "),
+				scansRunList)))
 		} else {
-			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n")))
+			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n\n🔍 Ran scans:\n%s", 
+				scansRunList)))
 		}
 	}
 
