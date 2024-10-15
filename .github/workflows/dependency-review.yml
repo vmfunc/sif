@@ -1,0 +1,22 @@
+name: "Dependency Review"
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v3
+      - name: "Dependency Review"
+        uses: actions/dependency-review-action@v3
+        continue-on-error: ${{ github.event_name == 'push' }}
+      - name: "Check Dependency Review Outcome"
+        if: github.event_name == 'push' && failure()
+        run: |
+          echo "::warning::Dependency review failed. Please check the dependencies for potential issues."

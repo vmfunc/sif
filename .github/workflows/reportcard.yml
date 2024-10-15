@@ -1,0 +1,16 @@
+name: Update Report Card
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+jobs:
+  update-report-card:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Update Go Report Card
+        uses: creekorful/goreportcard-action@v1.0
