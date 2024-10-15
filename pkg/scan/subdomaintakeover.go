@@ -2,24 +2,24 @@ package scan
 
 import (
 	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"strings"
-	"time"
-	"os"
-	"sync"
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/styles"
 	"github.com/dropalldatabases/sif/pkg/logger"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+	"time"
 )
 
 // SubdomainTakeoverResult represents the outcome of a subdomain takeover vulnerability check.
 // It includes the subdomain tested, whether it's vulnerable, and the potentially vulnerable service.
 type SubdomainTakeoverResult struct {
-	Subdomain string `json:"subdomain"`
-	Vulnerable bool `json:"vulnerable"`
-	Service string `json:"service,omitempty"`
+	Subdomain  string `json:"subdomain"`
+	Vulnerable bool   `json:"vulnerable"`
+	Service    string `json:"service,omitempty"`
 }
 
 // SubdomainTakeover checks for potential subdomain takeover vulnerabilities.

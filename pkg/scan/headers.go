@@ -17,7 +17,7 @@
 ║        research or educational purposes must purchase a license              ║
 ║        from https://lunchcat.dev                                             ║
 ║                                                                              ║
-║        For more information, visit: https://github.com/lunchcat/sif          ║ 
+║        For more information, visit: https://github.com/lunchcat/sif          ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 */
@@ -27,9 +27,9 @@ package scan
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
-	"os"
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/styles"
@@ -81,4 +81,3 @@ func Headers(url string, timeout time.Duration, logdir string) ([]HeaderResult, 
 
 	return results, nil
 }
-

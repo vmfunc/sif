@@ -253,11 +253,11 @@ func (app *App) Run() error {
 	if !app.settings.ApiMode {
 		scansRunList := "  • " + strings.Join(scansRun, "\n  • ")
 		if app.settings.LogDir != "" {
-			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n📂 Output saved to files: %s\n\n🔍 Ran scans:\n%s", 
+			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n📂 Output saved to files: %s\n\n🔍 Ran scans:\n%s",
 				strings.Join(app.logFiles, ", "),
 				scansRunList)))
 		} else {
-			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n\n🔍 Ran scans:\n%s", 
+			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n\n🔍 Ran scans:\n%s",
 				scansRunList)))
 		}
 	}

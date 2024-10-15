@@ -17,7 +17,7 @@
 ║        research or educational purposes must purchase a license              ║
 ║        from https://lunchcat.dev                                             ║
 ║                                                                              ║
-║        For more information, visit: https://github.com/lunchcat/sif          ║ 
+║        For more information, visit: https://github.com/lunchcat/sif          ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 */
@@ -32,26 +32,26 @@ import (
 )
 
 type Settings struct {
-	Dirlist    string
-	Dnslist    string
-	Debug      bool
-	LogDir     string
-	NoScan     bool
-	Ports      string
-	Dorking    bool
-	Git        bool
-	Whois      bool
-	Threads    int
-	Nuclei     bool
-	JavaScript bool
-	Timeout    time.Duration
-	URLs       goflags.StringSlice
-	File       string
-	ApiMode    bool
-	Template   string
-	CMS        bool
-	Headers    bool
-	CloudStorage bool
+	Dirlist           string
+	Dnslist           string
+	Debug             bool
+	LogDir            string
+	NoScan            bool
+	Ports             string
+	Dorking           bool
+	Git               bool
+	Whois             bool
+	Threads           int
+	Nuclei            bool
+	JavaScript        bool
+	Timeout           time.Duration
+	URLs              goflags.StringSlice
+	File              string
+	ApiMode           bool
+	Template          string
+	CMS               bool
+	Headers           bool
+	CloudStorage      bool
 	SubdomainTakeover bool
 }
 

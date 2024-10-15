@@ -17,7 +17,7 @@
 ║        research or educational purposes must purchase a license              ║
 ║        from https://lunchcat.dev                                             ║
 ║                                                                              ║
-║        For more information, visit: https://github.com/lunchcat/sif          ║ 
+║        For more information, visit: https://github.com/lunchcat/sif          ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 */
@@ -66,13 +66,13 @@ var (
 
 // Severity level styles for color-coding vulnerability severities
 var (
-	SeverityLow      = lipgloss.NewStyle().
+	SeverityLow = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00ff00"))
 
-	SeverityMedium   = lipgloss.NewStyle().
+	SeverityMedium = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#ffff00"))
 
-	SeverityHigh     = lipgloss.NewStyle().
+	SeverityHigh = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#ff8800"))
 
 	SeverityCritical = lipgloss.NewStyle().

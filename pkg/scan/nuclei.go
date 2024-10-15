@@ -17,7 +17,7 @@
 ║        research or educational purposes must purchase a license              ║
 ║        from https://lunchcat.dev                                             ║
 ║                                                                              ║
-║        For more information, visit: https://github.com/lunchcat/sif          ║ 
+║        For more information, visit: https://github.com/lunchcat/sif          ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 */

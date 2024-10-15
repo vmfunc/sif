@@ -17,7 +17,7 @@
 ║        research or educational purposes must purchase a license              ║
 ║        from https://lunchcat.dev                                             ║
 ║                                                                              ║
-║        For more information, visit: https://github.com/lunchcat/sif          ║ 
+║        For more information, visit: https://github.com/lunchcat/sif          ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 */
@@ -27,9 +27,9 @@ package scan
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
-	"os"
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/styles"
@@ -92,7 +92,7 @@ func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStor
 }
 
 func extractPotentialBuckets(url string) []string {
-	// This is a simple implementation. 
+	// This is a simple implementation.
 	// TODO: add more cases
 	parts := strings.Split(url, ".")
 	var buckets []string
@@ -100,11 +100,11 @@ func extractPotentialBuckets(url string) []string {
 		buckets = append(buckets, part)
 		buckets = append(buckets, part+"-s3")
 		buckets = append(buckets, "s3-"+part)
-		
+
 		if i < len(parts)-1 {
 			domainExtension := part + "-" + parts[i+1]
 			buckets = append(buckets, domainExtension)
-			buckets = append(buckets, parts[i+1] + "-" + part)
+			buckets = append(buckets, parts[i+1]+"-"+part)
 		}
 	}
 	return buckets
@@ -121,4 +121,3 @@ func checkS3Bucket(bucket string, client *http.Client) (bool, error) {
 	// If we can access the bucket listing, it's public
 	return resp.StatusCode == http.StatusOK, nil
 }
-

@@ -17,7 +17,7 @@
 ║        research or educational purposes must purchase a license              ║
 ║        from https://lunchcat.dev                                             ║
 ║                                                                              ║
-║        For more information, visit: https://github.com/lunchcat/sif          ║ 
+║        For more information, visit: https://github.com/lunchcat/sif          ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 */
@@ -28,9 +28,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
-	"os"
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/styles"
@@ -57,7 +57,6 @@ func CMS(url string, timeout time.Duration, logdir string) (*CMSResult, error) {
 	cmslog := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "CMS 🔍",
 	}).With("url", url)
-	
 
 	client := &http.Client{
 		Timeout: timeout,
