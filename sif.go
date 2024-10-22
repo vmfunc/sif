@@ -149,6 +149,16 @@ func (app *App) Run() error {
 			log.Warnf("Subdomain Takeover check is enabled but DNS scan is disabled. Skipping Subdomain Takeover check.")
 		}
 
+		if app.settings.Dorking {
+			result, err := scan.Dork(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running Dork module: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"dork", result})
+				scansRun = append(scansRun, "Dork")
+			}
+		}
+
 		if app.settings.Ports != "none" {
 			result, err := scan.Ports(app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 			if err != nil {

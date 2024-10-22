@@ -108,6 +108,8 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 			defer wg.Done()
 
 			for i, dork := range dorks {
+
+
 				if i%threads != thread {
 					continue
 				}
