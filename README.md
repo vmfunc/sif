@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://github.com/lunchcat/sif/blob/main/assets/banner.png?raw=true">
+<img src="https://github.com/user-attachments/assets/e4caf24e-693f-4f12-b8ad-8e4a8d338fa9">
 </div>
 
 <div align="center">
@@ -95,7 +95,7 @@ sif offers a wide range of commands and options to customize your pentesting wor
 ```
 
 - Port scanning
-  
+
 ```
 ./sif -u https://example.com -ports common
 ```
@@ -116,6 +116,7 @@ sif is designed for high performance and efficiency:
 We welcome contributions from the community! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting a pull request.
 
 Areas we're particularly interested in:
+
 - New scanning modules
 - Performance improvements
 - Documentation enhancements
