@@ -22,42 +22,48 @@ type FrameworkResult struct {
 	Suggestions []string `json:"suggestions,omitempty"`
 }
 
-var frameworkSignatures = map[string][]string{
+type FrameworkSignature struct {
+	Pattern    string
+	Weight     float32
+	HeaderOnly bool
+}
+
+var frameworkSignatures = map[string][]FrameworkSignature{
 	"Laravel": {
-		`laravel_session`,
-		`XSRF-TOKEN`,
-		`<meta name="csrf-token"`,
+		{Pattern: `laravel_session`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `XSRF-TOKEN`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `<meta name="csrf-token"`, Weight: 0.3},
 	},
 	"Django": {
-		`csrfmiddlewaretoken`,
-		`django.contrib`,
-		`django.core`,
-		`__admin_media_prefix__`,
+		{Pattern: `csrfmiddlewaretoken`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `django.contrib`, Weight: 0.3},
+		{Pattern: `django.core`, Weight: 0.3},
+		{Pattern: `__admin_media_prefix__`, Weight: 0.3},
 	},
 	"Ruby on Rails": {
-		`csrf-param`,
-		`csrf-token`,
-		`ruby-on-rails`,
-		`rails-env`,
+		{Pattern: `csrf-param`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `csrf-token`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `ruby-on-rails`, Weight: 0.3},
+		{Pattern: `rails-env`, Weight: 0.3},
 	},
 	"Express.js": {
-		`express`,
-		`connect.sid`,
+		{Pattern: `express`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `connect.sid`, Weight: 0.3, HeaderOnly: true},
 	},
 	"ASP.NET": {
-		`ASP.NET`,
-		`__VIEWSTATE`,
-		`__EVENTVALIDATION`,
+		{Pattern: `ASP.NET`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `__VIEWSTATE`, Weight: 0.3},
+		{Pattern: `__EVENTVALIDATION`, Weight: 0.3},
 	},
 	"Spring": {
-		`org.springframework`,
-		`spring-security`,
-		`jsessionid`,
+		{Pattern: `org.springframework`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `spring-security`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `jsessionid`, Weight: 0.3, HeaderOnly: true},
 	},
 	"Flask": {
-		`flask`,
-		`werkzeug`,
-		`jinja2`,
+		{Pattern: `flask`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `werkzeug`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `jinja2`, Weight: 0.3},
 	},
 }
 
@@ -88,14 +94,23 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	var highestConfidence float32
 
 	for framework, signatures := range frameworkSignatures {
-		var matches int
+		var weightedScore float32
+		var totalWeight float32
+
 		for _, sig := range signatures {
-			if strings.Contains(bodyStr, sig) || containsHeader(resp.Header, sig) {
-				matches++
+			totalWeight += sig.Weight
+
+			if sig.HeaderOnly {
+				if containsHeader(resp.Header, sig.Pattern) {
+					weightedScore += sig.Weight
+				}
+			} else if strings.Contains(bodyStr, sig.Pattern) {
+				weightedScore += sig.Weight
 			}
 		}
 
-		confidence := float32(matches) / float32(len(signatures))
+		confidence := float32(1.0 / (1.0 + exp(-float64(weightedScore/totalWeight)*6.0)))
+
 		if confidence > highestConfidence {
 			highestConfidence = confidence
 			bestMatch = framework
@@ -118,7 +133,6 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 		frameworklog.Infof("Detected %s framework (version: %s) with %.2f confidence",
 			styles.Highlight.Render(bestMatch), version, highestConfidence)
 
-		// Add CVEs and suggestions based on version
 		if cves, suggestions := getVulnerabilities(bestMatch, version); len(cves) > 0 {
 			result.CVEs = cves
 			result.Suggestions = suggestions
@@ -146,23 +160,34 @@ func containsHeader(headers http.Header, signature string) bool {
 }
 
 func detectVersion(body string, framework string) string {
-	patterns := map[string]*regexp.Regexp{
-		"Laravel":       regexp.MustCompile(`Laravel[/\s+]?([\d.]+)`),
-		"Django":        regexp.MustCompile(`Django/([\d.]+)`),
-		"Ruby on Rails": regexp.MustCompile(`Rails/([\d.]+)`),
-		"Express.js":    regexp.MustCompile(`express/([\d.]+)`),
-		"ASP.NET":       regexp.MustCompile(`ASP\.NET[/\s+]?([\d.]+)`),
-		"Spring":        regexp.MustCompile(`spring-(core|framework)/([\d.]+)`),
-		"Flask":         regexp.MustCompile(`Flask/([\d.]+)`),
+	version := extractVersion(body, framework)
+	if version == "Unknown" {
+		return version
 	}
 
-	if pattern, exists := patterns[framework]; exists {
-		matches := pattern.FindStringSubmatch(body)
-		if len(matches) > 1 {
-			return matches[1]
-		}
+	parts := strings.Split(version, ".")
+	var normalized string
+	if len(parts) >= 3 {
+		normalized = fmt.Sprintf("%05s.%05s.%05s", parts[0], parts[1], parts[2])
 	}
-	return "Unknown"
+	return normalized
+}
+
+func exp(x float64) float64 {
+	if x > 88.0 {
+		return 1e38
+	}
+	if x < -88.0 {
+		return 0
+	}
+
+	sum := 1.0
+	term := 1.0
+	for i := 1; i <= 20; i++ {
+		term *= x / float64(i)
+		sum += term
+	}
+	return sum
 }
 
 func getVulnerabilities(framework, version string) ([]string, []string) {
@@ -176,4 +201,25 @@ func getVulnerabilities(framework, version string) ([]string, []string) {
 			}
 	}
 	return nil, nil
+}
+
+func extractVersion(body string, framework string) string {
+	versionPatterns := map[string]string{
+		"Laravel":       `Laravel\s+[Vv]?(\d+\.\d+\.\d+)`,
+		"Django":        `Django\s+[Vv]?(\d+\.\d+\.\d+)`,
+		"Ruby on Rails": `Rails\s+[Vv]?(\d+\.\d+\.\d+)`,
+		"Express.js":    `Express\s+[Vv]?(\d+\.\d+\.\d+)`,
+		"ASP.NET":       `ASP\.NET\s+[Vv]?(\d+\.\d+\.\d+)`,
+		"Spring":        `Spring\s+[Vv]?(\d+\.\d+\.\d+)`,
+		"Flask":         `Flask\s+[Vv]?(\d+\.\d+\.\d+)`,
+	}
+
+	if pattern, exists := versionPatterns[framework]; exists {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(body)
+		if len(matches) > 1 {
+			return matches[1]
+		}
+	}
+	return "Unknown"
 }
