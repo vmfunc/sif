@@ -28,6 +28,7 @@ import (
 	"github.com/dropalldatabases/sif/pkg/config"
 	"github.com/dropalldatabases/sif/pkg/logger"
 	"github.com/dropalldatabases/sif/pkg/scan"
+	"github.com/dropalldatabases/sif/pkg/scan/frameworks"
 	jsscan "github.com/dropalldatabases/sif/pkg/scan/js"
 )
 
@@ -123,6 +124,16 @@ func (app *App) Run() error {
 		if !app.settings.NoScan {
 			scan.Scan(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 			scansRun = append(scansRun, "Basic Scan")
+		}
+
+		if app.settings.Framework {
+			result, err := frameworks.DetectFramework(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running framework detection: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, ModuleResult{"framework", result})
+				scansRun = append(scansRun, "Framework Detection")
+			}
 		}
 
 		if app.settings.Dirlist != "none" {
