@@ -1,15 +1,8 @@
 <div align="center">
-<img src="https://github.com/user-attachments/assets/e4caf24e-693f-4f12-b8ad-8e4a8d338fa9">
-</div>
-
-<div align="center">
 
 ![Go version](https://img.shields.io/github/go-mod/go-version/dropalldatabases/sif?style=flat-square)
 [![Go Report Card](https://goreportcard.com/badge/github.com/dropalldatabases/sif?style=flat-square)](https://goreportcard.com/report/github.com/dropalldatabases/sif)
 [![Version](https://img.shields.io/github/v/tag/dropalldatabases/sif?style=flat-square)](https://github.com/dropalldatabases/sif/tags)
-[![All Contributors](https://img.shields.io/github/all-contributors/lunchcat/sif?color=ee8449&style=flat-square)](#contributors) 
-
-[![Discord](https://discordapp.com/api/guilds/1202922721969705010/widget.png?style=banner2)](https://discord.gg/w6HuE8puuX) 
 
 </div>
 
