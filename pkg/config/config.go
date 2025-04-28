@@ -53,6 +53,7 @@ type Settings struct {
 	Headers           bool
 	CloudStorage      bool
 	SubdomainTakeover bool
+	Framework         bool
 }
 
 const (
@@ -95,6 +96,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.Headers, "headers", false, "Enable HTTP Header Analysis"),
 		flagSet.BoolVar(&settings.CloudStorage, "c3", false, "Enable C3 Misconfiguration Scan"),
 		flagSet.BoolVar(&settings.SubdomainTakeover, "st", false, "Enable Subdomain Takeover Check"),
+		flagSet.BoolVar(&settings.Framework, "framework", false, "Enable framework detection"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",
