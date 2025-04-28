@@ -48,7 +48,7 @@ all: check_go_version sif
 check_go_version:
 	@echo "$$COPYRIGHT_ASCII"
 	@echo "🔍 Checking Go version..."
-	@$(GO) version | grep -q "go1\.23\." || (echo "❌ Error: Please install the latest version of Go" && exit 1)
+	@$(GO) version | grep -E "go1\.[2-9][0-9]*\." || (echo "❌ Error: Please install the latest version of Go" && exit 1)
 	@echo "✅ Go version check passed!"
 
 sif: check_go_version
