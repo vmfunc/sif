@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/styles"
-	"github.com/dropalldatabases/sif/pkg/logger"
 )
 
 // detectionThreshold is the minimum confidence for a detection to be reported.
