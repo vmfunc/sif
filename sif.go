@@ -49,6 +49,21 @@ type ModuleResult struct {
 	Data interface{} `json:"data"`
 }
 
+// ScanResult is the interface that all scan result types must implement.
+// This mirrors the definition in pkg/scan/result.go for use by the main package.
+type ScanResult interface {
+	ResultType() string
+}
+
+// NewModuleResult creates a ModuleResult with compile-time type safety.
+// The data parameter must implement ScanResult, which is enforced at compile time.
+func NewModuleResult[T ScanResult](data T) ModuleResult {
+	return ModuleResult{
+		Id:   data.ResultType(),
+		Data: data,
+	}
+}
+
 // New creates a new App struct by parsing the configuration options,
 // figuring out the targets from list or file, etc.
 //
@@ -131,7 +146,7 @@ func (app *App) Run() error {
 			if err != nil {
 				log.Errorf("Error while running framework detection: %s", err)
 			} else if result != nil {
-				moduleResults = append(moduleResults, ModuleResult{"framework", result})
+				moduleResults = append(moduleResults, NewModuleResult(result))
 				scansRun = append(scansRun, "Framework Detection")
 			}
 		}
@@ -223,7 +238,7 @@ func (app *App) Run() error {
 			if err != nil {
 				log.Errorf("Error while running JS module: %s", err)
 			} else {
-				moduleResults = append(moduleResults, ModuleResult{"js", result})
+				moduleResults = append(moduleResults, NewModuleResult(result))
 				scansRun = append(scansRun, "JS")
 			}
 		}
@@ -234,7 +249,7 @@ func (app *App) Run() error {
 				log.Errorf("Error while running CMS detection: %s", err)
 				scansRun = append(scansRun, "CMS")
 			} else if result != nil {
-				moduleResults = append(moduleResults, ModuleResult{"cms", result})
+				moduleResults = append(moduleResults, NewModuleResult(result))
 			}
 		}
 
@@ -263,7 +278,7 @@ func (app *App) Run() error {
 			if err != nil {
 				log.Errorf("Error while running Shodan lookup: %s", err)
 			} else if result != nil {
-				moduleResults = append(moduleResults, ModuleResult{"shodan", result})
+				moduleResults = append(moduleResults, NewModuleResult(result))
 				scansRun = append(scansRun, "Shodan")
 			}
 		}
@@ -273,7 +288,7 @@ func (app *App) Run() error {
 			if err != nil {
 				log.Errorf("Error while running SQL reconnaissance: %s", err)
 			} else if result != nil {
-				moduleResults = append(moduleResults, ModuleResult{"sql", result})
+				moduleResults = append(moduleResults, NewModuleResult(result))
 				scansRun = append(scansRun, "SQL Recon")
 			}
 		}
@@ -283,7 +298,7 @@ func (app *App) Run() error {
 			if err != nil {
 				log.Errorf("Error while running LFI reconnaissance: %s", err)
 			} else if result != nil {
-				moduleResults = append(moduleResults, ModuleResult{"lfi", result})
+				moduleResults = append(moduleResults, NewModuleResult(result))
 				scansRun = append(scansRun, "LFI Recon")
 			}
 		}

@@ -32,6 +32,9 @@ type JavascriptScanResult struct {
 	FoundEnvironmentVars map[string]string    `json:"environment_variables"`
 }
 
+// ResultType implements the ScanResult interface.
+func (r *JavascriptScanResult) ResultType() string { return "js" }
+
 func JavascriptScan(url string, timeout time.Duration, threads int, logdir string) (*JavascriptScanResult, error) {
 	jslog := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "🚧 JavaScript",
