@@ -114,7 +114,11 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 					continue
 				}
 
-				results, _ := googlesearch.Search(nil, fmt.Sprintf("%s %s", dork, sanitizedURL))
+				results, err := googlesearch.Search(nil, fmt.Sprintf("%s %s", dork, sanitizedURL))
+				if err != nil {
+					dorklog.Debugf("error searching for dork %s: %v", dork, err)
+					continue
+				}
 				if len(results) > 0 {
 					dorklog.Infof("%s dork results found for dork [%s]", styles.Status.Render(strconv.Itoa(len(results))), styles.Highlight.Render(dork))
 					if logdir != "" {
