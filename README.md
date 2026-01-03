@@ -32,7 +32,7 @@ grab the latest binary from [releases](https://github.com/vmfunc/sif/releases).
 ### from source
 
 ```bash
-git clone https://github.com/dropalldatabases/sif.git
+git clone https://github.com/vmfunc/sif.git
 cd sif
 make
 ```
