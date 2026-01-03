@@ -121,7 +121,6 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 						scanlog.Debugf("Error %s: %s", sanitizedRobot, err)
 						continue
 					}
-					defer resp.Body.Close()
 
 					if resp.StatusCode != 404 {
 						scanlog.Infof("%s from robots: [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(sanitizedRobot))
@@ -129,6 +128,7 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 							logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s from robots: [%s]\n", strconv.Itoa(resp.StatusCode), sanitizedRobot))
 						}
 					}
+					resp.Body.Close()
 				}
 
 			}(thread)
