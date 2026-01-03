@@ -171,12 +171,12 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 					log.Debugf("Error checking %s: %v", checkURL, err)
 					continue
 				}
-				defer resp.Body.Close()
 
 				// check for successful response (not 404)
 				if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
 					// read body to check for common admin panel indicators
 					body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*100)) // limit to 100KB
+					resp.Body.Close()
 					if err != nil {
 						continue
 					}
@@ -202,6 +202,8 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 							logger.Write(sanitizedURL, logdir, fmt.Sprintf("Found %s at [%s] (status: %d)\n", adminPath.panelType, checkURL, resp.StatusCode))
 						}
 					}
+				} else {
+					resp.Body.Close()
 				}
 			}
 		}()
