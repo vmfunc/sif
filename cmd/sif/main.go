@@ -15,7 +15,7 @@ package main
 import (
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif"
-	"github.com/dropalldatabases/sif/pkg/config"
+	"github.com/dropalldatabases/sif/internal/config"
 
 	// Register framework detectors
 	_ "github.com/dropalldatabases/sif/pkg/scan/frameworks/detectors"
