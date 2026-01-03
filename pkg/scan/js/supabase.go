@@ -31,6 +31,9 @@ import (
 	"github.com/charmbracelet/log"
 )
 
+// jwtRegex matches JWT tokens in JavaScript content.
+var jwtRegex = regexp.MustCompile(`["'\x60](ey[A-Za-z0-9_-]{2,}(?:\.[A-Za-z0-9_-]{2,}){2})["'\x60]`)
+
 type supabaseJwtBody struct {
 	ProjectId *string `json:"ref"`
 	Role      *string `json:"role"`
@@ -130,7 +133,7 @@ func doSupabaseRequest(projectId, path, apikey string, auth *string) ([]byte, *h
 		return nil, nil, errors.New("request to " + resp.Request.URL.String() + " failed with status code " + strconv.Itoa(resp.StatusCode))
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -142,12 +145,6 @@ func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) 
 	supabaselog := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "🚧 JavaScript > Supabase ⚡️",
 	}).With("url", jsUrl)
-
-	jwtRegex, err := regexp.Compile("[\"|'|`](ey[A-Za-z0-9_-]{2,}(?:\\.[A-Za-z0-9_-]{2,}){2})[\"|'|`]")
-
-	if err != nil {
-		return nil, err
-	}
 
 	var results = []supabaseScanResult{}
 	jwtGroups := jwtRegex.FindAllStringSubmatch(jsContent, -1)
@@ -201,7 +198,7 @@ func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) 
 
 		var auth string
 		if resp.StatusCode == http.StatusOK {
-			body, err := io.ReadAll(resp.Body)
+			body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
 			if err != nil {
 				resp.Body.Close()
 				return nil, err
