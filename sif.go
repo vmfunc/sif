@@ -18,7 +18,6 @@ package sif
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -81,7 +80,7 @@ func New(settings *config.Settings) (*App, error) {
 			app.targets = append(app.targets, scanner.Text())
 		}
 	} else {
-		return app, errors.New("target(s) must be supplied with -u or -f\n\nSee 'sif -h' for more information")
+		return app, fmt.Errorf("target(s) must be supplied with -u or -f\n\nSee 'sif -h' for more information")
 	}
 
 	return app, nil
@@ -105,16 +104,16 @@ func (app *App) Run() error {
 		defer logger.Close()
 	}
 
-	scansRun := []string{}
+	scansRun := make([]string, 0, 16)
 
 	for _, url := range app.targets {
 		if !strings.Contains(url, "://") {
-			return errors.New(fmt.Sprintf("URL %s must include leading protocol", url))
+			return fmt.Errorf("URL %s must include leading protocol", url)
 		}
 
 		log.Infof("📡Starting scan on %s...", url)
 
-		moduleResults := []ModuleResult{}
+		moduleResults := make([]ModuleResult, 0, 16)
 
 		if app.settings.LogDir != "" {
 			if err := logger.CreateFile(&app.logFiles, url, app.settings.LogDir); err != nil {
