@@ -80,7 +80,7 @@ func (l *Loader) LoadAll() error {
 		}
 	}
 
-	log.Debugf("Loaded %d modules", l.loaded)
+	log.Infof("📦 Loaded %d modules", l.loaded)
 	return nil
 }
 
