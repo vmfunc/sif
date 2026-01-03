@@ -80,12 +80,12 @@ func New(settings *config.Settings) (*App, error) {
 		app.targets = settings.URLs
 	} else if settings.File != "" {
 		if _, err := os.Stat(settings.File); err != nil {
-			return app, err
+			return nil, err
 		}
 
 		data, err := os.Open(settings.File)
 		if err != nil {
-			return app, err
+			return nil, err
 		}
 		defer data.Close()
 
@@ -95,10 +95,28 @@ func New(settings *config.Settings) (*App, error) {
 			app.targets = append(app.targets, scanner.Text())
 		}
 	} else {
-		return app, fmt.Errorf("target(s) must be supplied with -u or -f\n\nSee 'sif -h' for more information")
+		return nil, fmt.Errorf("target(s) must be supplied with -u or -f\n\nSee 'sif -h' for more information")
+	}
+
+	// Validate all URLs early
+	for _, url := range app.targets {
+		if err := validateURL(url); err != nil {
+			return nil, err
+		}
 	}
 
 	return app, nil
+}
+
+// validateURL checks that a URL has a valid HTTP/HTTPS protocol.
+func validateURL(url string) error {
+	if url == "" {
+		return fmt.Errorf("empty URL provided")
+	}
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		return fmt.Errorf("URL %s must include http:// or https:// protocol", url)
+	}
+	return nil
 }
 
 // Run runs the pentesting suite, with the targets specified, according to the
@@ -122,10 +140,6 @@ func (app *App) Run() error {
 	scansRun := make([]string, 0, 16)
 
 	for _, url := range app.targets {
-		if !strings.Contains(url, "://") {
-			return fmt.Errorf("URL %s must include leading protocol", url)
-		}
-
 		log.Infof("📡Starting scan on %s...", url)
 
 		moduleResults := make([]ModuleResult, 0, 16)
