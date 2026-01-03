@@ -17,6 +17,7 @@ package sif
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -25,6 +26,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/config"
 	"github.com/dropalldatabases/sif/internal/logger"
+	"github.com/dropalldatabases/sif/internal/modules"
 	"github.com/dropalldatabases/sif/internal/styles"
 	"github.com/dropalldatabases/sif/pkg/scan"
 	"github.com/dropalldatabases/sif/pkg/scan/frameworks"
@@ -76,6 +78,11 @@ func New(settings *config.Settings) (*App, error) {
 		fmt.Println(styles.Subheading.Render("\nblazing-fast pentesting suite\nman's best friend\n\nbsd 3-clause · (c) 2022-2025 vmfunc, xyzeva & contributors\n"))
 	}
 
+	// Skip target requirement if just listing modules
+	if settings.ListModules {
+		return app, nil
+	}
+
 	if len(settings.URLs) > 0 {
 		app.targets = settings.URLs
 	} else if settings.File != "" {
@@ -122,6 +129,23 @@ func validateURL(url string) error {
 // Run runs the pentesting suite, with the targets specified, according to the
 // settings specified.
 func (app *App) Run() error {
+	// Handle --list-modules before any other processing
+	if app.settings.ListModules {
+		loader, err := modules.NewLoader()
+		if err != nil {
+			return fmt.Errorf("failed to create module loader: %w", err)
+		}
+		if err := loader.LoadAll(); err != nil {
+			log.Warnf("Failed to load modules: %v", err)
+		}
+		fmt.Println("Available modules:")
+		for _, m := range modules.All() {
+			info := m.Info()
+			fmt.Printf("  %-25s %s [%s]\n", info.ID, info.Name, strings.Join(info.Tags, ", "))
+		}
+		return nil
+	}
+
 	if app.settings.Debug {
 		log.SetLevel(log.DebugLevel)
 	}
@@ -314,6 +338,55 @@ func (app *App) Run() error {
 			} else if result != nil {
 				moduleResults = append(moduleResults, NewModuleResult(result))
 				scansRun = append(scansRun, "LFI Recon")
+			}
+		}
+
+		// Load and run modules
+		if app.settings.AllModules || app.settings.Modules != "" || app.settings.ModuleTags != "" {
+			loader, err := modules.NewLoader()
+			if err != nil {
+				log.Warnf("Failed to create module loader: %v", err)
+			} else {
+				if err := loader.LoadAll(); err != nil {
+					log.Warnf("Failed to load modules: %v", err)
+				}
+
+				// Determine which modules to run
+				var toRun []modules.Module
+				if app.settings.AllModules {
+					toRun = modules.All()
+				} else if app.settings.ModuleTags != "" {
+					for _, tag := range strings.Split(app.settings.ModuleTags, ",") {
+						toRun = append(toRun, modules.ByTag(strings.TrimSpace(tag))...)
+					}
+				} else if app.settings.Modules != "" {
+					for _, id := range strings.Split(app.settings.Modules, ",") {
+						if m, ok := modules.Get(strings.TrimSpace(id)); ok {
+							toRun = append(toRun, m)
+						} else {
+							log.Warnf("Module not found: %s", id)
+						}
+					}
+				}
+
+				// Execute modules
+				opts := modules.Options{
+					Timeout: app.settings.Timeout,
+					Threads: app.settings.Threads,
+					LogDir:  app.settings.LogDir,
+				}
+
+				for _, m := range toRun {
+					result, err := m.Execute(context.Background(), url, opts)
+					if err != nil {
+						log.Warnf("Module %s failed: %v", m.Info().ID, err)
+						continue
+					}
+					if result != nil && len(result.Findings) > 0 {
+						moduleResults = append(moduleResults, NewModuleResult(result))
+						log.Infof("Module %s found %d findings", m.Info().ID, len(result.Findings))
+					}
+				}
 			}
 		}
 
