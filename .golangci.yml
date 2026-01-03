@@ -7,12 +7,28 @@ linters:
     - gosimple      # simplifications
     - ineffassign   # useless assignments
     - misspell      # spelling mistakes
+    - gocritic      # opinionated lints
+    - revive        # replacement for golint
+    - unconvert     # unnecessary type conversions
+    - prealloc      # slice preallocation hints
+    - bodyclose     # http response body not closed
+    - noctx         # http requests without context
+    - exportloopref # loop variable capture
 
 linters-settings:
   govet:
     enable-all: true
   errcheck:
     check-blank: false
+  revive:
+    rules:
+      - name: exported
+        arguments: [checkPrivateReceivers]
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
 
 run:
   timeout: 5m
