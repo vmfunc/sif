@@ -1,0 +1,39 @@
+# Exposed Git Repository Detection Module
+
+id: git-exposed
+info:
+  name: Exposed Git Repository
+  author: sif
+  severity: high
+  description: Detects exposed .git directories that may leak source code
+  tags: [git, exposure, source-code, misconfiguration]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.git/HEAD"
+    - "{{BaseURL}}/.git/config"
+    - "{{BaseURL}}/.git/index"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "ref: refs/"
+        - "[core]"
+        - "repositoryformatversion"
+      condition: or
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: git_branch
+      part: body
+      regex:
+        - "ref: refs/heads/(.+)"
+      group: 1
