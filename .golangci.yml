@@ -1,0 +1,23 @@
+linters:
+  enable:
+    - errcheck      # check error returns
+    - govet         # suspicious constructs
+    - staticcheck   # advanced static analysis
+    - unused        # unused code
+    - gosimple      # simplifications
+    - ineffassign   # useless assignments
+    - misspell      # spelling mistakes
+
+linters-settings:
+  govet:
+    enable-all: true
+  errcheck:
+    check-blank: false
+
+run:
+  timeout: 5m
+  issues-exit-code: 1
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 3
