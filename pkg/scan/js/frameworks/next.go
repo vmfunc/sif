@@ -32,6 +32,9 @@ import (
 	urlutil "github.com/projectdiscovery/utils/url"
 )
 
+// nextPagesRegex matches JavaScript file references in Next.js build manifest.
+var nextPagesRegex = regexp.MustCompile(`\[("([^"]+\.js)"(,?))`)
+
 func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
 	baseUrl, err := urlutil.Parse(scriptUrl)
 	if err != nil {
@@ -45,20 +48,15 @@ func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	var manifestText string
+	var sb strings.Builder
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
-		manifestText += scanner.Text()
+		sb.WriteString(scanner.Text())
 	}
+	manifestText := sb.String()
 
-	regex, err := regexp.Compile("\\[(\"([^\"]+.js)\"(,?))")
-
-	if err != nil {
-		return nil, err
-	}
-
-	list := regex.FindAllStringSubmatch(manifestText, -1)
+	list := nextPagesRegex.FindAllStringSubmatch(manifestText, -1)
 
 	var scripts []string
 
