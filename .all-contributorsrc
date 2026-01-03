@@ -18,7 +18,7 @@
         "mentoring",
         "projectManagement",
         "security",
-        "code",
+        "code"
       ]
     },
     {
@@ -36,6 +36,7 @@
       "avatar_url": "https://avatars.githubusercontent.com/u/127897805?v=4",
       "profile": "https://github.com/macdoos",
       "contributions": [
+        "code"
       ]
     },
     {
@@ -47,7 +48,7 @@
         "ideas"
       ]
     },
-{
+    {
       "login": "tessa-u-k",
       "name": "tessa ",
       "avatar_url": "https://avatars.githubusercontent.com/u/109355732?v=4",
@@ -71,6 +72,16 @@
         "test",
         "code"
       ]
+    },
+    {
+      "login": "vxfemboy",
+      "name": "Zoa Hickenlooper",
+      "avatar_url": "https://avatars.githubusercontent.com/u/79362520?v=4",
+      "profile": "https://github.com/vxfemboy",
+      "contributions": [
+        "code"
+      ]
     }
-  ]
+  ],
+  "repoType": "github"
 }
