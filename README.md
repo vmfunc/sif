@@ -63,6 +63,9 @@ requires go 1.23+
 # sql recon + lfi scanning
 ./sif -u https://example.com -sql -lfi
 
+# framework detection (with cve lookup)
+./sif -u https://example.com -framework
+
 # everything
 ./sif -u https://example.com -all
 ```
@@ -88,6 +91,7 @@ run `./sif -h` for all options.
 | `shodan` | shodan host intelligence (requires SHODAN_API_KEY) |
 | `sql` | sql admin panel and error disclosure detection |
 | `lfi` | local file inclusion vulnerability scanning |
+| `framework` | web framework detection with version + cve lookup |
 
 ## contribute
 

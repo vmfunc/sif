@@ -1,0 +1,785 @@
+/*
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+:                                                                               :
+:   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :
+:   ▄█ █ █▀    ·   BSD 3-Clause License                                         :
+:                                                                               :
+:   (c) 2022-2025 vmfunc, xyzeva,                                               :
+:                 lunchcat alumni & contributors                                :
+:                                                                               :
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+*/
+
+package frameworks
+
+import (
+	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"os"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/pkg/logger"
+)
+
+type FrameworkResult struct {
+	Name              string   `json:"name"`
+	Version           string   `json:"version"`
+	Confidence        float32  `json:"confidence"`
+	VersionConfidence float32  `json:"version_confidence"`
+	CVEs              []string `json:"cves,omitempty"`
+	Suggestions       []string `json:"suggestions,omitempty"`
+	RiskLevel         string   `json:"risk_level,omitempty"`
+}
+
+type FrameworkSignature struct {
+	Pattern    string
+	Weight     float32
+	HeaderOnly bool
+}
+
+var frameworkSignatures = map[string][]FrameworkSignature{
+	"Laravel": {
+		{Pattern: `laravel_session`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `XSRF-TOKEN`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `<meta name="csrf-token"`, Weight: 0.3},
+	},
+	"Django": {
+		{Pattern: `csrfmiddlewaretoken`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `csrftoken`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `django.contrib`, Weight: 0.3},
+		{Pattern: `django.core`, Weight: 0.3},
+		{Pattern: `__admin_media_prefix__`, Weight: 0.3},
+	},
+	"Ruby on Rails": {
+		{Pattern: `csrf-param`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `csrf-token`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `_rails_session`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `ruby-on-rails`, Weight: 0.3},
+		{Pattern: `rails-env`, Weight: 0.3},
+		{Pattern: `data-turbo`, Weight: 0.2},
+	},
+	"Express.js": {
+		{Pattern: `Express`, Weight: 0.5, HeaderOnly: true},
+		{Pattern: `connect.sid`, Weight: 0.3, HeaderOnly: true},
+	},
+	"ASP.NET": {
+		{Pattern: `X-AspNet-Version`, Weight: 0.5, HeaderOnly: true},
+		{Pattern: `X-AspNetMvc-Version`, Weight: 0.5, HeaderOnly: true},
+		{Pattern: `ASP.NET`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `__VIEWSTATE`, Weight: 0.4},
+		{Pattern: `__EVENTVALIDATION`, Weight: 0.3},
+		{Pattern: `__VIEWSTATEGENERATOR`, Weight: 0.3},
+		{Pattern: `.aspx`, Weight: 0.2},
+		{Pattern: `.ashx`, Weight: 0.2},
+		{Pattern: `.asmx`, Weight: 0.2},
+		{Pattern: `asp.net_sessionid`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `X-Powered-By: ASP.NET`, Weight: 0.4, HeaderOnly: true},
+	},
+	"ASP.NET Core": {
+		{Pattern: `.AspNetCore.`, Weight: 0.5, HeaderOnly: true},
+		{Pattern: `blazor`, Weight: 0.4},
+		{Pattern: `_blazor`, Weight: 0.4},
+		{Pattern: `dotnet`, Weight: 0.2, HeaderOnly: true},
+	},
+	"Spring": {
+		{Pattern: `org.springframework`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `spring-security`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `JSESSIONID`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `X-Application-Context`, Weight: 0.3, HeaderOnly: true},
+	},
+	"Spring Boot": {
+		{Pattern: `spring-boot`, Weight: 0.5},
+		{Pattern: `actuator`, Weight: 0.3},
+		{Pattern: `whitelabel`, Weight: 0.2},
+	},
+	"Flask": {
+		{Pattern: `Werkzeug`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `flask`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `jinja2`, Weight: 0.3},
+	},
+	"Next.js": {
+		{Pattern: `__NEXT_DATA__`, Weight: 0.5},
+		{Pattern: `_next/static`, Weight: 0.4},
+		{Pattern: `__next`, Weight: 0.3},
+		{Pattern: `x-nextjs`, Weight: 0.3, HeaderOnly: true},
+	},
+	"Nuxt.js": {
+		{Pattern: `__NUXT__`, Weight: 0.5},
+		{Pattern: `_nuxt/`, Weight: 0.4},
+		{Pattern: `nuxt`, Weight: 0.2},
+	},
+	"Vue.js": {
+		{Pattern: `data-v-`, Weight: 0.5},
+		{Pattern: `Vue.js`, Weight: 0.4},
+		{Pattern: `vue.runtime`, Weight: 0.4},
+		{Pattern: `vue.min.js`, Weight: 0.4},
+		{Pattern: `__vue__`, Weight: 0.3},
+		{Pattern: `v-cloak`, Weight: 0.3},
+	},
+	"Angular": {
+		{Pattern: `ng-version`, Weight: 0.5},
+		{Pattern: `ng-app`, Weight: 0.4},
+		{Pattern: `ng-controller`, Weight: 0.4},
+		{Pattern: `angular.js`, Weight: 0.4},
+		{Pattern: `angular.min.js`, Weight: 0.4},
+		{Pattern: `ng-binding`, Weight: 0.3},
+		{Pattern: `_nghost`, Weight: 0.3},
+		{Pattern: `_ngcontent`, Weight: 0.3},
+	},
+	"React": {
+		{Pattern: `data-reactroot`, Weight: 0.5},
+		{Pattern: `react-dom`, Weight: 0.4},
+		{Pattern: `__REACT_DEVTOOLS`, Weight: 0.4},
+		{Pattern: `react.production`, Weight: 0.4},
+		{Pattern: `_reactRootContainer`, Weight: 0.3},
+	},
+	"Svelte": {
+		{Pattern: `svelte`, Weight: 0.4},
+		{Pattern: `__svelte`, Weight: 0.5},
+		{Pattern: `svelte-`, Weight: 0.3},
+	},
+	"SvelteKit": {
+		{Pattern: `__sveltekit`, Weight: 0.5},
+		{Pattern: `_app/immutable`, Weight: 0.4},
+		{Pattern: `sveltekit`, Weight: 0.3},
+	},
+	"Remix": {
+		{Pattern: `__remixContext`, Weight: 0.5},
+		{Pattern: `remix`, Weight: 0.3},
+		{Pattern: `_remix`, Weight: 0.4},
+	},
+	"Gatsby": {
+		{Pattern: `___gatsby`, Weight: 0.5},
+		{Pattern: `gatsby-`, Weight: 0.4},
+		{Pattern: `page-data.json`, Weight: 0.3},
+	},
+	"WordPress": {
+		{Pattern: `wp-content`, Weight: 0.4},
+		{Pattern: `wp-includes`, Weight: 0.4},
+		{Pattern: `wp-json`, Weight: 0.3},
+		{Pattern: `wordpress`, Weight: 0.3},
+		{Pattern: `wp-emoji`, Weight: 0.2},
+	},
+	"Drupal": {
+		{Pattern: `Drupal`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `drupal.js`, Weight: 0.4},
+		{Pattern: `/sites/default/files`, Weight: 0.3},
+		{Pattern: `Drupal.settings`, Weight: 0.3},
+	},
+	"Joomla": {
+		{Pattern: `Joomla`, Weight: 0.4},
+		{Pattern: `/media/jui/`, Weight: 0.4},
+		{Pattern: `/components/com_`, Weight: 0.3},
+		{Pattern: `joomla.javascript`, Weight: 0.3},
+	},
+	"Magento": {
+		{Pattern: `Magento`, Weight: 0.4},
+		{Pattern: `/static/frontend/`, Weight: 0.4},
+		{Pattern: `mage/`, Weight: 0.3},
+		{Pattern: `Mage.Cookies`, Weight: 0.3},
+	},
+	"Shopify": {
+		{Pattern: `Shopify`, Weight: 0.5},
+		{Pattern: `cdn.shopify.com`, Weight: 0.4},
+		{Pattern: `shopify-section`, Weight: 0.4},
+		{Pattern: `myshopify.com`, Weight: 0.3},
+	},
+	"Ghost": {
+		{Pattern: `ghost-`, Weight: 0.4},
+		{Pattern: `Ghost`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `/ghost/api/`, Weight: 0.4},
+	},
+	"Symfony": {
+		{Pattern: `symfony`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `sf_`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `_sf2_`, Weight: 0.3, HeaderOnly: true},
+	},
+	"FastAPI": {
+		{Pattern: `fastapi`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `starlette`, Weight: 0.3, HeaderOnly: true},
+	},
+	"Gin": {
+		{Pattern: `gin-gonic`, Weight: 0.4},
+		{Pattern: `gin`, Weight: 0.2, HeaderOnly: true},
+	},
+	"Phoenix": {
+		{Pattern: `_csrf_token`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `phx-`, Weight: 0.3},
+		{Pattern: `phoenix`, Weight: 0.2},
+	},
+	"Ember.js": {
+		{Pattern: `ember`, Weight: 0.4},
+		{Pattern: `ember-cli`, Weight: 0.4},
+		{Pattern: `data-ember`, Weight: 0.3},
+	},
+	"Backbone.js": {
+		{Pattern: `backbone`, Weight: 0.4},
+		{Pattern: `Backbone.`, Weight: 0.4},
+	},
+	"Meteor": {
+		{Pattern: `__meteor_runtime_config__`, Weight: 0.5},
+		{Pattern: `meteor`, Weight: 0.3},
+	},
+	"Strapi": {
+		{Pattern: `strapi`, Weight: 0.4},
+		{Pattern: `/api/`, Weight: 0.2},
+	},
+	"AdonisJS": {
+		{Pattern: `adonis`, Weight: 0.4},
+		{Pattern: `_csrf`, Weight: 0.2, HeaderOnly: true},
+	},
+	"CakePHP": {
+		{Pattern: `cakephp`, Weight: 0.4},
+		{Pattern: `cake`, Weight: 0.2},
+	},
+	"CodeIgniter": {
+		{Pattern: `codeigniter`, Weight: 0.4},
+		{Pattern: `ci_session`, Weight: 0.4, HeaderOnly: true},
+	},
+}
+
+// frameworkMatch holds the result of checking a single framework
+type frameworkMatch struct {
+	framework  string
+	confidence float32
+}
+
+func DetectFramework(url string, timeout time.Duration, logdir string) (*FrameworkResult, error) {
+	fmt.Println(styles.Separator.Render("🔍 Starting " + styles.Status.Render("Framework Detection") + "..."))
+
+	frameworklog := log.NewWithOptions(os.Stderr, log.Options{
+		Prefix: "Framework Detection 🔍",
+	}).With("url", url)
+
+	client := &http.Client{
+		Timeout: timeout,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	bodyStr := string(body)
+
+	// concurrent framework detection
+	results := make(chan frameworkMatch, len(frameworkSignatures))
+	var wg sync.WaitGroup
+
+	for framework, signatures := range frameworkSignatures {
+		wg.Add(1)
+		go func(fw string, sigs []FrameworkSignature) {
+			defer wg.Done()
+
+			var weightedScore float32
+			var totalWeight float32
+
+			for _, sig := range sigs {
+				totalWeight += sig.Weight
+
+				if sig.HeaderOnly {
+					if containsHeader(resp.Header, sig.Pattern) {
+						weightedScore += sig.Weight
+					}
+				} else if strings.Contains(bodyStr, sig.Pattern) {
+					weightedScore += sig.Weight
+				}
+			}
+
+			confidence := float32(1.0 / (1.0 + math.Exp(-float64(weightedScore/totalWeight)*6.0)))
+			results <- frameworkMatch{framework: fw, confidence: confidence}
+		}(framework, signatures)
+	}
+
+	// close results channel when all goroutines complete
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// find the best match
+	var bestMatch string
+	var highestConfidence float32
+
+	for match := range results {
+		if match.confidence > highestConfidence {
+			highestConfidence = match.confidence
+			bestMatch = match.framework
+		}
+	}
+
+	if highestConfidence > 0.5 { // threshold for detection
+		versionMatch := extractVersionWithConfidence(bodyStr, bestMatch)
+		cves, suggestions := getVulnerabilities(bestMatch, versionMatch.Version)
+
+		result := &FrameworkResult{
+			Name:              bestMatch,
+			Version:           versionMatch.Version,
+			Confidence:        highestConfidence,
+			VersionConfidence: versionMatch.Confidence,
+			CVEs:              cves,
+			Suggestions:       suggestions,
+			RiskLevel:         getRiskLevel(cves),
+		}
+
+		if logdir != "" {
+			logEntry := fmt.Sprintf("Detected framework: %s (version: %s, confidence: %.2f, version_confidence: %.2f)\n",
+				bestMatch, versionMatch.Version, highestConfidence, versionMatch.Confidence)
+			if len(cves) > 0 {
+				logEntry += fmt.Sprintf("  Risk Level: %s\n", result.RiskLevel)
+				logEntry += fmt.Sprintf("  CVEs: %v\n", cves)
+				logEntry += fmt.Sprintf("  Recommendations: %v\n", suggestions)
+			}
+			logger.Write(url, logdir, logEntry)
+		}
+
+		frameworklog.Infof("Detected %s framework (version: %s, confidence: %.2f)",
+			styles.Highlight.Render(bestMatch), versionMatch.Version, highestConfidence)
+
+		if versionMatch.Confidence > 0 {
+			frameworklog.Debugf("Version detected from: %s (confidence: %.2f)",
+				versionMatch.Source, versionMatch.Confidence)
+		}
+
+		if len(cves) > 0 {
+			frameworklog.Warnf("Risk level: %s", styles.SeverityHigh.Render(result.RiskLevel))
+			for _, cve := range cves {
+				frameworklog.Warnf("Found potential vulnerability: %s", styles.Highlight.Render(cve))
+			}
+			for _, suggestion := range suggestions {
+				frameworklog.Infof("Recommendation: %s", suggestion)
+			}
+		}
+
+		return result, nil
+	}
+
+	frameworklog.Info("No framework detected with sufficient confidence")
+	return nil, nil
+}
+
+func containsHeader(headers http.Header, signature string) bool {
+	sigLower := strings.ToLower(signature)
+
+	// check header names
+	for name := range headers {
+		if strings.Contains(strings.ToLower(name), sigLower) {
+			return true
+		}
+	}
+
+	// check header values
+	for _, values := range headers {
+		for _, value := range values {
+			if strings.Contains(strings.ToLower(value), sigLower) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func detectVersion(body string, framework string) string {
+	return extractVersion(body, framework)
+}
+
+// CVEEntry represents a known vulnerability for a framework version
+type CVEEntry struct {
+	CVE              string
+	AffectedVersions []string // versions affected (use semver ranges in future)
+	FixedVersion     string
+	Severity         string // critical, high, medium, low
+	Description      string
+	Recommendations  []string
+}
+
+// Known CVEs database - can be extended or loaded from external source
+var knownCVEs = map[string][]CVEEntry{
+	"Laravel": {
+		{
+			CVE:              "CVE-2021-3129",
+			AffectedVersions: []string{"8.0.0", "8.0.1", "8.0.2", "8.1.0", "8.2.0", "8.3.0", "8.4.0", "8.4.1"},
+			FixedVersion:     "8.4.2",
+			Severity:         "critical",
+			Description:      "Ignition debug mode RCE vulnerability",
+			Recommendations:  []string{"Update to Laravel 8.4.2 or later", "Disable debug mode in production"},
+		},
+		{
+			CVE:              "CVE-2021-21263",
+			AffectedVersions: []string{"8.0.0", "8.1.0", "8.2.0", "8.3.0", "8.4.0"},
+			FixedVersion:     "8.5.0",
+			Severity:         "high",
+			Description:      "SQL injection via request validation",
+			Recommendations:  []string{"Update to Laravel 8.5.0 or later", "Use parameterized queries"},
+		},
+	},
+	"Django": {
+		{
+			CVE:              "CVE-2023-36053",
+			AffectedVersions: []string{"3.2.0", "3.2.1", "3.2.2", "4.0.0", "4.1.0"},
+			FixedVersion:     "4.2.3",
+			Severity:         "high",
+			Description:      "Potential ReDoS in EmailValidator and URLValidator",
+			Recommendations:  []string{"Update to Django 4.2.3 or later"},
+		},
+		{
+			CVE:              "CVE-2023-31047",
+			AffectedVersions: []string{"3.2.0", "4.0.0", "4.1.0"},
+			FixedVersion:     "4.1.9",
+			Severity:         "medium",
+			Description:      "File upload validation bypass",
+			Recommendations:  []string{"Update to Django 4.1.9 or later", "Implement additional file validation"},
+		},
+	},
+	"WordPress": {
+		{
+			CVE:              "CVE-2023-2745",
+			AffectedVersions: []string{"5.0", "5.1", "5.2", "5.3", "5.4", "5.5", "5.6", "5.7", "5.8", "5.9", "6.0", "6.1"},
+			FixedVersion:     "6.2",
+			Severity:         "medium",
+			Description:      "Directory traversal vulnerability",
+			Recommendations:  []string{"Update to WordPress 6.2 or later"},
+		},
+	},
+	"Drupal": {
+		{
+			CVE:              "CVE-2023-44487",
+			AffectedVersions: []string{"9.0", "9.1", "9.2", "9.3", "9.4", "9.5", "10.0"},
+			FixedVersion:     "10.1.4",
+			Severity:         "high",
+			Description:      "HTTP/2 rapid reset attack (DoS)",
+			Recommendations:  []string{"Update to Drupal 10.1.4 or later", "Configure HTTP/2 rate limiting"},
+		},
+	},
+	"Next.js": {
+		{
+			CVE:              "CVE-2023-46298",
+			AffectedVersions: []string{"13.0.0", "13.1.0", "13.2.0", "13.3.0", "13.4.0"},
+			FixedVersion:     "13.5.0",
+			Severity:         "medium",
+			Description:      "Server-side request forgery vulnerability",
+			Recommendations:  []string{"Update to Next.js 13.5.0 or later"},
+		},
+	},
+	"Angular": {
+		{
+			CVE:              "CVE-2023-26117",
+			AffectedVersions: []string{"14.0.0", "14.1.0", "14.2.0", "15.0.0"},
+			FixedVersion:     "15.2.0",
+			Severity:         "medium",
+			Description:      "Regular expression denial of service",
+			Recommendations:  []string{"Update to Angular 15.2.0 or later"},
+		},
+	},
+	"Vue.js": {
+		{
+			CVE:              "CVE-2024-5987",
+			AffectedVersions: []string{"2.0.0", "2.1.0", "2.2.0", "2.3.0", "2.4.0", "2.5.0", "2.6.0"},
+			FixedVersion:     "2.7.16",
+			Severity:         "medium",
+			Description:      "XSS vulnerability in certain configurations",
+			Recommendations:  []string{"Update to Vue.js 2.7.16 or 3.x"},
+		},
+	},
+	"Express.js": {
+		{
+			CVE:              "CVE-2024-29041",
+			AffectedVersions: []string{"4.0.0", "4.1.0", "4.2.0", "4.3.0", "4.4.0"},
+			FixedVersion:     "4.19.2",
+			Severity:         "medium",
+			Description:      "Open redirect vulnerability",
+			Recommendations:  []string{"Update to Express.js 4.19.2 or later"},
+		},
+	},
+	"Ruby on Rails": {
+		{
+			CVE:              "CVE-2023-22795",
+			AffectedVersions: []string{"6.0.0", "6.1.0", "7.0.0"},
+			FixedVersion:     "7.0.4.1",
+			Severity:         "high",
+			Description:      "ReDoS vulnerability in Action Dispatch",
+			Recommendations:  []string{"Update to Rails 7.0.4.1 or later"},
+		},
+	},
+	"Spring": {
+		{
+			CVE:              "CVE-2022-22965",
+			AffectedVersions: []string{"5.0.0", "5.1.0", "5.2.0", "5.3.0"},
+			FixedVersion:     "5.3.18",
+			Severity:         "critical",
+			Description:      "Spring4Shell RCE vulnerability",
+			Recommendations:  []string{"Update to Spring 5.3.18 or later", "Disable class binding on user input"},
+		},
+	},
+	"Spring Boot": {
+		{
+			CVE:              "CVE-2022-22963",
+			AffectedVersions: []string{"2.0.0", "2.1.0", "2.2.0", "2.3.0", "2.4.0", "2.5.0", "2.6.0"},
+			FixedVersion:     "2.6.6",
+			Severity:         "critical",
+			Description:      "RCE via Spring Cloud Function",
+			Recommendations:  []string{"Update to Spring Boot 2.6.6 or later"},
+		},
+	},
+	"ASP.NET": {
+		{
+			CVE:              "CVE-2023-36899",
+			AffectedVersions: []string{"4.0", "4.5", "4.6", "4.7", "4.8"},
+			FixedVersion:     "latest security patches",
+			Severity:         "high",
+			Description:      "Elevation of privilege vulnerability",
+			Recommendations:  []string{"Apply latest security patches", "Ensure proper request validation"},
+		},
+	},
+	"Joomla": {
+		{
+			CVE:              "CVE-2023-23752",
+			AffectedVersions: []string{"4.0.0", "4.1.0", "4.2.0"},
+			FixedVersion:     "4.2.8",
+			Severity:         "critical",
+			Description:      "Improper access check allowing unauthorized access to webservice endpoints",
+			Recommendations:  []string{"Update to Joomla 4.2.8 or later"},
+		},
+	},
+	"Magento": {
+		{
+			CVE:              "CVE-2022-24086",
+			AffectedVersions: []string{"2.3.0", "2.3.1", "2.3.2", "2.4.0", "2.4.1", "2.4.2"},
+			FixedVersion:     "2.4.3-p1",
+			Severity:         "critical",
+			Description:      "Improper input validation leading to arbitrary code execution",
+			Recommendations:  []string{"Update to Magento 2.4.3-p1 or later"},
+		},
+	},
+}
+
+func getVulnerabilities(framework, version string) ([]string, []string) {
+	entries, exists := knownCVEs[framework]
+	if !exists {
+		return nil, nil
+	}
+
+	var cves []string
+	var recommendations []string
+	seenRecs := make(map[string]bool)
+
+	for _, entry := range entries {
+		for _, affectedVer := range entry.AffectedVersions {
+			if version == affectedVer || strings.HasPrefix(version, affectedVer) {
+				cves = append(cves, fmt.Sprintf("%s (%s)", entry.CVE, entry.Severity))
+				for _, rec := range entry.Recommendations {
+					if !seenRecs[rec] {
+						recommendations = append(recommendations, rec)
+						seenRecs[rec] = true
+					}
+				}
+				break
+			}
+		}
+	}
+
+	return cves, recommendations
+}
+
+// getRiskLevel determines overall risk based on detected CVEs
+func getRiskLevel(cves []string) string {
+	if len(cves) == 0 {
+		return "low"
+	}
+	for _, cve := range cves {
+		if strings.Contains(cve, "critical") {
+			return "critical"
+		}
+	}
+	for _, cve := range cves {
+		if strings.Contains(cve, "high") {
+			return "high"
+		}
+	}
+	return "medium"
+}
+
+// VersionMatch represents a version detection result with confidence
+type VersionMatch struct {
+	Version    string
+	Confidence float32
+	Source     string // where the version was found
+}
+
+// isValidVersion checks if a version string looks reasonable
+func isValidVersion(version string) bool {
+	if version == "" || version == "unknown" {
+		return false
+	}
+	// parse major version and check if reasonable (< 100)
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	var major int
+	_, err := fmt.Sscanf(parts[0], "%d", &major)
+	if err != nil || major >= 100 || major < 0 {
+		return false
+	}
+	return true
+}
+
+func extractVersion(body string, framework string) string {
+	match := extractVersionWithConfidence(body, framework)
+	return match.Version
+}
+
+func extractVersionWithConfidence(body string, framework string) VersionMatch {
+	versionPatterns := map[string][]struct {
+		pattern    string
+		confidence float32
+		source     string
+	}{
+		"Laravel": {
+			{`Laravel\s+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`laravel/framework.*?(\d+\.\d+(?:\.\d+)?)`, 0.8, "composer.json"},
+		},
+		"Django": {
+			{`Django[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`django.*?(\d+\.\d+(?:\.\d+)?)`, 0.7, "package reference"},
+		},
+		"Ruby on Rails": {
+			{`Rails[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`rails.*?(\d+\.\d+(?:\.\d+)?)`, 0.7, "gem reference"},
+		},
+		"Express.js": {
+			{`Express[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`"express":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+		},
+		"ASP.NET": {
+			{`X-AspNet-Version:\s*(\d+\.\d+(?:\.\d+)?)`, 0.95, "header"},
+			{`ASP\.NET[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`X-AspNetMvc-Version:\s*(\d+\.\d+(?:\.\d+)?)`, 0.9, "MVC header"},
+		},
+		"ASP.NET Core": {
+			{`\.NET\s*(\d+\.\d+(?:\.\d+)?)`, 0.8, "dotnet version"},
+		},
+		"Spring": {
+			{`Spring[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`spring-core.*?(\d+\.\d+(?:\.\d+)?)`, 0.8, "maven"},
+		},
+		"Spring Boot": {
+			{`spring-boot.*?(\d+\.\d+(?:\.\d+)?)`, 0.9, "maven"},
+		},
+		"Flask": {
+			{`Flask[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`Werkzeug[/\s]+(\d+\.\d+(?:\.\d+)?)`, 0.7, "werkzeug version"},
+		},
+		"Next.js": {
+			{`Next\.js[/\s]+[Vv]?(\d{1,2}\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`"next":\s*"[~^]?(\d{1,2}\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+		},
+		"Nuxt.js": {
+			{`Nuxt[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`"nuxt":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+		},
+		"Vue.js": {
+			{`Vue\.js[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`"vue":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+			{`vue@(\d+\.\d+(?:\.\d+)?)`, 0.8, "CDN reference"},
+		},
+		"Angular": {
+			{`ng-version="(\d+\.\d+(?:\.\d+)?)"`, 0.95, "ng-version attribute"},
+			{`Angular[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`"@angular/core":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+		},
+		"React": {
+			{`React[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`"react":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+			{`react@(\d+\.\d+(?:\.\d+)?)`, 0.8, "CDN reference"},
+		},
+		"Svelte": {
+			{`Svelte[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`"svelte":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+		},
+		"SvelteKit": {
+			{`"@sveltejs/kit":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+		},
+		"WordPress": {
+			{`<meta name="generator" content="WordPress (\d+\.\d+(?:\.\d+)?)"`, 0.95, "generator meta"},
+			{`WordPress (\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+		},
+		"Drupal": {
+			{`Drupal[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`<meta name="Generator" content="Drupal (\d+)`, 0.9, "generator meta"},
+		},
+		"Joomla": {
+			{`Joomla[!/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`<meta name="generator" content="Joomla! - Open Source Content Management - Version (\d+\.\d+(?:\.\d+)?)"`, 0.95, "generator meta"},
+		},
+		"Magento": {
+			{`Magento[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+		},
+		"Shopify": {
+			{`Shopify\.theme.*?(\d+\.\d+(?:\.\d+)?)`, 0.7, "theme version"},
+		},
+		"Symfony": {
+			{`Symfony[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+		},
+		"FastAPI": {
+			{`FastAPI[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+		},
+		"Gin": {
+			{`Gin[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+		},
+		"Phoenix": {
+			{`Phoenix[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+		},
+		"Ember.js": {
+			{`Ember[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+		},
+		"Backbone.js": {
+			{`Backbone[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+		},
+		"Meteor": {
+			{`Meteor[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+		},
+		"Ghost": {
+			{`Ghost[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+		},
+	}
+
+	patterns, exists := versionPatterns[framework]
+	if !exists {
+		return VersionMatch{Version: "unknown", Confidence: 0, Source: ""}
+	}
+
+	var bestMatch VersionMatch
+	for _, p := range patterns {
+		re := regexp.MustCompile(p.pattern)
+		matches := re.FindStringSubmatch(body)
+		if len(matches) > 1 && p.confidence > bestMatch.Confidence {
+			candidate := matches[1]
+			// validate version looks reasonable
+			if isValidVersion(candidate) {
+				bestMatch = VersionMatch{
+					Version:    candidate,
+					Confidence: p.confidence,
+					Source:     p.source,
+				}
+			}
+		}
+	}
+
+	if bestMatch.Version == "" {
+		return VersionMatch{Version: "unknown", Confidence: 0, Source: ""}
+	}
+	return bestMatch
+}
