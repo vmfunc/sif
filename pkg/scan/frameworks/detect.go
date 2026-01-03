@@ -618,6 +618,24 @@ type VersionMatch struct {
 	Source     string // where the version was found
 }
 
+// isValidVersion checks if a version string looks reasonable
+func isValidVersion(version string) bool {
+	if version == "" || version == "unknown" {
+		return false
+	}
+	// parse major version and check if reasonable (< 100)
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	var major int
+	_, err := fmt.Sscanf(parts[0], "%d", &major)
+	if err != nil || major >= 100 || major < 0 {
+		return false
+	}
+	return true
+}
+
 func extractVersion(body string, framework string) string {
 	match := extractVersionWithConfidence(body, framework)
 	return match.Version
@@ -665,9 +683,8 @@ func extractVersionWithConfidence(body string, framework string) VersionMatch {
 			{`Werkzeug[/\s]+(\d+\.\d+(?:\.\d+)?)`, 0.7, "werkzeug version"},
 		},
 		"Next.js": {
-			{`Next\.js[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`"next":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
-			{`_next/static/.*?(\d+\.\d+(?:\.\d+)?)`, 0.6, "static path"},
+			{`Next\.js[/\s]+[Vv]?(\d{1,2}\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`"next":\s*"[~^]?(\d{1,2}\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
 		},
 		"Nuxt.js": {
 			{`Nuxt[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
@@ -696,9 +713,8 @@ func extractVersionWithConfidence(body string, framework string) VersionMatch {
 			{`"@sveltejs/kit":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
 		},
 		"WordPress": {
-			{`WordPress[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`wp-includes/version\.php.*?(\d+\.\d+(?:\.\d+)?)`, 0.85, "version.php"},
 			{`<meta name="generator" content="WordPress (\d+\.\d+(?:\.\d+)?)"`, 0.95, "generator meta"},
+			{`WordPress (\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
 		},
 		"Drupal": {
 			{`Drupal[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
@@ -750,10 +766,14 @@ func extractVersionWithConfidence(body string, framework string) VersionMatch {
 		re := regexp.MustCompile(p.pattern)
 		matches := re.FindStringSubmatch(body)
 		if len(matches) > 1 && p.confidence > bestMatch.Confidence {
-			bestMatch = VersionMatch{
-				Version:    matches[1],
-				Confidence: p.confidence,
-				Source:     p.source,
+			candidate := matches[1]
+			// validate version looks reasonable
+			if isValidVersion(candidate) {
+				bestMatch = VersionMatch{
+					Version:    candidate,
+					Confidence: p.confidence,
+					Source:     p.source,
+				}
 			}
 		}
 	}

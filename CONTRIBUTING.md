@@ -53,6 +53,98 @@ When making a pull request, please adhere to the following conventions:
 
 If you have any questions, feel free to ask around on the IRC channel.
 
+## Contributing Framework Detection Patterns
+
+The framework detection module (`pkg/scan/frameworks/detect.go`) identifies web frameworks by analyzing HTTP headers and response bodies. To add support for a new framework:
+
+### Adding a New Framework Signature
+
+1. Add your framework to the `frameworkSignatures` map:
+
+```go
+"MyFramework": {
+    {Pattern: `unique-identifier`, Weight: 0.5},
+    {Pattern: `header-signature`, Weight: 0.4, HeaderOnly: true},
+    {Pattern: `body-signature`, Weight: 0.3},
+},
+```
+
+**Pattern Guidelines:**
+- `Weight`: How much this signature contributes to detection (0.0-1.0)
+- `HeaderOnly`: Set to `true` for HTTP header patterns
+- Use unique identifiers that won't false-positive on other frameworks
+- Include multiple patterns for higher confidence
+
+### Adding Version Detection
+
+Add version patterns to `extractVersionWithConfidence()`:
+
+```go
+"MyFramework": {
+    {`MyFramework[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+    {`"myframework":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+},
+```
+
+### Adding CVE Data
+
+Add known vulnerabilities to the `knownCVEs` map:
+
+```go
+"MyFramework": {
+    {
+        CVE:              "CVE-YYYY-XXXXX",
+        AffectedVersions: []string{"1.0.0", "1.0.1", "1.1.0"},
+        FixedVersion:     "1.2.0",
+        Severity:         "high",  // critical, high, medium, low
+        Description:      "Brief description of the vulnerability",
+        Recommendations:  []string{"Update to 1.2.0 or later"},
+    },
+},
+```
+
+### Testing Your Changes
+
+Always add tests for new frameworks in `detect_test.go`:
+
+```go
+func TestDetectFramework_MyFramework(t *testing.T) {
+    server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte(`<html><body>unique-identifier</body></html>`))
+    }))
+    defer server.Close()
+
+    result, err := DetectFramework(server.URL, 5*time.Second, "")
+    // assertions...
+}
+```
+
+### Future Enhancements (Help Wanted)
+
+- **Custom Signature Support**: Allow users to define signatures via config file
+- **CVE API Integration**: Real-time CVE data from NVD or other sources
+- **Automated Signature Updates**: Fetch new signatures from a central repository
+- **Framework Fingerprint Database**: Community-maintained signature database
+
+## Configuration
+
+### Framework Detection Flags
+
+| Flag | Description |
+|------|-------------|
+| `-framework` | Enable framework detection |
+| `-timeout` | HTTP request timeout (affects all modules) |
+| `-threads` | Number of concurrent workers |
+| `-log` | Directory to save scan results |
+| `-debug` | Enable debug logging for verbose output |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `SHODAN_API_KEY` | API key for Shodan host intelligence |
+
 ## Packaging
 
 We'd love it if you helped us bring sif to your distribution.
