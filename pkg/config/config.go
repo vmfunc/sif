@@ -43,6 +43,7 @@ type Settings struct {
 	SubdomainTakeover bool
 	Shodan            bool
 	SQL               bool
+	LFI               bool
 }
 
 const (
@@ -87,6 +88,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.SubdomainTakeover, "st", false, "Enable Subdomain Takeover Check"),
 		flagSet.BoolVar(&settings.Shodan, "shodan", false, "Enable Shodan lookup (requires SHODAN_API_KEY env var)"),
 		flagSet.BoolVar(&settings.SQL, "sql", false, "Enable SQL reconnaissance (admin panels, error disclosure)"),
+		flagSet.BoolVar(&settings.LFI, "lfi", false, "Enable LFI (Local File Inclusion) reconnaissance"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",
