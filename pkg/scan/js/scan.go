@@ -110,7 +110,7 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 			continue
 		}
 
-		bodyBytes, err := io.ReadAll(resp.Body)
+		bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
 		resp.Body.Close()
 		if err != nil {
 			jslog.Errorf("Failed to read script body: %s", err)
