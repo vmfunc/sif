@@ -7,6 +7,7 @@
 [![go version](https://img.shields.io/github/go-mod/go-version/vmfunc/sif?style=flat-square&color=00ADD8)](https://go.dev/)
 [![build](https://img.shields.io/github/actions/workflow/status/vmfunc/sif/go.yml?style=flat-square)](https://github.com/vmfunc/sif/actions)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue?style=flat-square)](LICENSE)
+[![discord](https://img.shields.io/discord/1234567890?style=flat-square&logo=discord&logoColor=white&label=discord&color=5865F2)](https://discord.gg/sifcli)
 
 **[install](#install) · [usage](#usage) · [modules](#modules) · [contribute](#contribute)**
 
@@ -56,6 +57,12 @@ requires go 1.23+
 # javascript framework detection + cloud misconfig
 ./sif -u https://example.com -js -c3
 
+# shodan host intelligence (requires SHODAN_API_KEY env var)
+./sif -u https://example.com -shodan
+
+# sql recon + lfi scanning
+./sif -u https://example.com -sql -lfi
+
 # everything
 ./sif -u https://example.com -all
 ```
@@ -78,6 +85,9 @@ run `./sif -h` for all options.
 | `cms` | cms detection |
 | `whois` | whois lookups |
 | `git` | exposed git repository detection |
+| `shodan` | shodan host intelligence (requires SHODAN_API_KEY) |
+| `sql` | sql admin panel and error disclosure detection |
+| `lfi` | local file inclusion vulnerability scanning |
 
 ## contribute
 
@@ -93,6 +103,12 @@ golangci-lint run
 # test
 go test ./...
 ```
+
+## community
+
+join our discord for support, feature discussions, and pentesting tips:
+
+[![discord](https://img.shields.io/badge/join%20our%20discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/sifcli)
 
 ## contributors
 
