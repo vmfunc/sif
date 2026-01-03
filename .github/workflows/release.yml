@@ -18,7 +18,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -43,32 +43,13 @@ jobs:
       - name: Set release version
         run: echo "RELEASE_VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Get commit info
-        run: |
-          echo "COMMIT_MESSAGE=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
-          echo "COMMIT_AUTHOR=$(git log -1 --pretty=%an)" >> $GITHUB_ENV
-          echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: automated-release-${{ env.RELEASE_VERSION }}
-          release_name: Release ${{ env.RELEASE_VERSION }}
+          name: Release ${{ env.RELEASE_VERSION }}
           body: |
-            🚀 sif automated release v${{ env.RELEASE_VERSION }}
-
-            This is an automated release pushed by the release workflow.
-
-            ## Commit Information
-            - **Message:** ${{ env.COMMIT_MESSAGE }}
-            - **Author:** ${{ env.COMMIT_AUTHOR }}
-            - **SHA:** ${{ env.COMMIT_SHA }}
-
-            ## Build Information
-            - Built on: ${{ runner.os }}
+            Automated release v${{ env.RELEASE_VERSION }}
 
             ## Assets
             - Windows (64-bit): `sif-windows-amd64.exe`
@@ -79,78 +60,16 @@ jobs:
             - Linux (32-bit): `sif-linux-386`
             - Linux (64-bit ARM): `sif-linux-arm64`
 
-            For more details, please check the [commit history](https://github.com/${{ github.repository }}/commits/main).
-
-            @${{ env.COMMIT_AUTHOR }}, your changes have been included in this release.
+            For more details, check the [commit history](https://github.com/${{ github.repository }}/commits/main).
           draft: false
           prerelease: false
-
-      - name: Upload Windows Release Asset
-        uses: actions/upload-release-asset@v1
+          files: |
+            sif-windows-amd64.exe
+            sif-windows-386.exe
+            sif-macos-amd64
+            sif-macos-arm64
+            sif-linux-amd64
+            sif-linux-386
+            sif-linux-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sif-windows-amd64.exe
-          asset_name: sif-windows-amd64.exe
-          asset_content_type: application/octet-stream
-
-      - name: Upload Windows (32-bit) Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sif-windows-386.exe
-          asset_name: sif-windows-386.exe
-          asset_content_type: application/octet-stream
-
-      - name: Upload macOS Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sif-macos-amd64
-          asset_name: sif-macos-amd64
-          asset_content_type: application/octet-stream
-
-      - name: Upload macOS (ARM64) Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sif-macos-arm64
-          asset_name: sif-macos-arm64
-          asset_content_type: application/octet-stream
-
-      - name: Upload Linux Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sif-linux-amd64
-          asset_name: sif-linux-amd64
-          asset_content_type: application/octet-stream
-
-      - name: Upload Linux (32-bit) Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sif-linux-386
-          asset_name: sif-linux-386
-          asset_content_type: application/octet-stream
-
-      - name: Upload Linux (ARM64) Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sif-linux-arm64
-          asset_name: sif-linux-arm64
-          asset_content_type: application/octet-stream

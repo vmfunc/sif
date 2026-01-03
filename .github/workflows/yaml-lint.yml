@@ -11,9 +11,9 @@ jobs:
     name: runner / yamllint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: yamllint
-        uses: reviewdog/action-yamllint@v1.8.0
+        uses: reviewdog/action-yamllint@v1.19.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-review

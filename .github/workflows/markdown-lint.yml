@@ -10,9 +10,9 @@ jobs:
     name: runner / markdownlint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: markdownlint
-        uses: reviewdog/action-markdownlint@v0.10.0
+        uses: reviewdog/action-markdownlint@v0.24.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-review
