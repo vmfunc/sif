@@ -23,9 +23,9 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/config"
+	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/styles"
-	"github.com/dropalldatabases/sif/pkg/config"
-	"github.com/dropalldatabases/sif/pkg/logger"
 	"github.com/dropalldatabases/sif/pkg/scan"
 	"github.com/dropalldatabases/sif/pkg/scan/frameworks"
 	jsscan "github.com/dropalldatabases/sif/pkg/scan/js"
