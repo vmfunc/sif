@@ -1,68 +1,30 @@
-/*
-·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
-:                                                                               :
-:   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :
-:   ▄█ █ █▀    ·   BSD 3-Clause License                                         :
-:                                                                               :
-:   (c) 2022-2025 vmfunc (vmfunc), xyzeva,                        :
-:                 lunchcat alumni & contributors                                :
-:                                                                               :
-·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
-*/
-
 // Package styles provides custom styling options for the SIF tool's console output.
-// It uses the lipgloss library to create visually appealing and consistent text styles.
-
+// This package re-exports styles from internal/output for backwards compatibility.
 package styles
 
-import "github.com/charmbracelet/lipgloss"
-
-var (
-	// Separator style for creating visual breaks in the output
-	Separator = lipgloss.NewStyle().
-			Border(lipgloss.ThickBorder(), true, false).
-			Bold(true)
-
-	// Status style for highlighting important status messages
-	Status = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#00ff1a"))
-
-	// Highlight style for emphasizing specific text
-	Highlight = lipgloss.NewStyle().
-			Bold(true).
-			Underline(true)
-
-	// Box style for creating bordered content boxes
-	Box = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#fafafa")).
-		BorderStyle(lipgloss.RoundedBorder()).
-		Align(lipgloss.Center).
-		PaddingRight(15).
-		PaddingLeft(15).
-		Width(60)
-
-	// Subheading style for secondary titles or headers
-	Subheading = lipgloss.NewStyle().
-			Bold(true).
-			Align(lipgloss.Center).
-			PaddingRight(15).
-			PaddingLeft(15).
-			Width(60)
+import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
-// Severity level styles for color-coding vulnerability severities
+// Re-export styles from output package
 var (
-	SeverityLow = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#00ff00"))
+	Status     = output.Status
+	Highlight  = output.Highlight
+	Box        = output.Box
+	Subheading = output.Subheading
+)
 
-	SeverityMedium = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#ffff00"))
+// Separator style - kept for backwards compatibility but deprecated
+// Use output.ScanStart() instead
+var Separator = lipgloss.NewStyle().
+	Border(lipgloss.ThickBorder(), true, false).
+	Bold(true)
 
-	SeverityHigh = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#ff8800"))
-
-	SeverityCritical = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#ff0000"))
+// Severity level styles - re-exported from output
+var (
+	SeverityLow      = output.SeverityLow
+	SeverityMedium   = output.SeverityMedium
+	SeverityHigh     = output.SeverityHigh
+	SeverityCritical = output.SeverityCritical
 )

@@ -1,28 +1,15 @@
-/*
-·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
-:                                                                               :
-:   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :
-:   ▄█ █ █▀    ·   BSD 3-Clause License                                         :
-:                                                                               :
-:   (c) 2022-2025 vmfunc (vmfunc), xyzeva,                        :
-:                 lunchcat alumni & contributors                                :
-:                                                                               :
-·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
-*/
-
 package frameworks
 
 import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/log"
+	charmlog "github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 // detectionThreshold is the minimum confidence for a detection to be reported.
@@ -40,22 +27,24 @@ type detectionResult struct {
 
 // DetectFramework runs all registered detectors against the target URL.
 func DetectFramework(url string, timeout time.Duration, logdir string) (*FrameworkResult, error) {
-	fmt.Println(styles.Separator.Render("🔍 Starting " + styles.Status.Render("Framework Detection") + "..."))
+	log := output.Module("FRAMEWORK")
+	log.Start()
 
-	frameworklog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "Framework Detection 🔍",
-	}).With("url", url)
+	spin := output.NewSpinner("Detecting frameworks")
+	spin.Start()
 
 	client := &http.Client{Timeout: timeout}
 
 	resp, err := client.Get(url)
 	if err != nil {
+		spin.Stop()
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
 	if err != nil {
+		spin.Stop()
 		return nil, err
 	}
 	bodyStr := string(body)
@@ -63,7 +52,8 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	// Get all registered detectors
 	detectors := GetDetectors()
 	if len(detectors) == 0 {
-		frameworklog.Warn("No framework detectors registered")
+		spin.Stop()
+		log.Warn("No framework detectors registered")
 		return nil, nil
 	}
 
@@ -98,8 +88,11 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 		}
 	}
 
+	spin.Stop()
+
 	if best.confidence <= detectionThreshold {
-		frameworklog.Info("No framework detected with sufficient confidence")
+		log.Info("No framework detected with sufficient confidence")
+		log.Complete(0, "detected")
 		return nil, nil
 	}
 
@@ -122,23 +115,25 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 		logger.Write(url, logdir, logEntry)
 	}
 
-	frameworklog.Infof("Detected %s framework (version: %s, confidence: %.2f)",
-		styles.Highlight.Render(best.name), best.version, best.confidence)
+	log.Success("Detected %s framework (version: %s, confidence: %.2f)",
+		output.Highlight.Render(best.name), best.version, best.confidence)
 
 	if versionMatch.Confidence > 0 {
-		frameworklog.Debugf("Version detected from: %s (confidence: %.2f)",
+		charmlog.Debugf("Version detected from: %s (confidence: %.2f)",
 			versionMatch.Source, versionMatch.Confidence)
 	}
 
 	if len(cves) > 0 {
-		frameworklog.Warnf("Risk level: %s", styles.SeverityHigh.Render(result.RiskLevel))
+		log.Warn("Risk level: %s", output.SeverityHigh.Render(result.RiskLevel))
 		for _, cve := range cves {
-			frameworklog.Warnf("Found potential vulnerability: %s", styles.Highlight.Render(cve))
+			log.Warn("Found potential vulnerability: %s", output.Highlight.Render(cve))
 		}
 		for _, suggestion := range suggestions {
-			frameworklog.Infof("Recommendation: %s", suggestion)
+			log.Info("Recommendation: %s", suggestion)
 		}
 	}
+
+	log.Complete(1, "detected")
 
 	return result, nil
 }

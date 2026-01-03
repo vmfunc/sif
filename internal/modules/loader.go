@@ -19,6 +19,7 @@ import (
 	"runtime"
 
 	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 // Loader handles module discovery and loading.
@@ -80,7 +81,10 @@ func (l *Loader) LoadAll() error {
 		}
 	}
 
-	log.Infof("📦 Loaded %d modules", l.loaded)
+	if l.loaded > 0 {
+		modLog := output.Module("MODULES")
+		modLog.Info("Loaded %d modules", l.loaded)
+	}
 	return nil
 }
 

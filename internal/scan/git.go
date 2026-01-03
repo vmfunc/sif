@@ -14,17 +14,15 @@ package scan
 
 import (
 	"bufio"
-	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/log"
+	charmlog "github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 const (
@@ -33,27 +31,26 @@ const (
 )
 
 func Git(url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
+	log := output.Module("GIT")
+	log.Start()
 
-	fmt.Println(styles.Separator.Render("🌿 Starting " + styles.Status.Render("git repository scanning") + "..."))
+	spin := output.NewSpinner("Scanning for exposed git repositories")
+	spin.Start()
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "git directory fuzzing"); err != nil {
-			log.Errorf("Error creating log file: %v", err)
+			spin.Stop()
+			log.Error("Error creating log file: %v", err)
 			return nil, err
 		}
 	}
 
-	gitlog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "Git 🌿",
-	}).With("url", url)
-
-	gitlog.Infof("Starting repository scanning")
-
 	resp, err := http.Get(gitURL + gitFile)
 	if err != nil {
-		log.Errorf("Error downloading git list: %s", err)
+		spin.Stop()
+		log.Error("Error downloading git list: %s", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -82,17 +79,18 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 					continue
 				}
 
-				log.Debugf("%s", repourl)
+				charmlog.Debugf("%s", repourl)
 				resp, err := client.Get(url + "/" + repourl)
 				if err != nil {
-					log.Debugf("Error %s: %s", repourl, err)
+					charmlog.Debugf("Error %s: %s", repourl, err)
 				}
 
 				if resp.StatusCode == 200 && !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
-					// log url, directory, and status code
-					gitlog.Infof("%s git found at [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(repourl))
+					spin.Stop()
+					log.Success("Git found at %s [%s]", output.Highlight.Render(repourl), output.Status.Render(strconv.Itoa(resp.StatusCode)))
+					spin.Start()
 					if logdir != "" {
-						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s git found at [%s]\n", strconv.Itoa(resp.StatusCode), repourl))
+						logger.Write(sanitizedURL, logdir, strconv.Itoa(resp.StatusCode)+" git found at ["+repourl+"]\n")
 					}
 
 					foundUrls = append(foundUrls, resp.Request.URL.String())
@@ -101,6 +99,9 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 		}(thread)
 	}
 	wg.Wait()
+
+	spin.Stop()
+	log.Complete(len(foundUrls), "found")
 
 	return foundUrls, nil
 }

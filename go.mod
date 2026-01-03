@@ -14,6 +14,7 @@ require (
 	github.com/projectdiscovery/ratelimit v0.0.9
 	github.com/projectdiscovery/utils v0.1.1
 	github.com/rocketlaunchr/google-search v1.1.6
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -220,6 +221,5 @@ require (
 	gopkg.in/corvus-ch/zbase32.v1 v1.0.0 // indirect
 	gopkg.in/djherbis/times.v1 v1.3.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	moul.io/http2curl v1.0.0 // indirect
 )
