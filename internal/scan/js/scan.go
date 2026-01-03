@@ -23,7 +23,7 @@ import (
 
 	"github.com/antchfx/htmlquery"
 	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/pkg/scan/js/frameworks"
+	"github.com/dropalldatabases/sif/internal/scan/js/frameworks"
 	urlutil "github.com/projectdiscovery/utils/url"
 )
 

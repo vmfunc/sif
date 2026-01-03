@@ -27,10 +27,10 @@ import (
 	"github.com/dropalldatabases/sif/internal/config"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/modules"
+	"github.com/dropalldatabases/sif/internal/scan"
+	"github.com/dropalldatabases/sif/internal/scan/frameworks"
+	jsscan "github.com/dropalldatabases/sif/internal/scan/js"
 	"github.com/dropalldatabases/sif/internal/styles"
-	"github.com/dropalldatabases/sif/pkg/scan"
-	"github.com/dropalldatabases/sif/pkg/scan/frameworks"
-	jsscan "github.com/dropalldatabases/sif/pkg/scan/js"
 )
 
 // App represents the main application structure for sif.
