@@ -42,6 +42,7 @@ type Settings struct {
 	CloudStorage      bool
 	SubdomainTakeover bool
 	Shodan            bool
+	SQL               bool
 }
 
 const (
@@ -85,6 +86,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.CloudStorage, "c3", false, "Enable C3 Misconfiguration Scan"),
 		flagSet.BoolVar(&settings.SubdomainTakeover, "st", false, "Enable Subdomain Takeover Check"),
 		flagSet.BoolVar(&settings.Shodan, "shodan", false, "Enable Shodan lookup (requires SHODAN_API_KEY env var)"),
+		flagSet.BoolVar(&settings.SQL, "sql", false, "Enable SQL reconnaissance (admin panels, error disclosure)"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",
