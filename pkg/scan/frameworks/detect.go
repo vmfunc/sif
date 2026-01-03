@@ -18,7 +18,6 @@ import (
 	"math"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -268,7 +267,9 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	// Limit body read to 5MB to prevent memory exhaustion
+	const maxBodySize = 5 * 1024 * 1024
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +322,7 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	}
 
 	if highestConfidence > 0.5 { // threshold for detection
-		versionMatch := extractVersionWithConfidence(bodyStr, bestMatch)
+		versionMatch := extractVersionOptimized(bodyStr, bestMatch)
 		cves, suggestions := getVulnerabilities(bestMatch, versionMatch.Version)
 
 		result := &FrameworkResult{
@@ -392,7 +393,8 @@ func containsHeader(headers http.Header, signature string) bool {
 }
 
 func detectVersion(body string, framework string) string {
-	return extractVersion(body, framework)
+	match := extractVersionOptimized(body, framework)
+	return match.Version
 }
 
 // CVEEntry represents a known vulnerability for a framework version
@@ -618,168 +620,7 @@ type VersionMatch struct {
 	Source     string // where the version was found
 }
 
-// isValidVersion checks if a version string looks reasonable
-func isValidVersion(version string) bool {
-	if version == "" || version == "unknown" {
-		return false
-	}
-	// parse major version and check if reasonable (< 100)
-	parts := strings.Split(version, ".")
-	if len(parts) < 2 {
-		return false
-	}
-	var major int
-	_, err := fmt.Sscanf(parts[0], "%d", &major)
-	if err != nil || major >= 100 || major < 0 {
-		return false
-	}
-	return true
-}
-
 func extractVersion(body string, framework string) string {
-	match := extractVersionWithConfidence(body, framework)
+	match := extractVersionOptimized(body, framework)
 	return match.Version
-}
-
-func extractVersionWithConfidence(body string, framework string) VersionMatch {
-	versionPatterns := map[string][]struct {
-		pattern    string
-		confidence float32
-		source     string
-	}{
-		"Laravel": {
-			{`Laravel\s+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`laravel/framework.*?(\d+\.\d+(?:\.\d+)?)`, 0.8, "composer.json"},
-		},
-		"Django": {
-			{`Django[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`django.*?(\d+\.\d+(?:\.\d+)?)`, 0.7, "package reference"},
-		},
-		"Ruby on Rails": {
-			{`Rails[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`rails.*?(\d+\.\d+(?:\.\d+)?)`, 0.7, "gem reference"},
-		},
-		"Express.js": {
-			{`Express[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`"express":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
-		},
-		"ASP.NET": {
-			{`X-AspNet-Version:\s*(\d+\.\d+(?:\.\d+)?)`, 0.95, "header"},
-			{`ASP\.NET[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`X-AspNetMvc-Version:\s*(\d+\.\d+(?:\.\d+)?)`, 0.9, "MVC header"},
-		},
-		"ASP.NET Core": {
-			{`\.NET\s*(\d+\.\d+(?:\.\d+)?)`, 0.8, "dotnet version"},
-		},
-		"Spring": {
-			{`Spring[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`spring-core.*?(\d+\.\d+(?:\.\d+)?)`, 0.8, "maven"},
-		},
-		"Spring Boot": {
-			{`spring-boot.*?(\d+\.\d+(?:\.\d+)?)`, 0.9, "maven"},
-		},
-		"Flask": {
-			{`Flask[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`Werkzeug[/\s]+(\d+\.\d+(?:\.\d+)?)`, 0.7, "werkzeug version"},
-		},
-		"Next.js": {
-			{`Next\.js[/\s]+[Vv]?(\d{1,2}\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`"next":\s*"[~^]?(\d{1,2}\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
-		},
-		"Nuxt.js": {
-			{`Nuxt[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`"nuxt":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
-		},
-		"Vue.js": {
-			{`Vue\.js[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`"vue":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
-			{`vue@(\d+\.\d+(?:\.\d+)?)`, 0.8, "CDN reference"},
-		},
-		"Angular": {
-			{`ng-version="(\d+\.\d+(?:\.\d+)?)"`, 0.95, "ng-version attribute"},
-			{`Angular[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`"@angular/core":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
-		},
-		"React": {
-			{`React[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`"react":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
-			{`react@(\d+\.\d+(?:\.\d+)?)`, 0.8, "CDN reference"},
-		},
-		"Svelte": {
-			{`Svelte[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`"svelte":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
-		},
-		"SvelteKit": {
-			{`"@sveltejs/kit":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
-		},
-		"WordPress": {
-			{`<meta name="generator" content="WordPress (\d+\.\d+(?:\.\d+)?)"`, 0.95, "generator meta"},
-			{`WordPress (\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"Drupal": {
-			{`Drupal[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`<meta name="Generator" content="Drupal (\d+)`, 0.9, "generator meta"},
-		},
-		"Joomla": {
-			{`Joomla[!/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`<meta name="generator" content="Joomla! - Open Source Content Management - Version (\d+\.\d+(?:\.\d+)?)"`, 0.95, "generator meta"},
-		},
-		"Magento": {
-			{`Magento[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"Shopify": {
-			{`Shopify\.theme.*?(\d+\.\d+(?:\.\d+)?)`, 0.7, "theme version"},
-		},
-		"Symfony": {
-			{`Symfony[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"FastAPI": {
-			{`FastAPI[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"Gin": {
-			{`Gin[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"Phoenix": {
-			{`Phoenix[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"Ember.js": {
-			{`Ember[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"Backbone.js": {
-			{`Backbone[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"Meteor": {
-			{`Meteor[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"Ghost": {
-			{`Ghost[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-	}
-
-	patterns, exists := versionPatterns[framework]
-	if !exists {
-		return VersionMatch{Version: "unknown", Confidence: 0, Source: ""}
-	}
-
-	var bestMatch VersionMatch
-	for _, p := range patterns {
-		re := regexp.MustCompile(p.pattern)
-		matches := re.FindStringSubmatch(body)
-		if len(matches) > 1 && p.confidence > bestMatch.Confidence {
-			candidate := matches[1]
-			// validate version looks reasonable
-			if isValidVersion(candidate) {
-				bestMatch = VersionMatch{
-					Version:    candidate,
-					Confidence: p.confidence,
-					Source:     p.source,
-				}
-			}
-		}
-	}
-
-	if bestMatch.Version == "" {
-		return VersionMatch{Version: "unknown", Confidence: 0, Source: ""}
-	}
-	return bestMatch
 }

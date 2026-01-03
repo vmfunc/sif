@@ -308,12 +308,12 @@ func TestExtractVersionWithConfidence(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := extractVersionWithConfidence(tt.body, tt.framework)
+			result := extractVersionOptimized(tt.body, tt.framework)
 			if result.Version != tt.wantVer {
-				t.Errorf("extractVersionWithConfidence() version = %q, want %q", result.Version, tt.wantVer)
+				t.Errorf("extractVersionOptimized() version = %q, want %q", result.Version, tt.wantVer)
 			}
 			if result.Confidence < tt.minConf {
-				t.Errorf("extractVersionWithConfidence() confidence = %f, want >= %f", result.Confidence, tt.minConf)
+				t.Errorf("extractVersionOptimized() confidence = %f, want >= %f", result.Confidence, tt.minConf)
 			}
 		})
 	}
