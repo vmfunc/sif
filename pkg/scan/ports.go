@@ -31,7 +31,7 @@ import (
 const commonPorts = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/ports/top-ports.txt"
 
 func Ports(scope string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
-	log.Printf(styles.Separator.Render("🚪 Starting " + styles.Status.Render("port scanning") + "..."))
+	log.Printf("%s", styles.Separator.Render("🚪 Starting "+styles.Status.Render("port scanning")+"..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 	if logdir != "" {
