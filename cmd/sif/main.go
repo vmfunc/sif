@@ -18,7 +18,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/config"
 
 	// Register framework detectors
-	_ "github.com/dropalldatabases/sif/pkg/scan/frameworks/detectors"
+	_ "github.com/dropalldatabases/sif/internal/scan/frameworks/detectors"
 )
 
 func main() {
