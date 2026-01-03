@@ -115,9 +115,14 @@ func (l *Loader) loadDir(dir string, userDefined bool) error {
 }
 
 // loadYAML loads a YAML module definition.
-// Implementation will be provided in yaml.go.
 func (l *Loader) loadYAML(path string) error {
-	// Will be implemented in yaml.go
+	def, err := ParseYAMLModule(path)
+	if err != nil {
+		return err
+	}
+
+	module := newYAMLModuleWrapper(def, path)
+	Register(module)
 	return nil
 }
 
