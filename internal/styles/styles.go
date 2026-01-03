@@ -1,3 +1,15 @@
+/*
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+:                                                                               :
+:   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :
+:   ▄█ █ █▀    ·   BSD 3-Clause License                                         :
+:                                                                               :
+:   (c) 2022-2025 vmfunc, xyzeva,                                               :
+:                 lunchcat alumni & contributors                                :
+:                                                                               :
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+*/
+
 // Package styles provides custom styling options for the SIF tool's console output.
 // This package re-exports styles from internal/output for backwards compatibility.
 package styles

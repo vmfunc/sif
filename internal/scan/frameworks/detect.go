@@ -1,3 +1,15 @@
+/*
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+:                                                                               :
+:   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :
+:   ▄█ █ █▀    ·   BSD 3-Clause License                                         :
+:                                                                               :
+:   (c) 2022-2025 vmfunc, xyzeva,                                               :
+:                 lunchcat alumni & contributors                                :
+:                                                                               :
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+*/
+
 package frameworks
 
 import (
