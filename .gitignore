@@ -31,3 +31,7 @@ result
 
 # nuclei templates
 nuclei-templates
+
+# claude files
+CLAUDE.md
+.claude/
