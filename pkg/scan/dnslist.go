@@ -93,9 +93,10 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 	}
 
 	var wg sync.WaitGroup
+	var mu sync.Mutex
 	wg.Add(threads)
 
-	urls := []string{}
+	urls := make([]string, 0, 64)
 	for thread := 0; thread < threads; thread++ {
 		go func(thread int) {
 			defer wg.Done()
@@ -110,17 +111,13 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 				if err != nil {
 					log.Debugf("Error %s: %s", domain, err)
 				} else {
+					mu.Lock()
 					urls = append(urls, resp.Request.URL.String())
+					mu.Unlock()
 					dnslog.Infof("%s %s.%s", styles.Status.Render("[http]"), styles.Highlight.Render(domain), sanitizedURL)
 
 					if logdir != "" {
-						f, err := os.OpenFile(logdir+"/"+sanitizedURL+".log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-						if err != nil {
-							log.Errorf("Error creating log file: %s", err)
-							return
-						}
-						defer f.Close()
-						f.WriteString(fmt.Sprintf("[http] %s.%s\n", domain, sanitizedURL))
+						logger.Write(sanitizedURL, logdir, fmt.Sprintf("[http] %s.%s\n", domain, sanitizedURL))
 					}
 				}
 
@@ -128,7 +125,9 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 				if err != nil {
 					log.Debugf("Error %s: %s", domain, err)
 				} else {
+					mu.Lock()
 					urls = append(urls, resp.Request.URL.String())
+					mu.Unlock()
 					dnslog.Infof("%s %s.%s", styles.Status.Render("[https]"), styles.Highlight.Render(domain), sanitizedURL)
 					if logdir != "" {
 						logger.Write(sanitizedURL, logdir, fmt.Sprintf("[https] %s.%s\n", domain, sanitizedURL))

@@ -99,9 +99,10 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 	}
 
 	var wg sync.WaitGroup
+	var mu sync.Mutex
 	wg.Add(threads)
 
-	results := []DirectoryResult{}
+	results := make([]DirectoryResult, 0, 64)
 	for thread := 0; thread < threads; thread++ {
 		go func(thread int) {
 			defer wg.Done()
@@ -119,7 +120,6 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 				}
 
 				if resp.StatusCode != 404 && resp.StatusCode != 403 {
-					// log url, directory, and status code
 					dirlog.Infof("%s [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(directory))
 					if logdir != "" {
 						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s [%s]\n", strconv.Itoa(resp.StatusCode), directory))
@@ -129,7 +129,9 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 						Url:        resp.Request.URL.String(),
 						StatusCode: resp.StatusCode,
 					}
+					mu.Lock()
 					results = append(results, result)
+					mu.Unlock()
 				}
 			}
 		}(thread)
