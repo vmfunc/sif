@@ -16,6 +16,9 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif"
 	"github.com/dropalldatabases/sif/pkg/config"
+
+	// Register framework detectors
+	_ "github.com/dropalldatabases/sif/pkg/scan/frameworks/detectors"
 )
 
 func main() {
