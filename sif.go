@@ -377,6 +377,7 @@ func (app *App) Run() error {
 				}
 
 				for _, m := range toRun {
+					log.Debugf("Running module: %s", m.Info().ID)
 					result, err := m.Execute(context.Background(), url, opts)
 					if err != nil {
 						log.Warnf("Module %s failed: %v", m.Info().ID, err)
@@ -385,6 +386,8 @@ func (app *App) Run() error {
 					if result != nil && len(result.Findings) > 0 {
 						moduleResults = append(moduleResults, NewModuleResult(result))
 						log.Infof("Module %s found %d findings", m.Info().ID, len(result.Findings))
+					} else {
+						log.Debugf("Module %s: no findings", m.Info().ID)
 					}
 				}
 			}
