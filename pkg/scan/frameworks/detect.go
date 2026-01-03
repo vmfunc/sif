@@ -37,6 +37,9 @@ type FrameworkResult struct {
 	RiskLevel         string   `json:"risk_level,omitempty"`
 }
 
+// ResultType implements the ScanResult interface.
+func (r *FrameworkResult) ResultType() string { return "framework" }
+
 type FrameworkSignature struct {
 	Pattern    string
 	Weight     float32

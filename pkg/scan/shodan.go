@@ -72,13 +72,22 @@ type shodanHostResponse struct {
 	LastUpdate  string       `json:"last_update"`
 }
 
+// shodanMetadata represents the _shodan field in Shodan API responses.
+// This provides type safety instead of using map[string]interface{}.
+type shodanMetadata struct {
+	Module  string `json:"module"`
+	Crawler string `json:"crawler,omitempty"`
+	ID      string `json:"id,omitempty"`
+	Ptr     bool   `json:"ptr,omitempty"`
+}
+
 type shodanData struct {
-	Port      int                    `json:"port"`
-	Transport string                 `json:"transport"`
-	Product   string                 `json:"product"`
-	Version   string                 `json:"version"`
-	Data      string                 `json:"data"`
-	Shodan    map[string]interface{} `json:"_shodan"`
+	Port      int            `json:"port"`
+	Transport string         `json:"transport"`
+	Product   string         `json:"product"`
+	Version   string         `json:"version"`
+	Data      string         `json:"data"`
+	Shodan    shodanMetadata `json:"_shodan"`
 }
 
 // Shodan performs a Shodan lookup for the given URL
@@ -217,9 +226,7 @@ func queryShodanHost(ip string, apiKey string, timeout time.Duration) (*ShodanRe
 			Product:  data.Product,
 			Version:  data.Version,
 			Banner:   truncateBanner(data.Data, 200),
-		}
-		if module, ok := data.Shodan["module"].(string); ok {
-			service.Module = module
+			Module:   data.Shodan.Module,
 		}
 		result.Services = append(result.Services, service)
 	}

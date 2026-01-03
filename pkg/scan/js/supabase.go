@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"math"
 	"net/http"
 	"os"
 	"regexp"
@@ -36,24 +35,82 @@ type supabaseJwtBody struct {
 	ProjectId *string `json:"ref"`
 	Role      *string `json:"role"`
 }
+
 type supabaseScanResult struct {
 	ProjectId   string               `json:"project_id"`
 	ApiKey      string               `json:"api_key"`
 	Role        string               `json:"role"` // note: if this isnt anon its bad
 	Collections []supabaseCollection `json:"collections"`
 }
+
 type supabaseCollection struct {
-	Name   string        `json:"name"`
-	Sample []interface{} `json:"sample"`
-	Count  int           `json:"count"`
+	Name   string            `json:"name"`
+	Sample []json.RawMessage `json:"sample"` // raw JSON for deferred parsing
+	Count  int               `json:"count"`
 }
 
-func GetSupabaseJsonResponse(projectId string, path string, apikey string, auth *string) (map[string]interface{}, error) {
+// supabaseArrayResponse represents a response that is an array with count header.
+type supabaseArrayResponse struct {
+	Array []json.RawMessage
+	Count int
+}
+
+// supabaseAuthResponse represents the auth response from Supabase.
+type supabaseAuthResponse struct {
+	AccessToken string `json:"access_token"`
+}
+
+// supabaseOpenAPIResponse represents the OpenAPI spec response.
+type supabaseOpenAPIResponse struct {
+	Paths map[string]json.RawMessage `json:"paths"`
+}
+
+// getSupabaseArrayResponse fetches a Supabase endpoint that returns an array.
+func getSupabaseArrayResponse(projectId, path, apikey string, auth *string) (*supabaseArrayResponse, error) {
+	body, resp, err := doSupabaseRequest(projectId, path, apikey, auth)
+	if err != nil {
+		return nil, err
+	}
+
+	var arr []json.RawMessage
+	if err := json.Unmarshal(body, &arr); err != nil {
+		return nil, err
+	}
+
+	contentRange := resp.Header.Get("Content-Range")
+	parts := strings.Split(contentRange, "/")
+	if len(parts) < 2 {
+		return nil, errors.New("invalid Content-Range header")
+	}
+	count, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return nil, err
+	}
+
+	return &supabaseArrayResponse{Array: arr, Count: count}, nil
+}
+
+// getSupabaseOpenAPI fetches the OpenAPI spec from Supabase.
+func getSupabaseOpenAPI(projectId, apikey string, auth *string) (*supabaseOpenAPIResponse, error) {
+	body, _, err := doSupabaseRequest(projectId, "/rest/v1/", apikey, auth)
+	if err != nil {
+		return nil, err
+	}
+
+	var spec supabaseOpenAPIResponse
+	if err := json.Unmarshal(body, &spec); err != nil {
+		return nil, err
+	}
+	return &spec, nil
+}
+
+// doSupabaseRequest performs a GET request to the Supabase API.
+func doSupabaseRequest(projectId, path, apikey string, auth *string) ([]byte, *http.Response, error) {
 	client := http.Client{}
 
 	req, err := http.NewRequest("GET", "https://"+projectId+".supabase.co"+path, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	log.Debugf("Sending request to %s", req.URL.String())
@@ -65,44 +122,20 @@ func GetSupabaseJsonResponse(projectId string, path string, apikey string, auth 
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, errors.New("Request to " + resp.Request.URL.String() + " failed with status code " + strconv.Itoa(resp.StatusCode))
+		return nil, nil, errors.New("request to " + resp.Request.URL.String() + " failed with status code " + strconv.Itoa(resp.StatusCode))
 	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
-	}
-	content := string(body)
-
-	var data interface{}
-
-	err = json.Unmarshal([]byte(content), &data)
-	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	arr, ok := data.([]interface{})
-	if ok {
-		wrappedData := map[string]interface{}{}
-
-		contentRange := resp.Header.Get("Content-Range")
-		count, err := strconv.Atoi(strings.Split(contentRange, "/")[1])
-		if err != nil {
-			return nil, err
-		}
-
-		wrappedData["count"] = count
-		wrappedData["array"] = arr
-
-		return wrappedData, nil
-	}
-
-	return data.(map[string]interface{}), nil
+	return body, resp, nil
 }
 
 func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) {
@@ -170,64 +203,65 @@ func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) 
 		if resp.StatusCode == http.StatusOK {
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
+				resp.Body.Close()
 				return nil, err
 			}
-			content := string(body)
+			resp.Body.Close()
 
-			var data map[string]interface{}
-			err = json.Unmarshal([]byte(content), &data)
-			if err != nil {
+			var authResp supabaseAuthResponse
+			if err := json.Unmarshal(body, &authResp); err != nil {
 				return nil, err
 			}
 
-			auth = data["access_token"].(string)
+			auth = authResp.AccessToken
 			supabaselog.Infof("Created account with JWT %s", auth)
+		} else {
+			resp.Body.Close()
 		}
 
 		var collections = []supabaseCollection{}
 
-		res, err := GetSupabaseJsonResponse(*supabaseJwt.ProjectId, "/rest/v1/", jwt, &auth)
+		openAPI, err := getSupabaseOpenAPI(*supabaseJwt.ProjectId, jwt, &auth)
 		if err != nil {
 			return nil, err
 		}
 
-		index := res
-
-		if index["paths"] == nil {
+		if openAPI.Paths == nil {
 			return nil, errors.New("paths not found in supabase openapi")
 		}
 
-		var paths = index["paths"].(map[string]interface{})
-
-		for k := range paths {
-			if k == "/" {
+		for path := range openAPI.Paths {
+			if path == "/" {
 				continue
 			}
 
 			// todo: support for scanning rpc calls
-			if strings.HasPrefix(k, "/rpc/") {
+			if strings.HasPrefix(path, "/rpc/") {
 				continue
 			}
 
-			sampleObj, err := GetSupabaseJsonResponse(*supabaseJwt.ProjectId, "/rest/v1"+k, jwt, &auth)
+			sampleResp, err := getSupabaseArrayResponse(*supabaseJwt.ProjectId, "/rest/v1"+path, jwt, &auth)
 			if err != nil {
 				continue
 			}
 
-			samples := sampleObj["array"].([]interface{})
-			marshalled, err := json.Marshal(samples)
+			marshalled, err := json.Marshal(sampleResp.Array)
 			if err != nil {
-				supabaselog.Errorf("Failed to marshal sample data for %s: %s", k, err)
+				supabaselog.Errorf("Failed to marshal sample data for %s: %s", path, err)
 			}
 
-			supabaselog.Infof("Got sample (1000 entries) for collection %s: %s", k, string(marshalled))
+			supabaselog.Infof("Got sample (1000 entries) for collection %s: %s", path, string(marshalled))
 
-			limitedSample := samples[0:int(math.Min(float64(len(samples)), 10))]
+			// limit to first 10 samples
+			sampleLimit := len(sampleResp.Array)
+			if sampleLimit > 10 {
+				sampleLimit = 10
+			}
 
 			collection := supabaseCollection{
-				Name:   strings.TrimPrefix(k, "/"),
-				Sample: limitedSample, // passed to local LLM for scope
-				Count:  sampleObj["count"].(int),
+				Name:   strings.TrimPrefix(path, "/"),
+				Sample: sampleResp.Array[:sampleLimit], // passed to local LLM for scope
+				Count:  sampleResp.Count,
 			}
 
 			if collection.Count > 1 /* one entry may just be for the user */ {
