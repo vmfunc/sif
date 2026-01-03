@@ -257,17 +257,6 @@ func (app *App) Run() error {
 			}
 		}
 
-		if app.settings.SubdomainTakeover {
-			// Pass the dnsResults to the SubdomainTakeover function
-			result, err := scan.SubdomainTakeover(url, dnsResults, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running Subdomain Takeover Vulnerability Check: %s", err)
-			} else {
-				moduleResults = append(moduleResults, ModuleResult{"subdomain_takeover", result})
-				scansRun = append(scansRun, "Subdomain Takeover")
-			}
-		}
-
 		if app.settings.ApiMode {
 			result := UrlResult{
 				Url:     url,
