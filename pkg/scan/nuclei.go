@@ -70,7 +70,7 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 	outputWriter := testutils.NewMockOutputWriter()
 	outputWriter.WriteCallback = func(event *output.ResultEvent) {
 		if event.Matched != "" {
-			nucleilog.Infof(format.FormatLine(event))
+			nucleilog.Infof("%s", format.FormatLine(event))
 
 			results = append(results, *event)
 			// TODO: metasploit
