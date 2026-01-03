@@ -259,11 +259,13 @@ func TestGetVulnerabilities_NoMatch(t *testing.T) {
 
 func TestFrameworkResult_Fields(t *testing.T) {
 	result := FrameworkResult{
-		Name:        "Laravel",
-		Version:     "9.0.0",
-		Confidence:  0.85,
-		CVEs:        []string{"CVE-2021-3129"},
-		Suggestions: []string{"Update to latest version"},
+		Name:              "Laravel",
+		Version:           "9.0.0",
+		Confidence:        0.85,
+		VersionConfidence: 0.9,
+		CVEs:              []string{"CVE-2021-3129"},
+		Suggestions:       []string{"Update to latest version"},
+		RiskLevel:         "critical",
 	}
 
 	if result.Name != "Laravel" {
@@ -275,10 +277,262 @@ func TestFrameworkResult_Fields(t *testing.T) {
 	if result.Confidence != 0.85 {
 		t.Errorf("expected Confidence 0.85, got %f", result.Confidence)
 	}
+	if result.VersionConfidence != 0.9 {
+		t.Errorf("expected VersionConfidence 0.9, got %f", result.VersionConfidence)
+	}
 	if len(result.CVEs) != 1 {
 		t.Errorf("expected 1 CVE, got %d", len(result.CVEs))
 	}
 	if len(result.Suggestions) != 1 {
 		t.Errorf("expected 1 suggestion, got %d", len(result.Suggestions))
+	}
+	if result.RiskLevel != "critical" {
+		t.Errorf("expected RiskLevel 'critical', got '%s'", result.RiskLevel)
+	}
+}
+
+func TestExtractVersionWithConfidence(t *testing.T) {
+	tests := []struct {
+		name      string
+		body      string
+		framework string
+		wantVer   string
+		minConf   float32
+	}{
+		{"Laravel explicit", "Laravel 8.0.0", "Laravel", "8.0.0", 0.8},
+		{"Angular ng-version", `<html ng-version="14.2.0">`, "Angular", "14.2.0", 0.9},
+		{"WordPress generator", `<meta name="generator" content="WordPress 6.1.0">`, "WordPress", "6.1.0", 0.9},
+		{"Vue CDN", "vue@3.2.0/dist", "Vue.js", "3.2.0", 0.7},
+		{"No version", "Hello World", "Laravel", "unknown", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractVersionWithConfidence(tt.body, tt.framework)
+			if result.Version != tt.wantVer {
+				t.Errorf("extractVersionWithConfidence() version = %q, want %q", result.Version, tt.wantVer)
+			}
+			if result.Confidence < tt.minConf {
+				t.Errorf("extractVersionWithConfidence() confidence = %f, want >= %f", result.Confidence, tt.minConf)
+			}
+		})
+	}
+}
+
+func TestGetRiskLevel(t *testing.T) {
+	tests := []struct {
+		name     string
+		cves     []string
+		expected string
+	}{
+		{"no CVEs", []string{}, "low"},
+		{"critical", []string{"CVE-2021-3129 (critical)"}, "critical"},
+		{"high", []string{"CVE-2023-22795 (high)"}, "high"},
+		{"medium", []string{"CVE-2023-46298 (medium)"}, "medium"},
+		{"mixed - critical wins", []string{"CVE-2023-1 (medium)", "CVE-2021-3129 (critical)"}, "critical"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getRiskLevel(tt.cves)
+			if result != tt.expected {
+				t.Errorf("getRiskLevel() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetVulnerabilities_Django(t *testing.T) {
+	cves, suggestions := getVulnerabilities("Django", "3.2.0")
+	if len(cves) == 0 {
+		t.Error("expected CVEs for Django 3.2.0")
+	}
+	if len(suggestions) == 0 {
+		t.Error("expected suggestions for Django 3.2.0")
+	}
+}
+
+func TestGetVulnerabilities_Spring(t *testing.T) {
+	cves, suggestions := getVulnerabilities("Spring", "5.3.0")
+	if len(cves) == 0 {
+		t.Error("expected CVEs for Spring 5.3.0 (Spring4Shell)")
+	}
+	found := false
+	for _, cve := range cves {
+		if cve == "CVE-2022-22965 (critical)" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected Spring4Shell CVE-2022-22965")
+	}
+	if len(suggestions) == 0 {
+		t.Error("expected suggestions for Spring 5.3.0")
+	}
+}
+
+func TestDetectFramework_Vue(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head><title>Vue App</title></head>
+			<body>
+				<div id="app" data-v-12345>
+					<div v-cloak>Loading...</div>
+				</div>
+				<script src="https://unpkg.com/vue@3.2.0/dist/vue.global.js"></script>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "Vue.js" {
+		t.Errorf("expected framework 'Vue.js', got '%s'", result.Name)
+	}
+}
+
+func TestDetectFramework_Angular(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html ng-version="15.0.0">
+			<head><title>Angular App</title></head>
+			<body>
+				<app-root _nghost-abc-c123 _ngcontent-abc-c123></app-root>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "Angular" {
+		t.Errorf("expected framework 'Angular', got '%s'", result.Name)
+	}
+}
+
+func TestDetectFramework_React(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head><title>React App</title></head>
+			<body>
+				<div id="root" data-reactroot="">Content</div>
+				<script src="/static/js/react-dom.production.min.js"></script>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "React" {
+		t.Errorf("expected framework 'React', got '%s'", result.Name)
+	}
+}
+
+func TestDetectFramework_Svelte(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head><title>Svelte App</title></head>
+			<body>
+				<div id="app" class="__svelte-123">
+					<span class="svelte-abc123">Content</span>
+				</div>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "Svelte" {
+		t.Errorf("expected framework 'Svelte', got '%s'", result.Name)
+	}
+}
+
+func TestDetectFramework_Joomla(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<meta name="generator" content="Joomla! - Open Source Content Management">
+				<script src="/media/jui/js/jquery.js"></script>
+			</head>
+			<body>
+				<div class="Joomla">Content</div>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "Joomla" {
+		t.Errorf("expected framework 'Joomla', got '%s'", result.Name)
+	}
+}
+
+func TestCVEEntry_Fields(t *testing.T) {
+	entry := CVEEntry{
+		CVE:              "CVE-2021-3129",
+		AffectedVersions: []string{"8.0.0", "8.0.1"},
+		FixedVersion:     "8.4.2",
+		Severity:         "critical",
+		Description:      "RCE vulnerability",
+		Recommendations:  []string{"Update immediately"},
+	}
+
+	if entry.CVE != "CVE-2021-3129" {
+		t.Errorf("expected CVE 'CVE-2021-3129', got '%s'", entry.CVE)
+	}
+	if len(entry.AffectedVersions) != 2 {
+		t.Errorf("expected 2 affected versions, got %d", len(entry.AffectedVersions))
+	}
+	if entry.Severity != "critical" {
+		t.Errorf("expected Severity 'critical', got '%s'", entry.Severity)
 	}
 }
