@@ -31,7 +31,7 @@ When opening an issue, please use the search tool and make sure that the issue h
 
 ### Development
 
-To develop sif, you'll need version 1.20 or later of the Go toolchain. After making your changes, run the program using `go run ./cmd/sif` to make sure it compiles and runs properly.
+To develop sif, you'll need version 1.23 or later of the Go toolchain. After making your changes, run the program using `go run ./cmd/sif` to make sure it compiles and runs properly.
 
 *Nix users:* the repository provides a flake that can be used to develop and run sif. Use `nix run`, `nix develop`, `nix build`, etc. Make sure to run `gomod2nix` if `go.mod` is changed.
 
