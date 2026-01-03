@@ -1,0 +1,50 @@
+# Security Headers Check Module
+# Checks for missing or misconfigured security headers
+
+id: security-headers
+info:
+  name: Security Headers Analysis
+  author: sif
+  severity: info
+  description: Checks for presence and configuration of security headers
+  tags: [headers, security, info, owasp]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+
+  matchers:
+    - type: regex
+      part: header
+      regex:
+        - "X-Frame-Options"
+        - "X-Content-Type-Options"
+        - "Strict-Transport-Security"
+        - "Content-Security-Policy"
+        - "X-XSS-Protection"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: x_frame_options
+      part: header
+      regex:
+        - "X-Frame-Options: (.+)"
+      group: 1
+
+    - type: regex
+      name: content_security_policy
+      part: header
+      regex:
+        - "Content-Security-Policy: (.+)"
+      group: 1
+
+    - type: regex
+      name: strict_transport_security
+      part: header
+      regex:
+        - "Strict-Transport-Security: (.+)"
+      group: 1

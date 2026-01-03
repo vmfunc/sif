@@ -1,0 +1,35 @@
+# Drupal CMS Detection Module
+
+id: cms-drupal
+info:
+  name: Drupal Detection
+  author: sif
+  severity: info
+  description: Detects Drupal CMS installations
+  tags: [cms, drupal, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+
+  matchers:
+    - type: word
+      part: all
+      words:
+        - "Drupal.settings"
+        - "X-Drupal-Cache"
+        - "/sites/default/files"
+        - "drupal.js"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: drupal_version
+      part: body
+      regex:
+        - 'Drupal ([0-9.]+)'
+        - 'content="Drupal ([0-9.]+)"'
+      group: 1

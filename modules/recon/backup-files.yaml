@@ -1,0 +1,45 @@
+# Backup Files Detection Module
+
+id: backup-files
+info:
+  name: Backup Files Detection
+  author: sif
+  severity: medium
+  description: Detects common backup files that may expose sensitive information
+  tags: [backup, exposure, misconfiguration, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/backup.sql"
+    - "{{BaseURL}}/backup.zip"
+    - "{{BaseURL}}/backup.tar.gz"
+    - "{{BaseURL}}/database.sql"
+    - "{{BaseURL}}/db.sql"
+    - "{{BaseURL}}/dump.sql"
+    - "{{BaseURL}}/.env"
+    - "{{BaseURL}}/.env.backup"
+    - "{{BaseURL}}/config.php.bak"
+    - "{{BaseURL}}/web.config.bak"
+    - "{{BaseURL}}/wp-config.php.bak"
+    - "{{BaseURL}}/settings.py.bak"
+
+  threads: 5
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - "CREATE TABLE"
+        - "INSERT INTO"
+        - "DB_PASSWORD"
+        - "APP_KEY"
+        - "SECRET_KEY"
+        - "database_password"
+      condition: or
