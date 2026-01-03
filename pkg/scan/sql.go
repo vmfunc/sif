@@ -133,9 +133,10 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	sqllog.Infof("Starting SQL reconnaissance...")
 
 	result := &SQLResult{
-		AdminPanels:    []SQLAdminPanel{},
-		DatabaseErrors: []SQLDatabaseError{},
+		AdminPanels:    make([]SQLAdminPanel, 0, 8),
+		DatabaseErrors: make([]SQLDatabaseError, 0, 8),
 	}
+	seenErrors := make(map[string]bool)
 
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -208,7 +209,7 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	wg.Wait()
 
 	// check main URL for database errors
-	checkDatabaseErrors(client, targetURL, sanitizedURL, result, sqllog, logdir, &mu)
+	checkDatabaseErrors(client, targetURL, sanitizedURL, result, sqllog, logdir, &mu, seenErrors)
 
 	// check common endpoints that might expose database errors
 	errorCheckPaths := []string{
@@ -223,7 +224,7 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 
 	for _, path := range errorCheckPaths {
 		checkURL := strings.TrimSuffix(targetURL, "/") + path
-		checkDatabaseErrors(client, checkURL, sanitizedURL, result, sqllog, logdir, &mu)
+		checkDatabaseErrors(client, checkURL, sanitizedURL, result, sqllog, logdir, &mu, seenErrors)
 	}
 
 	// summary
@@ -276,7 +277,7 @@ func isAdminPanel(body string, panelType string) bool {
 	}
 }
 
-func checkDatabaseErrors(client *http.Client, checkURL, sanitizedURL string, result *SQLResult, sqllog *log.Logger, logdir string, mu *sync.Mutex) {
+func checkDatabaseErrors(client *http.Client, checkURL, sanitizedURL string, result *SQLResult, sqllog *log.Logger, logdir string, mu *sync.Mutex, seen map[string]bool) {
 	resp, err := client.Get(checkURL)
 	if err != nil {
 		return
@@ -291,32 +292,29 @@ func checkDatabaseErrors(client *http.Client, checkURL, sanitizedURL string, res
 
 	for _, pattern := range databaseErrorPatterns {
 		if pattern.pattern.MatchString(bodyStr) {
+			key := checkURL + "|" + pattern.databaseType
 			mu.Lock()
-			// check if we already have this error for this URL
-			found := false
-			for _, existing := range result.DatabaseErrors {
-				if existing.URL == checkURL && existing.DatabaseType == pattern.databaseType {
-					found = true
-					break
-				}
+			if seen[key] {
+				mu.Unlock()
+				break
 			}
-			if !found {
-				dbError := SQLDatabaseError{
-					URL:          checkURL,
-					DatabaseType: pattern.databaseType,
-					ErrorPattern: pattern.pattern.String(),
-				}
-				result.DatabaseErrors = append(result.DatabaseErrors, dbError)
+			seen[key] = true
 
-				sqllog.Warnf("Database error disclosure: %s at [%s]",
-					styles.SeverityHigh.Render(pattern.databaseType),
-					styles.Highlight.Render(checkURL))
-
-				if logdir != "" {
-					logger.Write(sanitizedURL, logdir, fmt.Sprintf("Database error disclosure: %s at [%s]\n", pattern.databaseType, checkURL))
-				}
+			dbError := SQLDatabaseError{
+				URL:          checkURL,
+				DatabaseType: pattern.databaseType,
+				ErrorPattern: pattern.pattern.String(),
 			}
+			result.DatabaseErrors = append(result.DatabaseErrors, dbError)
 			mu.Unlock()
+
+			sqllog.Warnf("Database error disclosure: %s at [%s]",
+				styles.SeverityHigh.Render(pattern.databaseType),
+				styles.Highlight.Render(checkURL))
+
+			if logdir != "" {
+				logger.Write(sanitizedURL, logdir, fmt.Sprintf("Database error disclosure: %s at [%s]\n", pattern.databaseType, checkURL))
+			}
 			break // only report one database type per URL
 		}
 	}
