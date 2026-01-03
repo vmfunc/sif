@@ -1,0 +1,52 @@
+name: header check
+
+on:
+  push:
+    paths:
+      - '**.go'
+  pull_request:
+    paths:
+      - '**.go'
+
+jobs:
+  check-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: check license headers
+        run: |
+          missing_headers=()
+
+          while IFS= read -r -d '' file; do
+            # skip test files and generated files
+            if [[ "$file" == *"_test.go" ]]; then
+              continue
+            fi
+
+            # check if file starts with the license header
+            if ! head -n 3 "$file" | grep -q "█▀ █ █▀▀"; then
+              missing_headers+=("$file")
+            fi
+          done < <(find . -name "*.go" -type f -print0)
+
+          if [ ${#missing_headers[@]} -ne 0 ]; then
+            echo "::error::the following files are missing the license header:"
+            printf '%s\n' "${missing_headers[@]}"
+            echo ""
+            echo "expected header format:"
+            echo '/*'
+            echo '·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·'
+            echo ':                                                                               :'
+            echo ':   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :'
+            echo ':   ▄█ █ █▀    ·   BSD 3-Clause License                                         :'
+            echo ':                                                                               :'
+            echo ':   (c) 2022-2025 vmfunc, xyzeva,                                               :'
+            echo ':                 lunchcat alumni & contributors                                :'
+            echo ':                                                                               :'
+            echo '·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·'
+            echo '*/'
+            exit 1
+          fi
+
+          echo "all go files have proper license headers"

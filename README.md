@@ -1,124 +1,105 @@
 <div align="center">
 
-![Go version](https://img.shields.io/github/go-mod/go-version/dropalldatabases/sif?style=flat-square)
-[![Go Report Card](https://goreportcard.com/badge/github.com/dropalldatabases/sif?style=flat-square)](https://goreportcard.com/report/github.com/dropalldatabases/sif)
-[![Version](https://img.shields.io/github/v/tag/dropalldatabases/sif?style=flat-square)](https://github.com/dropalldatabases/sif/tags)
+```
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+:                                                                               :
+:   █▀ █ █▀▀                                                                    :
+:   ▄█ █ █▀    blazing-fast pentesting suite                                    :
+:                                                                               :
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+```
+
+[![go version](https://img.shields.io/github/go-mod/go-version/dropalldatabases/sif?style=flat-square&color=00ADD8)](https://go.dev/)
+[![build](https://img.shields.io/github/actions/workflow/status/dropalldatabases/sif/go.yml?style=flat-square)](https://github.com/dropalldatabases/sif/actions)
+[![license](https://img.shields.io/badge/license-BSD--3--Clause-blue?style=flat-square)](LICENSE)
+
+**[install](#install) · [usage](#usage) · [modules](#modules) · [contribute](#contribute)**
 
 </div>
 
-## 📖 Table of Contents
+---
 
-- [Modules](#-modules)
-- [Installation](#-installation)
-- [Quick Start](#-quick-start)
-- [Usage](#-usage)
-- [Performance](#-performance)
-- [Contributing](#-contributing)
-- [Contributors](#-contributors)
-- [Acknowledgements](#-acknowledgements)
+## what is sif?
 
-## 🧩 Modules
+sif is a modular pentesting toolkit written in go. it's designed to be fast, concurrent, and extensible. run multiple scan types against targets with a single command.
 
-sif is built with a modular architecture, allowing for easy extension and customization. Some of our key modules include:
-
-- 📂 Directory/file fuzzing/scanning
-- 📡 DNS subdomain enumeration
-- 🐾 Common Web scanning
-- 🖥️ Port/service scanning
-- 🦠 Vulnerability scanning
-  - Support for pre-existing nuclei templates
-  - Metasploit emulation for execution
-- 🔎 Automated Google dorking
-- 💘 Shodan integration
-- 📦 CMS detection
-- 🔍 HTTP Header Analysis
-- ☁️ C3 Misconfiguration Scanner
-- 🔍 Subdomain Takeover Checks
-
-## 📦 Installation
-
-### Using pre-built binaries
-
-Visit our [Releases](https://github.com/dropalldatabases/sif/releases) page to download the latest pre-built binary for your operating system.
-
-### Building from source
-
-1. Ensure you have Go 1.23+ installed on your system.
-2. Clone the repository:
-   ```
-   git clone https://github.com/lunchcat/sif.git
-   cd sif
-   ```
-3. Build using the Makefile:
-   ```
-   make
-   ```
-4. The binary will be available in the root directory.
-
-## 🚀 Quick Start
-
-1. Run a basic scan:
-   ```
-   ./sif -u example.com
-   ```
-2. For more options and advanced usage, refer to the help command:
-   ```
-   ./sif -h
-   ```
-
-## 🛠 Usage
-
-sif offers a wide range of commands and options to customize your pentesting workflow. Here are some common usage examples:
-
-- Directory fuzzing
-
-```
-./sif -u http://example.com -dirlist medium
+```bash
+./sif -u https://example.com -all
 ```
 
-- Subdomain enumeration
+## install
 
-```
-./sif -u http://example.com -dnslist medium
+### from releases
+
+grab the latest binary from [releases](https://github.com/dropalldatabases/sif/releases).
+
+### from source
+
+```bash
+git clone https://github.com/dropalldatabases/sif.git
+cd sif
+make
 ```
 
-- Supabase/Firebase and C3 Vulnerability scanning
+requires go 1.23+
 
-```
-./sif -u https://example.com -js -c3
-```
+## usage
 
-- Port scanning
+```bash
+# basic scan
+./sif -u https://example.com
 
-```
+# directory fuzzing
+./sif -u https://example.com -dirlist medium
+
+# subdomain enumeration
+./sif -u https://example.com -dnslist medium
+
+# port scanning
 ./sif -u https://example.com -ports common
+
+# javascript framework detection + cloud misconfig
+./sif -u https://example.com -js -c3
+
+# everything
+./sif -u https://example.com -all
 ```
 
-For a complete list of commands and options, run `./sif -h`.
+run `./sif -h` for all options.
 
-## ⚡ Performance
+## modules
 
-sif is designed for high performance and efficiency:
+| module | description |
+|--------|-------------|
+| `dirlist` | directory and file fuzzing |
+| `dnslist` | subdomain enumeration |
+| `ports` | port and service scanning |
+| `nuclei` | vulnerability scanning with nuclei templates |
+| `dork` | automated google dorking |
+| `js` | javascript framework detection (next.js, supabase) |
+| `c3` | cloud storage misconfiguration scanning |
+| `headers` | http header analysis |
+| `takeover` | subdomain takeover detection |
+| `cms` | cms detection |
+| `whois` | whois lookups |
+| `git` | exposed git repository detection |
 
-- Written in Go for excellent concurrency and speed
-- Optimized algorithms for minimal resource usage
-- Supports multi-threading for faster scans
-- Efficient caching mechanisms to reduce redundant operations
+## contribute
 
-## 🤝 Contributing
+contributions welcome. see [contributing.md](CONTRIBUTING.md) for guidelines.
 
-We welcome contributions from the community! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting a pull request.
+```bash
+# format
+gofmt -w .
 
-Areas we're particularly interested in:
+# lint
+golangci-lint run
 
-- New scanning modules
-- Performance improvements
-- Documentation enhancements
-- Bug fixes and error handling improvements
+# test
+go test ./...
+```
 
-## 🌟 Contributors
-
-Thanks to these wonderful people who have contributed to sif:
+## contributors
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
@@ -141,19 +122,13 @@ Thanks to these wonderful people who have contributed to sif:
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
-## 🙏 Acknowledgements
+## acknowledgements
 
-We'd like to thank the following projects and communities for their inspiration and support:
-
-- [ProjectDiscovery](https://projectdiscovery.io/) for their amazing open-source security tools
-- [Shodan](https://www.shodan.io/)
-- [Malcore](https://www.malcore.io/), for providing us direct API support at Lunchcat.
+- [projectdiscovery](https://projectdiscovery.io/) for nuclei and other security tools
+- [shodan](https://www.shodan.io/) for infrastructure intelligence
 
 ---
 
 <div align="center">
-  <strong>Happy Hunting! 🐾</strong>
-  <p>
-    <sub>Built with ❤️ by the lunchcat team and contributors worldwide</sub>
-  </p>
+  <sub>bsd 3-clause license · made by vmfunc, xyzeva, and contributors</sub>
 </div>
