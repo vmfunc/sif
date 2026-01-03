@@ -1,0 +1,37 @@
+# WordPress CMS Detection Module
+
+id: cms-wordpress
+info:
+  name: WordPress Detection
+  author: sif
+  severity: info
+  description: Detects WordPress CMS installations
+  tags: [cms, wordpress, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+    - "{{BaseURL}}/wp-login.php"
+    - "{{BaseURL}}/wp-admin/"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "wp-content"
+        - "wp-includes"
+        - "wp-json"
+        - "wordpress"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: wp_version
+      part: body
+      regex:
+        - 'content="WordPress ([0-9.]+)"'
+        - 'wp-includes/js/wp-embed.min.js\?ver=([0-9.]+)'
+      group: 1
