@@ -247,6 +247,16 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.Shodan {
+			result, err := scan.Shodan(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running Shodan lookup: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, ModuleResult{"shodan", result})
+				scansRun = append(scansRun, "Shodan")
+			}
+		}
+
 		if app.settings.SubdomainTakeover {
 			// Pass the dnsResults to the SubdomainTakeover function
 			result, err := scan.SubdomainTakeover(url, dnsResults, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
