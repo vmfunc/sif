@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/styles"
-	"github.com/dropalldatabases/sif/pkg/logger"
 )
 
 // LFIResult represents the results of LFI reconnaissance
