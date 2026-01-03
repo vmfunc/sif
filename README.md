@@ -9,8 +9,8 @@
 ·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
 ```
 
-[![go version](https://img.shields.io/github/go-mod/go-version/dropalldatabases/sif?style=flat-square&color=00ADD8)](https://go.dev/)
-[![build](https://img.shields.io/github/actions/workflow/status/dropalldatabases/sif/go.yml?style=flat-square)](https://github.com/dropalldatabases/sif/actions)
+[![go version](https://img.shields.io/github/go-mod/go-version/vmfunc/sif?style=flat-square&color=00ADD8)](https://go.dev/)
+[![build](https://img.shields.io/github/actions/workflow/status/vmfunc/sif/go.yml?style=flat-square)](https://github.com/vmfunc/sif/actions)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue?style=flat-square)](LICENSE)
 
 **[install](#install) · [usage](#usage) · [modules](#modules) · [contribute](#contribute)**
@@ -31,7 +31,7 @@ sif is a modular pentesting toolkit written in go. it's designed to be fast, con
 
 ### from releases
 
-grab the latest binary from [releases](https://github.com/dropalldatabases/sif/releases).
+grab the latest binary from [releases](https://github.com/vmfunc/sif/releases).
 
 ### from source
 
