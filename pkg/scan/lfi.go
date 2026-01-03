@@ -131,8 +131,9 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	lfilog.Infof("Starting LFI reconnaissance...")
 
 	result := &LFIResult{
-		Vulnerabilities: []LFIVulnerability{},
+		Vulnerabilities: make([]LFIVulnerability, 0, 16),
 	}
+	seen := make(map[string]bool)
 
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -232,38 +233,35 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 				// check for evidence patterns
 				for _, evidence := range lfiEvidencePatterns {
 					if evidence.pattern.MatchString(bodyStr) {
+						key := item.param + "|" + item.payload.payload
 						mu.Lock()
-						// check for duplicates
-						duplicate := false
-						for _, v := range result.Vulnerabilities {
-							if v.Parameter == item.param && v.Payload == item.payload.payload {
-								duplicate = true
-								break
-							}
+						if seen[key] {
+							mu.Unlock()
+							break
 						}
-						if !duplicate {
-							vuln := LFIVulnerability{
-								URL:          testURL,
-								Parameter:    item.param,
-								Payload:      item.payload.payload,
-								Evidence:     evidence.description,
-								Severity:     item.payload.severity,
-								FileIncluded: item.payload.target,
-							}
-							result.Vulnerabilities = append(result.Vulnerabilities, vuln)
+						seen[key] = true
 
-							lfilog.Warnf("LFI vulnerability found: %s in param [%s] - %s",
-								styles.SeverityHigh.Render(evidence.description),
-								styles.Highlight.Render(item.param),
-								styles.Status.Render(item.payload.target))
-
-							if logdir != "" {
-								logger.Write(sanitizedURL, logdir,
-									fmt.Sprintf("LFI: %s in param [%s] via payload [%s]\n",
-										evidence.description, item.param, item.payload.payload))
-							}
+						vuln := LFIVulnerability{
+							URL:          testURL,
+							Parameter:    item.param,
+							Payload:      item.payload.payload,
+							Evidence:     evidence.description,
+							Severity:     item.payload.severity,
+							FileIncluded: item.payload.target,
 						}
+						result.Vulnerabilities = append(result.Vulnerabilities, vuln)
 						mu.Unlock()
+
+						lfilog.Warnf("LFI vulnerability found: %s in param [%s] - %s",
+							styles.SeverityHigh.Render(evidence.description),
+							styles.Highlight.Render(item.param),
+							styles.Status.Render(item.payload.target))
+
+						if logdir != "" {
+							logger.Write(sanitizedURL, logdir,
+								fmt.Sprintf("LFI: %s in param [%s] via payload [%s]\n",
+									evidence.description, item.param, item.payload.payload))
+						}
 						break
 					}
 				}
