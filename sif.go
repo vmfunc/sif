@@ -257,6 +257,16 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.SQL {
+			result, err := scan.SQL(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running SQL reconnaissance: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, ModuleResult{"sql", result})
+				scansRun = append(scansRun, "SQL Recon")
+			}
+		}
+
 		if app.settings.ApiMode {
 			result := UrlResult{
 				Url:     url,
