@@ -267,6 +267,16 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.LFI {
+			result, err := scan.LFI(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running LFI reconnaissance: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, ModuleResult{"lfi", result})
+				scansRun = append(scansRun, "LFI Recon")
+			}
+		}
+
 		if app.settings.ApiMode {
 			result := UrlResult{
 				Url:     url,
