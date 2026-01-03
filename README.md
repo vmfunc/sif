@@ -9,7 +9,7 @@
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue?style=flat-square)](LICENSE)
 [![discord](https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/sifcli)
 
-**[install](#install) · [usage](#usage) · [modules](#modules) · [contribute](#contribute)**
+**[install](#install) · [usage](#usage) · [modules](#modules) · [docs](docs/) · [contribute](#contribute)**
 
 </div>
 

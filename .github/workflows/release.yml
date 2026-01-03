@@ -40,6 +40,21 @@ jobs:
           GOOS=linux GOARCH=386 go build -o sif-linux-386 ./cmd/sif
           GOOS=linux GOARCH=arm64 go build -o sif-linux-arm64 ./cmd/sif
 
+      - name: Package releases with modules
+        run: |
+          for binary in sif-linux-amd64 sif-linux-386 sif-linux-arm64 sif-macos-amd64 sif-macos-arm64; do
+            mkdir -p "dist/${binary}"
+            cp "${binary}" "dist/${binary}/sif"
+            cp -r modules "dist/${binary}/"
+            tar -czf "${binary}.tar.gz" -C dist "${binary}"
+          done
+          for binary in sif-windows-amd64 sif-windows-386; do
+            mkdir -p "dist/${binary}"
+            cp "${binary}.exe" "dist/${binary}/sif.exe"
+            cp -r modules "dist/${binary}/"
+            cd dist && zip -r "../${binary}.zip" "${binary}" && cd ..
+          done
+
       - name: Set release version
         run: echo "RELEASE_VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
@@ -52,24 +67,35 @@ jobs:
             Automated release v${{ env.RELEASE_VERSION }}
 
             ## Assets
-            - Windows (64-bit): `sif-windows-amd64.exe`
-            - Windows (32-bit): `sif-windows-386.exe`
-            - macOS (64-bit Intel): `sif-macos-amd64`
-            - macOS (64-bit ARM): `sif-macos-arm64`
-            - Linux (64-bit): `sif-linux-amd64`
-            - Linux (32-bit): `sif-linux-386`
-            - Linux (64-bit ARM): `sif-linux-arm64`
+
+            Each archive contains the sif binary and built-in modules.
+
+            - Windows (64-bit): `sif-windows-amd64.zip`
+            - Windows (32-bit): `sif-windows-386.zip`
+            - macOS (64-bit Intel): `sif-macos-amd64.tar.gz`
+            - macOS (64-bit ARM): `sif-macos-arm64.tar.gz`
+            - Linux (64-bit): `sif-linux-amd64.tar.gz`
+            - Linux (32-bit): `sif-linux-386.tar.gz`
+            - Linux (64-bit ARM): `sif-linux-arm64.tar.gz`
+
+            ## Installation
+
+            ```bash
+            tar -xzf sif-linux-amd64.tar.gz
+            cd sif-linux-amd64
+            ./sif -h
+            ```
 
             For more details, check the [commit history](https://github.com/${{ github.repository }}/commits/main).
           draft: false
           prerelease: false
           files: |
-            sif-windows-amd64.exe
-            sif-windows-386.exe
-            sif-macos-amd64
-            sif-macos-arm64
-            sif-linux-amd64
-            sif-linux-386
-            sif-linux-arm64
+            sif-windows-amd64.zip
+            sif-windows-386.zip
+            sif-macos-amd64.tar.gz
+            sif-macos-arm64.tar.gz
+            sif-linux-amd64.tar.gz
+            sif-linux-386.tar.gz
+            sif-linux-arm64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

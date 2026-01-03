@@ -27,3 +27,16 @@ jobs:
             echo "Sif exited with an error"
             exit 1
           fi
+
+      - name: Test module system
+        run: |
+          echo "Listing modules..."
+          ./sif -lm
+          echo "Running all modules..."
+          ./sif -u https://example.com -am
+          if [ $? -eq 0 ]; then
+            echo "Module system working"
+          else
+            echo "Module system failed"
+            exit 1
+          fi
