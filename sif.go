@@ -102,6 +102,7 @@ func (app *App) Run() error {
 		if err := logger.Init(app.settings.LogDir); err != nil {
 			return err
 		}
+		defer logger.Close()
 	}
 
 	scansRun := []string{}
