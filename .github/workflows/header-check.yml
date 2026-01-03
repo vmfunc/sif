@@ -24,8 +24,8 @@ jobs:
               continue
             fi
 
-            # check if file starts with the license header
-            if ! head -n 3 "$file" | grep -q "█▀ █ █▀▀"; then
+            # check if file starts with the license header (signature is on line 4)
+            if ! head -n 5 "$file" | grep -q "█▀ █ █▀▀"; then
               missing_headers+=("$file")
             fi
           done < <(find . -name "*.go" -type f -print0)
