@@ -112,8 +112,9 @@ func detectWordPress(url string, client *http.Client, bodyString string) bool {
 	for _, file := range wpFiles {
 		resp, err := client.Get(url + file)
 		if err == nil {
-			defer resp.Body.Close()
-			if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound {
+			found := resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound
+			resp.Body.Close()
+			if found {
 				return true
 			}
 		}
