@@ -3,6 +3,7 @@ package frameworks
 import (
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"regexp"
@@ -36,6 +37,7 @@ var frameworkSignatures = map[string][]FrameworkSignature{
 	},
 	"Django": {
 		{Pattern: `csrfmiddlewaretoken`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `csrftoken`, Weight: 0.3, HeaderOnly: true},
 		{Pattern: `django.contrib`, Weight: 0.3},
 		{Pattern: `django.core`, Weight: 0.3},
 		{Pattern: `__admin_media_prefix__`, Weight: 0.3},
@@ -43,27 +45,73 @@ var frameworkSignatures = map[string][]FrameworkSignature{
 	"Ruby on Rails": {
 		{Pattern: `csrf-param`, Weight: 0.4, HeaderOnly: true},
 		{Pattern: `csrf-token`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `_rails_session`, Weight: 0.3, HeaderOnly: true},
 		{Pattern: `ruby-on-rails`, Weight: 0.3},
 		{Pattern: `rails-env`, Weight: 0.3},
+		{Pattern: `data-turbo`, Weight: 0.2},
 	},
 	"Express.js": {
-		{Pattern: `express`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `Express`, Weight: 0.5, HeaderOnly: true},
 		{Pattern: `connect.sid`, Weight: 0.3, HeaderOnly: true},
 	},
 	"ASP.NET": {
+		{Pattern: `X-AspNet-Version`, Weight: 0.5, HeaderOnly: true},
 		{Pattern: `ASP.NET`, Weight: 0.4, HeaderOnly: true},
 		{Pattern: `__VIEWSTATE`, Weight: 0.3},
 		{Pattern: `__EVENTVALIDATION`, Weight: 0.3},
+		{Pattern: `.aspx`, Weight: 0.2},
 	},
 	"Spring": {
 		{Pattern: `org.springframework`, Weight: 0.4, HeaderOnly: true},
 		{Pattern: `spring-security`, Weight: 0.3, HeaderOnly: true},
-		{Pattern: `jsessionid`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `JSESSIONID`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `X-Application-Context`, Weight: 0.3, HeaderOnly: true},
 	},
 	"Flask": {
-		{Pattern: `flask`, Weight: 0.4, HeaderOnly: true},
-		{Pattern: `werkzeug`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `Werkzeug`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `flask`, Weight: 0.3, HeaderOnly: true},
 		{Pattern: `jinja2`, Weight: 0.3},
+	},
+	"Next.js": {
+		{Pattern: `__NEXT_DATA__`, Weight: 0.5},
+		{Pattern: `_next/static`, Weight: 0.4},
+		{Pattern: `__next`, Weight: 0.3},
+		{Pattern: `x-nextjs`, Weight: 0.3, HeaderOnly: true},
+	},
+	"Nuxt.js": {
+		{Pattern: `__NUXT__`, Weight: 0.5},
+		{Pattern: `_nuxt/`, Weight: 0.4},
+		{Pattern: `nuxt`, Weight: 0.2},
+	},
+	"WordPress": {
+		{Pattern: `wp-content`, Weight: 0.4},
+		{Pattern: `wp-includes`, Weight: 0.4},
+		{Pattern: `wp-json`, Weight: 0.3},
+		{Pattern: `wordpress`, Weight: 0.3},
+	},
+	"Drupal": {
+		{Pattern: `Drupal`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `drupal.js`, Weight: 0.4},
+		{Pattern: `/sites/default/files`, Weight: 0.3},
+		{Pattern: `Drupal.settings`, Weight: 0.3},
+	},
+	"Symfony": {
+		{Pattern: `symfony`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `sf_`, Weight: 0.3, HeaderOnly: true},
+		{Pattern: `_sf2_`, Weight: 0.3, HeaderOnly: true},
+	},
+	"FastAPI": {
+		{Pattern: `fastapi`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `starlette`, Weight: 0.3, HeaderOnly: true},
+	},
+	"Gin": {
+		{Pattern: `gin-gonic`, Weight: 0.4},
+		{Pattern: `gin`, Weight: 0.2, HeaderOnly: true},
+	},
+	"Phoenix": {
+		{Pattern: `_csrf_token`, Weight: 0.4, HeaderOnly: true},
+		{Pattern: `phx-`, Weight: 0.3},
+		{Pattern: `phoenix`, Weight: 0.2},
 	},
 }
 
@@ -109,7 +157,7 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 			}
 		}
 
-		confidence := float32(1.0 / (1.0 + exp(-float64(weightedScore/totalWeight)*6.0)))
+		confidence := float32(1.0 / (1.0 + math.Exp(-float64(weightedScore/totalWeight)*6.0)))
 
 		if confidence > highestConfidence {
 			highestConfidence = confidence
@@ -149,9 +197,19 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 }
 
 func containsHeader(headers http.Header, signature string) bool {
+	sigLower := strings.ToLower(signature)
+
+	// check header names
+	for name := range headers {
+		if strings.Contains(strings.ToLower(name), sigLower) {
+			return true
+		}
+	}
+
+	// check header values
 	for _, values := range headers {
 		for _, value := range values {
-			if strings.Contains(strings.ToLower(value), strings.ToLower(signature)) {
+			if strings.Contains(strings.ToLower(value), sigLower) {
 				return true
 			}
 		}
@@ -160,34 +218,7 @@ func containsHeader(headers http.Header, signature string) bool {
 }
 
 func detectVersion(body string, framework string) string {
-	version := extractVersion(body, framework)
-	if version == "Unknown" {
-		return version
-	}
-
-	parts := strings.Split(version, ".")
-	var normalized string
-	if len(parts) >= 3 {
-		normalized = fmt.Sprintf("%05s.%05s.%05s", parts[0], parts[1], parts[2])
-	}
-	return normalized
-}
-
-func exp(x float64) float64 {
-	if x > 88.0 {
-		return 1e38
-	}
-	if x < -88.0 {
-		return 0
-	}
-
-	sum := 1.0
-	term := 1.0
-	for i := 1; i <= 20; i++ {
-		term *= x / float64(i)
-		sum += term
-	}
-	return sum
+	return extractVersion(body, framework)
 }
 
 func getVulnerabilities(framework, version string) ([]string, []string) {
@@ -205,13 +236,21 @@ func getVulnerabilities(framework, version string) ([]string, []string) {
 
 func extractVersion(body string, framework string) string {
 	versionPatterns := map[string]string{
-		"Laravel":       `Laravel\s+[Vv]?(\d+\.\d+\.\d+)`,
-		"Django":        `Django\s+[Vv]?(\d+\.\d+\.\d+)`,
-		"Ruby on Rails": `Rails\s+[Vv]?(\d+\.\d+\.\d+)`,
-		"Express.js":    `Express\s+[Vv]?(\d+\.\d+\.\d+)`,
-		"ASP.NET":       `ASP\.NET\s+[Vv]?(\d+\.\d+\.\d+)`,
-		"Spring":        `Spring\s+[Vv]?(\d+\.\d+\.\d+)`,
-		"Flask":         `Flask\s+[Vv]?(\d+\.\d+\.\d+)`,
+		"Laravel":       `Laravel\s+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Django":        `Django[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Ruby on Rails": `Rails[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Express.js":    `Express[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"ASP.NET":       `ASP\.NET[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Spring":        `Spring[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Flask":         `Flask[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Next.js":       `Next\.js[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Nuxt.js":       `Nuxt[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"WordPress":     `WordPress[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Drupal":        `Drupal[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Symfony":       `Symfony[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"FastAPI":       `FastAPI[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Gin":           `Gin[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
+		"Phoenix":       `Phoenix[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`,
 	}
 
 	if pattern, exists := versionPatterns[framework]; exists {
@@ -221,5 +260,5 @@ func extractVersion(body string, framework string) string {
 			return matches[1]
 		}
 	}
-	return "Unknown"
+	return "unknown"
 }
