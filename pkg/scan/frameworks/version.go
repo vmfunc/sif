@@ -17,6 +17,13 @@ import (
 	"unicode"
 )
 
+// VersionMatch represents a version detection result with confidence.
+type VersionMatch struct {
+	Version    string
+	Confidence float32
+	Source     string // where the version was found
+}
+
 // compiledVersionPattern holds a pre-compiled regex for version extraction
 type compiledVersionPattern struct {
 	re         *regexp.Regexp
@@ -159,8 +166,9 @@ func init() {
 	}
 }
 
-// extractVersionOptimized extracts version using pre-compiled patterns
-func extractVersionOptimized(body string, framework string) VersionMatch {
+// ExtractVersionOptimized extracts version using pre-compiled patterns.
+// This is exported for use by individual detector implementations.
+func ExtractVersionOptimized(body string, framework string) VersionMatch {
 	patterns, exists := frameworkVersionPatterns[framework]
 	if !exists {
 		return VersionMatch{Version: "unknown", Confidence: 0, Source: ""}

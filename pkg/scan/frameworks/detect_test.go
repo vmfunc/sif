@@ -10,52 +10,18 @@
 ·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
 */
 
-package frameworks
+package frameworks_test
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/dropalldatabases/sif/pkg/scan/frameworks"
+	// Import detectors to register them via init()
+	_ "github.com/dropalldatabases/sif/pkg/scan/frameworks/detectors"
 )
-
-func TestContainsHeader_HeaderName(t *testing.T) {
-	headers := http.Header{
-		"X-Powered-By": []string{"Express"},
-		"Content-Type": []string{"text/html"},
-	}
-
-	if !containsHeader(headers, "x-powered-by") {
-		t.Error("expected to find x-powered-by in header names")
-	}
-	if !containsHeader(headers, "X-POWERED-BY") {
-		t.Error("expected case-insensitive match for header names")
-	}
-}
-
-func TestContainsHeader_HeaderValue(t *testing.T) {
-	headers := http.Header{
-		"X-Powered-By": []string{"Express"},
-		"Set-Cookie":   []string{"laravel_session=abc123"},
-	}
-
-	if !containsHeader(headers, "express") {
-		t.Error("expected to find 'express' in header values")
-	}
-	if !containsHeader(headers, "laravel_session") {
-		t.Error("expected to find 'laravel_session' in header values")
-	}
-}
-
-func TestContainsHeader_NotFound(t *testing.T) {
-	headers := http.Header{
-		"Content-Type": []string{"text/html"},
-	}
-
-	if containsHeader(headers, "django") {
-		t.Error("expected not to find 'django' in headers")
-	}
-}
 
 func TestExtractVersion_Laravel(t *testing.T) {
 	tests := []struct {
@@ -69,9 +35,9 @@ func TestExtractVersion_Laravel(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := extractVersion(tt.body, "Laravel")
+		result := frameworks.ExtractVersionOptimized(tt.body, "Laravel").Version
 		if result != tt.expected {
-			t.Errorf("extractVersion(%q, 'Laravel') = %q, want %q", tt.body, result, tt.expected)
+			t.Errorf("ExtractVersionOptimized(%q, 'Laravel') = %q, want %q", tt.body, result, tt.expected)
 		}
 	}
 }
@@ -87,9 +53,9 @@ func TestExtractVersion_Django(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := extractVersion(tt.body, "Django")
+		result := frameworks.ExtractVersionOptimized(tt.body, "Django").Version
 		if result != tt.expected {
-			t.Errorf("extractVersion(%q, 'Django') = %q, want %q", tt.body, result, tt.expected)
+			t.Errorf("ExtractVersionOptimized(%q, 'Django') = %q, want %q", tt.body, result, tt.expected)
 		}
 	}
 }
@@ -105,9 +71,9 @@ func TestExtractVersion_NextJS(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := extractVersion(tt.body, "Next.js")
+		result := frameworks.ExtractVersionOptimized(tt.body, "Next.js").Version
 		if result != tt.expected {
-			t.Errorf("extractVersion(%q, 'Next.js') = %q, want %q", tt.body, result, tt.expected)
+			t.Errorf("ExtractVersionOptimized(%q, 'Next.js') = %q, want %q", tt.body, result, tt.expected)
 		}
 	}
 }
@@ -129,7 +95,7 @@ func TestDetectFramework_NextJS(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -152,7 +118,7 @@ func TestDetectFramework_Express(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -180,7 +146,7 @@ func TestDetectFramework_WordPress(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -208,7 +174,7 @@ func TestDetectFramework_ASPNET(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -227,7 +193,7 @@ func TestDetectFramework_NoMatch(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -237,36 +203,9 @@ func TestDetectFramework_NoMatch(t *testing.T) {
 	}
 }
 
-func TestGetVulnerabilities_Laravel(t *testing.T) {
-	cves, suggestions := getVulnerabilities("Laravel", "8.0.0")
-	if len(cves) == 0 {
-		t.Error("expected CVEs for Laravel 8.0.0")
-	}
-	if len(suggestions) == 0 {
-		t.Error("expected suggestions for Laravel 8.0.0")
-	}
-}
-
-func TestGetVulnerabilities_NoMatch(t *testing.T) {
-	cves, suggestions := getVulnerabilities("Unknown", "1.0.0")
-	if len(cves) != 0 {
-		t.Error("expected no CVEs for unknown framework")
-	}
-	if len(suggestions) != 0 {
-		t.Error("expected no suggestions for unknown framework")
-	}
-}
-
 func TestFrameworkResult_Fields(t *testing.T) {
-	result := FrameworkResult{
-		Name:              "Laravel",
-		Version:           "9.0.0",
-		Confidence:        0.85,
-		VersionConfidence: 0.9,
-		CVEs:              []string{"CVE-2021-3129"},
-		Suggestions:       []string{"Update to latest version"},
-		RiskLevel:         "critical",
-	}
+	result := frameworks.NewFrameworkResult("Laravel", "9.0.0", 0.85, 0.9)
+	result.WithVulnerabilities([]string{"CVE-2021-3129"}, []string{"Update to latest version"})
 
 	if result.Name != "Laravel" {
 		t.Errorf("expected Name 'Laravel', got '%s'", result.Name)
@@ -285,9 +224,6 @@ func TestFrameworkResult_Fields(t *testing.T) {
 	}
 	if len(result.Suggestions) != 1 {
 		t.Errorf("expected 1 suggestion, got %d", len(result.Suggestions))
-	}
-	if result.RiskLevel != "critical" {
-		t.Errorf("expected RiskLevel 'critical', got '%s'", result.RiskLevel)
 	}
 }
 
@@ -308,18 +244,18 @@ func TestExtractVersionWithConfidence(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := extractVersionOptimized(tt.body, tt.framework)
+			result := frameworks.ExtractVersionOptimized(tt.body, tt.framework)
 			if result.Version != tt.wantVer {
-				t.Errorf("extractVersionOptimized() version = %q, want %q", result.Version, tt.wantVer)
+				t.Errorf("ExtractVersionOptimized() version = %q, want %q", result.Version, tt.wantVer)
 			}
 			if result.Confidence < tt.minConf {
-				t.Errorf("extractVersionOptimized() confidence = %f, want >= %f", result.Confidence, tt.minConf)
+				t.Errorf("ExtractVersionOptimized() confidence = %f, want >= %f", result.Confidence, tt.minConf)
 			}
 		})
 	}
 }
 
-func TestGetRiskLevel(t *testing.T) {
+func TestDetermineRiskLevel(t *testing.T) {
 	tests := []struct {
 		name     string
 		cves     []string
@@ -334,41 +270,13 @@ func TestGetRiskLevel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getRiskLevel(tt.cves)
-			if result != tt.expected {
-				t.Errorf("getRiskLevel() = %q, want %q", result, tt.expected)
+			// Test via WithVulnerabilities which uses determineRiskLevel internally
+			result := frameworks.NewFrameworkResult("Test", "1.0", 0.5, 0.5)
+			result.WithVulnerabilities(tt.cves, nil)
+			if result.RiskLevel != tt.expected {
+				t.Errorf("determineRiskLevel() = %q, want %q", result.RiskLevel, tt.expected)
 			}
 		})
-	}
-}
-
-func TestGetVulnerabilities_Django(t *testing.T) {
-	cves, suggestions := getVulnerabilities("Django", "3.2.0")
-	if len(cves) == 0 {
-		t.Error("expected CVEs for Django 3.2.0")
-	}
-	if len(suggestions) == 0 {
-		t.Error("expected suggestions for Django 3.2.0")
-	}
-}
-
-func TestGetVulnerabilities_Spring(t *testing.T) {
-	cves, suggestions := getVulnerabilities("Spring", "5.3.0")
-	if len(cves) == 0 {
-		t.Error("expected CVEs for Spring 5.3.0 (Spring4Shell)")
-	}
-	found := false
-	for _, cve := range cves {
-		if cve == "CVE-2022-22965 (critical)" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected Spring4Shell CVE-2022-22965")
-	}
-	if len(suggestions) == 0 {
-		t.Error("expected suggestions for Spring 5.3.0")
 	}
 }
 
@@ -390,7 +298,7 @@ func TestDetectFramework_Vue(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -417,7 +325,7 @@ func TestDetectFramework_Angular(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -445,7 +353,7 @@ func TestDetectFramework_React(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -474,7 +382,7 @@ func TestDetectFramework_Svelte(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -504,7 +412,7 @@ func TestDetectFramework_Joomla(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := DetectFramework(server.URL, 5*time.Second, "")
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -517,7 +425,7 @@ func TestDetectFramework_Joomla(t *testing.T) {
 }
 
 func TestCVEEntry_Fields(t *testing.T) {
-	entry := CVEEntry{
+	entry := frameworks.CVEEntry{
 		CVE:              "CVE-2021-3129",
 		AffectedVersions: []string{"8.0.0", "8.0.1"},
 		FixedVersion:     "8.4.2",
@@ -534,5 +442,20 @@ func TestCVEEntry_Fields(t *testing.T) {
 	}
 	if entry.Severity != "critical" {
 		t.Errorf("expected Severity 'critical', got '%s'", entry.Severity)
+	}
+}
+
+func TestDetectorRegistry(t *testing.T) {
+	detectors := frameworks.GetDetectors()
+	if len(detectors) == 0 {
+		t.Fatal("expected registered detectors, got none")
+	}
+
+	// Check that some expected detectors are registered
+	expectedDetectors := []string{"Laravel", "Django", "React", "Vue.js", "Angular", "Next.js", "WordPress"}
+	for _, name := range expectedDetectors {
+		if _, ok := frameworks.GetDetector(name); !ok {
+			t.Errorf("expected detector %q to be registered", name)
+		}
 	}
 }
