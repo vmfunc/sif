@@ -1,29 +1,16 @@
-/*
-·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
-:                                                                               :
-:   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :
-:   ▄█ █ █▀    ·   BSD 3-Clause License                                         :
-:                                                                               :
-:   (c) 2022-2025 vmfunc, xyzeva,                                               :
-:                 lunchcat alumni & contributors                                :
-:                                                                               :
-·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
-*/
-
 package scan
 
 import (
 	"bufio"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/log"
+	charmlog "github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 const (
@@ -34,27 +21,11 @@ const (
 )
 
 // Dnslist performs DNS subdomain enumeration on the target domain.
-//
-// Parameters:
-//   - size: determines the size of the subdomain list to use ("small", "medium", or "large")
-//   - url: the target URL to scan
-//   - timeout: maximum duration for each DNS lookup
-//   - threads: number of concurrent threads to use
-//   - logdir: directory to store log files (empty string for no logging)
-//
-// Returns:
-//   - []string: a slice of discovered subdomains
-//   - error: any error encountered during the enumeration
 func Dnslist(size string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
-
-	fmt.Println(styles.Separator.Render("📡 Starting " + styles.Status.Render("DNS fuzzing") + "..."))
-
-	dnslog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "Dnslist 📡",
-	}).With("url", url)
+	log := output.Module("DNS")
+	log.Start()
 
 	var list string
-
 	switch size {
 	case "small":
 		list = dnsURL + dnsSmallFile
@@ -64,14 +35,13 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 		list = dnsURL + dnsBigFile
 	}
 
-	dnslog.Infof("Starting %s DNS listing", size)
-
 	resp, err := http.Get(list)
 	if err != nil {
-		log.Errorf("Error downloading DNS list: %s", err)
+		log.Error("Error downloading DNS list: %s", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	var dns []string
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
@@ -83,7 +53,7 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, size+" subdomain fuzzing"); err != nil {
-			log.Errorf("Error creating log file: %v", err)
+			log.Error("Error creating log file: %v", err)
 			return nil, err
 		}
 	}
@@ -91,6 +61,8 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 	client := &http.Client{
 		Timeout: timeout,
 	}
+
+	progress := output.NewProgress(len(dns), "enumerating")
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -106,29 +78,41 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 					continue
 				}
 
-				log.Debugf("Looking up: %s", domain)
+				progress.Increment(domain)
+
+				charmlog.Debugf("Looking up: %s", domain)
+
+				// Check HTTP
 				resp, err := client.Get("http://" + domain + "." + sanitizedURL)
 				if err != nil {
-					log.Debugf("Error %s: %s", domain, err)
+					charmlog.Debugf("Error %s: %s", domain, err)
 				} else {
 					mu.Lock()
 					urls = append(urls, resp.Request.URL.String())
 					mu.Unlock()
-					dnslog.Infof("%s %s.%s", styles.Status.Render("[http]"), styles.Highlight.Render(domain), sanitizedURL)
+
+					progress.Pause()
+					log.Success("found: %s.%s [http]", output.Highlight.Render(domain), sanitizedURL)
+					progress.Resume()
 
 					if logdir != "" {
 						logger.Write(sanitizedURL, logdir, fmt.Sprintf("[http] %s.%s\n", domain, sanitizedURL))
 					}
 				}
 
+				// Check HTTPS
 				resp, err = client.Get("https://" + domain + "." + sanitizedURL)
 				if err != nil {
-					log.Debugf("Error %s: %s", domain, err)
+					charmlog.Debugf("Error %s: %s", domain, err)
 				} else {
 					mu.Lock()
 					urls = append(urls, resp.Request.URL.String())
 					mu.Unlock()
-					dnslog.Infof("%s %s.%s", styles.Status.Render("[https]"), styles.Highlight.Render(domain), sanitizedURL)
+
+					progress.Pause()
+					log.Success("found: %s.%s [https]", output.Highlight.Render(domain), sanitizedURL)
+					progress.Resume()
+
 					if logdir != "" {
 						logger.Write(sanitizedURL, logdir, fmt.Sprintf("[https] %s.%s\n", domain, sanitizedURL))
 					}
@@ -137,6 +121,9 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 		}(thread)
 	}
 	wg.Wait()
+	progress.Done()
+
+	log.Complete(len(urls), "found")
 
 	return urls, nil
 }

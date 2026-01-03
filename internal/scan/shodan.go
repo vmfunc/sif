@@ -23,9 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 const shodanBaseURL = "https://api.shodan.io"
@@ -93,21 +92,22 @@ type shodanData struct {
 // Shodan performs a Shodan lookup for the given URL
 // The API key should be provided via the SHODAN_API_KEY environment variable
 func Shodan(targetURL string, timeout time.Duration, logdir string) (*ShodanResult, error) {
-	fmt.Println(styles.Separator.Render("🔍 Starting " + styles.Status.Render("Shodan lookup") + "..."))
+	output.ScanStart("Shodan lookup")
 
-	shodanlog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "Shodan 🔍",
-	}).With("url", targetURL)
+	spin := output.NewSpinner("Querying Shodan API")
+	spin.Start()
 
-	apiKey := os.Getenv("SHODAN_API_KEY")
+	apiKey := getShodanAPIKey()
 	if apiKey == "" {
-		shodanlog.Warn("SHODAN_API_KEY environment variable not set, skipping Shodan lookup")
+		spin.Stop()
+		output.Warn("SHODAN_API_KEY environment variable not set, skipping Shodan lookup")
 		return nil, fmt.Errorf("SHODAN_API_KEY environment variable not set")
 	}
 
 	// extract hostname from URL
 	parsedURL, err := url.Parse(targetURL)
 	if err != nil {
+		spin.Stop()
 		return nil, fmt.Errorf("failed to parse URL: %w", err)
 	}
 	hostname := parsedURL.Hostname()
@@ -115,32 +115,42 @@ func Shodan(targetURL string, timeout time.Duration, logdir string) (*ShodanResu
 	// resolve hostname to IP
 	ip, err := resolveHostname(hostname)
 	if err != nil {
-		shodanlog.Warnf("Failed to resolve hostname %s: %v", hostname, err)
+		spin.Stop()
+		output.Warn("Failed to resolve hostname %s: %v", hostname, err)
 		return nil, fmt.Errorf("failed to resolve hostname: %w", err)
 	}
 
-	shodanlog.Infof("Resolved %s to %s", hostname, ip)
+	output.Info("Resolved %s to %s", hostname, ip)
 
 	// query Shodan API
 	result, err := queryShodanHost(ip, apiKey, timeout)
 	if err != nil {
-		shodanlog.Warnf("Shodan lookup failed: %v", err)
+		spin.Stop()
+		output.Warn("Shodan lookup failed: %v", err)
 		return nil, err
 	}
+
+	spin.Stop()
 
 	// log results
 	if logdir != "" {
 		sanitizedURL := strings.Split(targetURL, "://")[1]
 		if err := logger.WriteHeader(sanitizedURL, logdir, "Shodan lookup"); err != nil {
-			shodanlog.Errorf("Error writing log header: %v", err)
+			output.Error("Error writing log header: %v", err)
 		}
 		logShodanResults(sanitizedURL, logdir, result)
 	}
 
 	// print results
-	printShodanResults(shodanlog, result)
+	printShodanResults(result)
 
+	output.ScanComplete("Shodan lookup", 1, "completed")
 	return result, nil
+}
+
+// getShodanAPIKey returns the Shodan API key from environment
+func getShodanAPIKey() string {
+	return os.Getenv("SHODAN_API_KEY")
 }
 
 func resolveHostname(hostname string) (string, error) {
@@ -248,21 +258,21 @@ func truncateBanner(banner string, maxLen int) string {
 	return banner
 }
 
-func printShodanResults(shodanlog *log.Logger, result *ShodanResult) {
+func printShodanResults(result *ShodanResult) {
 	if result.IP != "" {
-		shodanlog.Infof("IP: %s", styles.Highlight.Render(result.IP))
+		output.Info("IP: %s", output.Highlight.Render(result.IP))
 	}
 
 	if len(result.Hostnames) > 0 {
-		shodanlog.Infof("Hostnames: %s", strings.Join(result.Hostnames, ", "))
+		output.Info("Hostnames: %s", strings.Join(result.Hostnames, ", "))
 	}
 
 	if result.Organization != "" {
-		shodanlog.Infof("Organization: %s", result.Organization)
+		output.Info("Organization: %s", result.Organization)
 	}
 
 	if result.ISP != "" {
-		shodanlog.Infof("ISP: %s", result.ISP)
+		output.Info("ISP: %s", result.ISP)
 	}
 
 	if result.Country != "" {
@@ -270,11 +280,11 @@ func printShodanResults(shodanlog *log.Logger, result *ShodanResult) {
 		if result.City != "" {
 			location = result.City + ", " + result.Country
 		}
-		shodanlog.Infof("Location: %s", location)
+		output.Info("Location: %s", location)
 	}
 
 	if result.OS != "" {
-		shodanlog.Infof("OS: %s", result.OS)
+		output.Info("OS: %s", result.OS)
 	}
 
 	if len(result.Ports) > 0 {
@@ -282,11 +292,11 @@ func printShodanResults(shodanlog *log.Logger, result *ShodanResult) {
 		for i, port := range result.Ports {
 			portStrs[i] = fmt.Sprintf("%d", port)
 		}
-		shodanlog.Infof("Open Ports: %s", styles.Status.Render(strings.Join(portStrs, ", ")))
+		output.Info("Open Ports: %s", output.Status.Render(strings.Join(portStrs, ", ")))
 	}
 
 	if len(result.Vulns) > 0 {
-		shodanlog.Warnf("Vulnerabilities: %s", styles.SeverityHigh.Render(strings.Join(result.Vulns, ", ")))
+		output.Warn("Vulnerabilities: %s", output.SeverityHigh.Render(strings.Join(result.Vulns, ", ")))
 	}
 
 	for _, service := range result.Services {
@@ -297,10 +307,7 @@ func printShodanResults(shodanlog *log.Logger, result *ShodanResult) {
 				serviceInfo += " " + service.Version
 			}
 		}
-		shodanlog.Infof("Service: %s", serviceInfo)
-		if service.Banner != "" {
-			shodanlog.Debugf("  Banner: %s", service.Banner)
-		}
+		output.Info("Service: %s", serviceInfo)
 	}
 }
 

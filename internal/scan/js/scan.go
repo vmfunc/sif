@@ -16,13 +16,13 @@ import (
 	"bufio"
 	"io"
 	"net/http"
-	"os"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/antchfx/htmlquery"
-	"github.com/charmbracelet/log"
+	charmlog "github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/output"
 	"github.com/dropalldatabases/sif/internal/scan/js/frameworks"
 	urlutil "github.com/projectdiscovery/utils/url"
 )
@@ -36,16 +36,20 @@ type JavascriptScanResult struct {
 func (r *JavascriptScanResult) ResultType() string { return "js" }
 
 func JavascriptScan(url string, timeout time.Duration, threads int, logdir string) (*JavascriptScanResult, error) {
-	jslog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "🚧 JavaScript",
-	}).With("url", url)
+	log := output.Module("JS")
+	log.Start()
+
+	spin := output.NewSpinner("Scanning JavaScript files")
+	spin.Start()
 
 	baseUrl, err := urlutil.Parse(url)
 	if err != nil {
+		spin.Stop()
 		return nil, err
 	}
 	resp, err := http.Get(url)
 	if err != nil {
+		spin.Stop()
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -84,9 +88,10 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 
 	for _, script := range scripts {
 		if strings.Contains(script, "/_buildManifest.js") {
-			jslog.Infof("Detected Next.JS pages router! Getting all scripts from %s", script)
+			log.Info("Detected Next.JS pages router! Getting all scripts from %s", script)
 			nextScripts, err := frameworks.GetPagesRouterScripts(script)
 			if err != nil {
+				spin.Stop()
 				return nil, err
 			}
 
@@ -99,30 +104,30 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 		}
 	}
 
-	jslog.Infof("Got %d scripts, now running scans on them", len(scripts))
+	log.Info("Got %d scripts, now running scans on them", len(scripts))
 
 	supabaseResults := make([]supabaseScanResult, 0, len(scripts))
 	for _, script := range scripts {
-		jslog.Infof("Scanning %s", script)
+		charmlog.Debugf("Scanning %s", script)
 		resp, err := http.Get(script)
 		if err != nil {
-			jslog.Warnf("Failed to fetch script: %s", err)
+			charmlog.Warnf("Failed to fetch script: %s", err)
 			continue
 		}
 
 		bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
 		resp.Body.Close()
 		if err != nil {
-			jslog.Errorf("Failed to read script body: %s", err)
+			charmlog.Errorf("Failed to read script body: %s", err)
 			continue
 		}
 		content := string(bodyBytes)
 
-		jslog.Infof("Running supabase scanner on %s", script)
+		charmlog.Debugf("Running supabase scanner on %s", script)
 		scriptSupabaseResults, err := ScanSupabase(content, script)
 
 		if err != nil {
-			jslog.Errorf("Error while scanning supabase: %s", err)
+			charmlog.Errorf("Error while scanning supabase: %s", err)
 		}
 
 		if scriptSupabaseResults != nil {
@@ -130,10 +135,14 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 		}
 	}
 
+	spin.Stop()
+
 	result := JavascriptScanResult{
 		SupabaseResults:      supabaseResults,
 		FoundEnvironmentVars: map[string]string{},
 	}
+
+	log.Complete(len(supabaseResults), "found")
 
 	return &result, nil
 }

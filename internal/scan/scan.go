@@ -19,9 +19,7 @@ package scan
 
 import (
 	"bufio"
-	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,7 +27,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 func fetchRobotsTXT(url string, client *http.Client) *http.Response {
@@ -61,20 +59,16 @@ func fetchRobotsTXT(url string, client *http.Client) *http.Response {
 //   - threads: number of concurrent threads to use
 //   - logdir: directory to store log files (empty string for no logging)
 func Scan(url string, timeout time.Duration, threads int, logdir string) {
-	fmt.Println(styles.Separator.Render("🐾 Starting " + styles.Status.Render("base url scanning") + "..."))
+	output.ScanStart("base URL scanning")
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "URL scanning"); err != nil {
-			log.Errorf("Error creating log file: %v", err)
+			output.Error("Error creating log file: %v", err)
 			return
 		}
 	}
-
-	scanlog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "Scan 👁️‍🗨️",
-	}).With("url", url)
 
 	client := &http.Client{
 		Timeout: timeout,
@@ -90,7 +84,7 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 404 && resp.StatusCode != 301 && resp.StatusCode != 302 && resp.StatusCode != 307 {
-		scanlog.Infof("file [%s] found", styles.Status.Render("robots.txt"))
+		output.Success("File %s found", output.Status.Render("robots.txt"))
 
 		var robotsData []string
 		scanner := bufio.NewScanner(resp.Body)
@@ -115,17 +109,17 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 					}
 
 					_, sanitizedRobot, _ := strings.Cut(robot, ": ")
-					scanlog.Debugf("%s", robot)
+					log.Debugf("%s", robot)
 					resp, err := client.Get(url + "/" + sanitizedRobot)
 					if err != nil {
-						scanlog.Debugf("Error %s: %s", sanitizedRobot, err)
+						log.Debugf("Error %s: %s", sanitizedRobot, err)
 						continue
 					}
 
 					if resp.StatusCode != 404 {
-						scanlog.Infof("%s from robots: [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(sanitizedRobot))
+						output.Success("%s from robots: %s", output.Status.Render(strconv.Itoa(resp.StatusCode)), output.Highlight.Render(sanitizedRobot))
 						if logdir != "" {
-							logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s from robots: [%s]\n", strconv.Itoa(resp.StatusCode), sanitizedRobot))
+							logger.Write(sanitizedURL, logdir, strconv.Itoa(resp.StatusCode)+" from robots: ["+sanitizedRobot+"]\n")
 						}
 					}
 					resp.Body.Close()

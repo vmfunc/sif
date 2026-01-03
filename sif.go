@@ -27,10 +27,10 @@ import (
 	"github.com/dropalldatabases/sif/internal/config"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/modules"
+	"github.com/dropalldatabases/sif/internal/output"
 	"github.com/dropalldatabases/sif/internal/scan"
 	"github.com/dropalldatabases/sif/internal/scan/frameworks"
 	jsscan "github.com/dropalldatabases/sif/internal/scan/js"
-	"github.com/dropalldatabases/sif/internal/styles"
 )
 
 // App represents the main application structure for sif.
@@ -74,8 +74,10 @@ func New(settings *config.Settings) (*App, error) {
 	app := &App{settings: settings}
 
 	if !settings.ApiMode {
-		fmt.Println(styles.Box.Render("   █▀ █ █▀▀\n  ▄█ █ █▀ "))
-		fmt.Println(styles.Subheading.Render("\nblazing-fast pentesting suite\nman's best friend\n\nbsd 3-clause · (c) 2022-2025 vmfunc, xyzeva & contributors\n"))
+		fmt.Println(output.Box.Render("   █▀ █ █▀▀\n  ▄█ █ █▀ "))
+		fmt.Println(output.Subheading.Render("\nblazing-fast pentesting suite\n\nbsd 3-clause · (c) 2022-2025 vmfunc, xyzeva & contributors\n"))
+	} else {
+		output.SetAPIMode(true)
 	}
 
 	// Skip target requirement if just listing modules
@@ -164,7 +166,7 @@ func (app *App) Run() error {
 	scansRun := make([]string, 0, 16)
 
 	for _, url := range app.targets {
-		log.Infof("📡Starting scan on %s...", url)
+		output.Info("Starting scan on %s", output.Highlight.Render(url))
 
 		moduleResults := make([]ModuleResult, 0, 16)
 
@@ -250,7 +252,6 @@ func (app *App) Run() error {
 			scansRun = append(scansRun, "Whois")
 		}
 
-		// func Git(url string, timeout time.Duration, threads int, logdir string)
 		if app.settings.Git {
 			result, err := scan.Git(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 			if err != nil {
@@ -377,17 +378,18 @@ func (app *App) Run() error {
 				}
 
 				for _, m := range toRun {
-					log.Infof("🔍 Running module: %s", m.Info().ID)
+					modLog := output.Module(m.Info().ID)
+					modLog.Start()
 					result, err := m.Execute(context.Background(), url, opts)
 					if err != nil {
-						log.Warnf("Module %s failed: %v", m.Info().ID, err)
+						modLog.Error("failed: %v", err)
 						continue
 					}
 					if result != nil && len(result.Findings) > 0 {
 						moduleResults = append(moduleResults, NewModuleResult(result))
-						log.Infof("✅ Module %s: %d findings", m.Info().ID, len(result.Findings))
+						modLog.Complete(len(result.Findings), "findings")
 					} else {
-						log.Infof("➖ Module %s: no findings", m.Info().ID)
+						modLog.Complete(0, "findings")
 					}
 				}
 			}
@@ -408,15 +410,7 @@ func (app *App) Run() error {
 	}
 
 	if !app.settings.ApiMode {
-		scansRunList := "  • " + strings.Join(scansRun, "\n  • ")
-		if app.settings.LogDir != "" {
-			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n📂 Output saved to files: %s\n\n🔍 Ran scans:\n%s",
-				strings.Join(app.logFiles, ", "),
-				scansRunList)))
-		} else {
-			fmt.Println(styles.Box.Render(fmt.Sprintf("🌿 All scans completed!\n\n🔍 Ran scans:\n%s",
-				scansRunList)))
-		}
+		output.PrintSummary(scansRun, app.logFiles)
 	}
 
 	return nil
