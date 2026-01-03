@@ -2,8 +2,6 @@ module github.com/dropalldatabases/sif
 
 go 1.24.0
 
-toolchain go1.25.5
-
 require (
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/charmbracelet/lipgloss v0.8.0
