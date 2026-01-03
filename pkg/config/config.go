@@ -44,6 +44,7 @@ type Settings struct {
 	Shodan            bool
 	SQL               bool
 	LFI               bool
+	Framework         bool
 }
 
 const (
@@ -89,6 +90,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.Shodan, "shodan", false, "Enable Shodan lookup (requires SHODAN_API_KEY env var)"),
 		flagSet.BoolVar(&settings.SQL, "sql", false, "Enable SQL reconnaissance (admin panels, error disclosure)"),
 		flagSet.BoolVar(&settings.LFI, "lfi", false, "Enable LFI (Local File Inclusion) reconnaissance"),
+		flagSet.BoolVar(&settings.Framework, "framework", false, "Enable framework detection"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",
