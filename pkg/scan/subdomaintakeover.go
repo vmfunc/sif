@@ -115,7 +115,10 @@ func checkSubdomainTakeover(subdomain string, client *http.Client) (bool, string
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, ""
+	}
 	bodyString := string(body)
 
 	// Check for common takeover signatures in the response

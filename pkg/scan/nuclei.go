@@ -70,7 +70,10 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 
 	// Get templates
 	templates.Install(nucleilog)
-	pwd, _ := os.Getwd()
+	pwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
 	config.DefaultConfig.SetTemplatesDir(pwd)
 	catalog := disk.NewCatalog(pwd)
 
@@ -90,7 +93,10 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 	defer cache.Close()
 
 	progressClient := &testutils.MockProgressClient{}
-	reportingClient, _ := reporting.New(&reporting.Options{}, "")
+	reportingClient, err := reporting.New(&reporting.Options{}, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reporting client: %w", err)
+	}
 	defer reportingClient.Close()
 
 	interactOpts := interactsh.DefaultOptions(outputWriter, reportingClient, progressClient)
