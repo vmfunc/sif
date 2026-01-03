@@ -45,6 +45,10 @@ type Settings struct {
 	SQL               bool
 	LFI               bool
 	Framework         bool
+	Modules           string // Comma-separated list of module IDs to run
+	ModuleTags        string // Run modules matching these tags
+	AllModules        bool   // Run all loaded modules
+	ListModules       bool   // List available modules and exit
 }
 
 const (
@@ -103,6 +107,13 @@ func Parse() *Settings {
 
 	flagSet.CreateGroup("api", "API",
 		flagSet.BoolVar(&settings.ApiMode, "api", false, "Enable API mode. Only useful for internal lunchcat usage"),
+	)
+
+	flagSet.CreateGroup("modules", "Modules",
+		flagSet.StringVarP(&settings.Modules, "modules", "m", "", "Comma-separated list of module IDs to run"),
+		flagSet.StringVarP(&settings.ModuleTags, "module-tags", "mt", "", "Run modules matching these tags"),
+		flagSet.BoolVarP(&settings.AllModules, "all-modules", "am", false, "Run all loaded modules"),
+		flagSet.BoolVarP(&settings.ListModules, "list-modules", "lm", false, "List available modules and exit"),
 	)
 
 	if err := flagSet.Parse(); err != nil {
