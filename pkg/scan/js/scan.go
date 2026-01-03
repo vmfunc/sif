@@ -14,7 +14,6 @@ package js
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -44,17 +43,17 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 	}
 	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	var html string
+	var sb strings.Builder
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
-		html += scanner.Text()
+		sb.WriteString(scanner.Text())
 	}
+	html := sb.String()
 
 	doc, err := htmlquery.Parse(strings.NewReader(html))
 	if err != nil {
@@ -99,19 +98,20 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 
 	jslog.Infof("Got %d scripts, now running scans on them", len(scripts))
 
-	var supabaseResults []supabaseScanResult
+	supabaseResults := make([]supabaseScanResult, 0, len(scripts))
 	for _, script := range scripts {
 		jslog.Infof("Scanning %s", script)
 		resp, err := http.Get(script)
 		if err != nil {
-			fmt.Println(err)
+			jslog.Warnf("Failed to fetch script: %s", err)
 			continue
 		}
-		defer resp.Body.Close()
 
 		bodyBytes, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
 		if err != nil {
-			log.Fatal(err)
+			jslog.Errorf("Failed to read script body: %s", err)
+			continue
 		}
 		content := string(bodyBytes)
 
