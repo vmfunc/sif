@@ -74,24 +74,85 @@ run `./sif -h` for all options.
 
 ## modules
 
-| module | description |
-|--------|-------------|
-| `dirlist` | directory and file fuzzing |
-| `dnslist` | subdomain enumeration |
-| `ports` | port and service scanning |
-| `nuclei` | vulnerability scanning with nuclei templates |
-| `dork` | automated google dorking |
-| `js` | javascript framework detection (next.js, supabase) |
-| `c3` | cloud storage misconfiguration scanning |
-| `headers` | http header analysis |
-| `takeover` | subdomain takeover detection |
-| `cms` | cms detection |
-| `whois` | whois lookups |
-| `git` | exposed git repository detection |
-| `shodan` | shodan host intelligence (requires SHODAN_API_KEY) |
-| `sql` | sql admin panel and error disclosure detection |
-| `lfi` | local file inclusion vulnerability scanning |
-| `framework` | web framework detection with version + cve lookup |
+sif has a modular architecture. modules are defined in yaml and can be extended by users.
+
+### built-in scan flags
+
+| flag | description |
+|------|-------------|
+| `-dirlist` | directory and file fuzzing (small/medium/large) |
+| `-dnslist` | subdomain enumeration (small/medium/large) |
+| `-ports` | port scanning (common/full) |
+| `-nuclei` | vulnerability scanning with nuclei templates |
+| `-dork` | automated google dorking |
+| `-js` | javascript analysis |
+| `-c3` | cloud storage misconfiguration |
+| `-headers` | http header analysis |
+| `-st` | subdomain takeover detection |
+| `-cms` | cms detection |
+| `-whois` | whois lookups |
+| `-git` | exposed git repository detection |
+| `-shodan` | shodan lookup (requires SHODAN_API_KEY) |
+| `-sql` | sql recon |
+| `-lfi` | local file inclusion |
+| `-framework` | framework detection with cve lookup |
+
+### yaml modules
+
+list available modules:
+
+```bash
+./sif -lm
+```
+
+run specific modules:
+
+```bash
+# run by id
+./sif -u https://example.com -m sqli-error-based,xss-reflected
+
+# run by tag
+./sif -u https://example.com -mt owasp-top10
+
+# run all modules
+./sif -u https://example.com -am
+```
+
+### custom modules
+
+create your own modules in `~/.config/sif/modules/`. modules use a yaml format similar to nuclei templates:
+
+```yaml
+id: my-custom-check
+info:
+  name: my custom security check
+  author: you
+  severity: medium
+  description: checks for something specific
+  tags: [custom, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/admin"
+    - "{{BaseURL}}/login"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "admin panel"
+        - "login"
+      condition: or
+```
+
+see [docs/modules.md](docs/modules.md) for the full module format.
 
 ## contribute
 
