@@ -189,11 +189,14 @@ func queryShodanHost(ip string, apiKey string, timeout time.Duration) (*ShodanRe
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
+		if err != nil {
+			return nil, fmt.Errorf("read shodan response: %w", err)
+		}
 		return nil, fmt.Errorf("Shodan API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
