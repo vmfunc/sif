@@ -13,15 +13,12 @@
 package scan
 
 import (
-	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 type HeaderResult struct {
@@ -30,20 +27,17 @@ type HeaderResult struct {
 }
 
 func Headers(url string, timeout time.Duration, logdir string) ([]HeaderResult, error) {
-	fmt.Println(styles.Separator.Render("🔍 Starting " + styles.Status.Render("HTTP Header Analysis") + "..."))
+	log := output.Module("HEADERS")
+	log.Start()
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "HTTP Header Analysis"); err != nil {
-			log.Errorf("Error creating log file: %v", err)
+			log.Error("Error creating log file: %v", err)
 			return nil, err
 		}
 	}
-
-	headerlog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "Headers 🔍",
-	}).With("url", url)
 
 	client := &http.Client{
 		Timeout: timeout,
@@ -60,12 +54,13 @@ func Headers(url string, timeout time.Duration, logdir string) ([]HeaderResult, 
 	for name, values := range resp.Header {
 		for _, value := range values {
 			results = append(results, HeaderResult{Name: name, Value: value})
-			headerlog.Infof("%s: %s", styles.Highlight.Render(name), value)
+			log.Info("%s: %s", output.Highlight.Render(name), value)
 			if logdir != "" {
-				logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s: %s\n", name, value))
+				logger.Write(sanitizedURL, logdir, name+": "+value+"\n")
 			}
 		}
 	}
 
+	log.Complete(len(results), "found")
 	return results, nil
 }

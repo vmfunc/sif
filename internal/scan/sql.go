@@ -13,18 +13,17 @@
 package scan
 
 import (
-	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/log"
+	charmlog "github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 // SQLResult represents the results of SQL reconnaissance
@@ -115,22 +114,21 @@ var databaseErrorPatterns = []struct {
 
 // SQL performs SQL reconnaissance on the target URL
 func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*SQLResult, error) {
-	fmt.Println(styles.Separator.Render("🗃️ Starting " + styles.Status.Render("SQL reconnaissance") + "..."))
+	log := output.Module("SQL")
+	log.Start()
+
+	spin := output.NewSpinner("Scanning for SQL exposures")
+	spin.Start()
 
 	sanitizedURL := strings.Split(targetURL, "://")[1]
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "SQL reconnaissance"); err != nil {
-			log.Errorf("Error creating log file: %v", err)
+			spin.Stop()
+			log.Error("Error creating log file: %v", err)
 			return nil, err
 		}
 	}
-
-	sqllog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "SQL 🗃️",
-	}).With("url", targetURL)
-
-	sqllog.Infof("Starting SQL reconnaissance...")
 
 	result := &SQLResult{
 		AdminPanels:    make([]SQLAdminPanel, 0, 8),
@@ -168,7 +166,7 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 
 				resp, err := client.Get(checkURL)
 				if err != nil {
-					log.Debugf("Error checking %s: %v", checkURL, err)
+					charmlog.Debugf("Error checking %s: %v", checkURL, err)
 					continue
 				}
 
@@ -193,13 +191,15 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 						result.AdminPanels = append(result.AdminPanels, panel)
 						mu.Unlock()
 
-						sqllog.Warnf("Found %s at [%s] (status: %d)",
-							styles.SeverityHigh.Render(adminPath.panelType),
-							styles.Highlight.Render(checkURL),
+						spin.Stop()
+						log.Warn("Found %s at %s (status: %d)",
+							output.SeverityHigh.Render(adminPath.panelType),
+							output.Highlight.Render(checkURL),
 							resp.StatusCode)
+						spin.Start()
 
 						if logdir != "" {
-							logger.Write(sanitizedURL, logdir, fmt.Sprintf("Found %s at [%s] (status: %d)\n", adminPath.panelType, checkURL, resp.StatusCode))
+							logger.Write(sanitizedURL, logdir, "Found "+adminPath.panelType+" at ["+checkURL+"] (status: "+strconv.Itoa(resp.StatusCode)+")\n")
 						}
 					}
 				} else {
@@ -211,7 +211,7 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	wg.Wait()
 
 	// check main URL for database errors
-	checkDatabaseErrors(client, targetURL, sanitizedURL, result, sqllog, logdir, &mu, seenErrors)
+	checkDatabaseErrors(client, targetURL, sanitizedURL, result, logdir, &mu, seenErrors)
 
 	// check common endpoints that might expose database errors
 	errorCheckPaths := []string{
@@ -226,22 +226,27 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 
 	for _, path := range errorCheckPaths {
 		checkURL := strings.TrimSuffix(targetURL, "/") + path
-		checkDatabaseErrors(client, checkURL, sanitizedURL, result, sqllog, logdir, &mu, seenErrors)
+		checkDatabaseErrors(client, checkURL, sanitizedURL, result, logdir, &mu, seenErrors)
 	}
+
+	spin.Stop()
 
 	// summary
+	totalFindings := len(result.AdminPanels) + len(result.DatabaseErrors)
 	if len(result.AdminPanels) > 0 {
-		sqllog.Warnf("Found %d database admin panel(s)", len(result.AdminPanels))
+		log.Warn("Found %d database admin panel(s)", len(result.AdminPanels))
 	}
 	if len(result.DatabaseErrors) > 0 {
-		sqllog.Warnf("Found %d database error disclosure(s)", len(result.DatabaseErrors))
+		log.Warn("Found %d database error disclosure(s)", len(result.DatabaseErrors))
 	}
 
-	if len(result.AdminPanels) == 0 && len(result.DatabaseErrors) == 0 {
-		sqllog.Infof("No SQL exposures found")
+	if totalFindings == 0 {
+		log.Info("No SQL exposures found")
+		log.Complete(0, "found")
 		return nil, nil
 	}
 
+	log.Complete(totalFindings, "found")
 	return result, nil
 }
 
@@ -279,7 +284,7 @@ func isAdminPanel(body string, panelType string) bool {
 	}
 }
 
-func checkDatabaseErrors(client *http.Client, checkURL, sanitizedURL string, result *SQLResult, sqllog *log.Logger, logdir string, mu *sync.Mutex, seen map[string]bool) {
+func checkDatabaseErrors(client *http.Client, checkURL, sanitizedURL string, result *SQLResult, logdir string, mu *sync.Mutex, seen map[string]bool) {
 	resp, err := client.Get(checkURL)
 	if err != nil {
 		return
@@ -310,12 +315,12 @@ func checkDatabaseErrors(client *http.Client, checkURL, sanitizedURL string, res
 			result.DatabaseErrors = append(result.DatabaseErrors, dbError)
 			mu.Unlock()
 
-			sqllog.Warnf("Database error disclosure: %s at [%s]",
-				styles.SeverityHigh.Render(pattern.databaseType),
-				styles.Highlight.Render(checkURL))
+			output.Warn("Database error disclosure: %s at %s",
+				output.SeverityHigh.Render(pattern.databaseType),
+				output.Highlight.Render(checkURL))
 
 			if logdir != "" {
-				logger.Write(sanitizedURL, logdir, fmt.Sprintf("Database error disclosure: %s at [%s]\n", pattern.databaseType, checkURL))
+				logger.Write(sanitizedURL, logdir, "Database error disclosure: "+pattern.databaseType+" at ["+checkURL+"]\n")
 			}
 			break // only report one database type per URL
 		}

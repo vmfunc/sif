@@ -17,15 +17,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/log"
+	charmlog "github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 // LFIResult represents the results of LFI reconnaissance
@@ -113,22 +112,21 @@ var commonLFIParams = []string{
 
 // LFI performs LFI (Local File Inclusion) reconnaissance on the target URL
 func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*LFIResult, error) {
-	fmt.Println(styles.Separator.Render("📁 Starting " + styles.Status.Render("LFI reconnaissance") + "..."))
+	log := output.Module("LFI")
+	log.Start()
+
+	spin := output.NewSpinner("Scanning for LFI vulnerabilities")
+	spin.Start()
 
 	sanitizedURL := strings.Split(targetURL, "://")[1]
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "LFI reconnaissance"); err != nil {
-			log.Errorf("Error creating log file: %v", err)
+			spin.Stop()
+			log.Error("Error creating log file: %v", err)
 			return nil, err
 		}
 	}
-
-	lfilog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "LFI 📁",
-	}).With("url", targetURL)
-
-	lfilog.Infof("Starting LFI reconnaissance...")
 
 	result := &LFIResult{
 		Vulnerabilities: make([]LFIVulnerability, 0, 16),
@@ -170,7 +168,7 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	result.TestedParams = len(paramsToTest)
 	result.TestedPayloads = len(lfiPayloads)
 
-	lfilog.Infof("Testing %d parameters with %d payloads", len(paramsToTest), len(lfiPayloads))
+	log.Info("Testing %d parameters with %d payloads", len(paramsToTest), len(lfiPayloads))
 
 	// create work items
 	type workItem struct {
@@ -218,7 +216,7 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 
 				resp, err := client.Get(testURL)
 				if err != nil {
-					log.Debugf("Error testing %s: %v", testURL, err)
+					charmlog.Debugf("Error testing %s: %v", testURL, err)
 					continue
 				}
 
@@ -252,10 +250,12 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 						result.Vulnerabilities = append(result.Vulnerabilities, vuln)
 						mu.Unlock()
 
-						lfilog.Warnf("LFI vulnerability found: %s in param [%s] - %s",
-							styles.SeverityHigh.Render(evidence.description),
-							styles.Highlight.Render(item.param),
-							styles.Status.Render(item.payload.target))
+						spin.Stop()
+						log.Warn("LFI vulnerability found: %s in param %s - %s",
+							output.SeverityHigh.Render(evidence.description),
+							output.Highlight.Render(item.param),
+							output.Status.Render(item.payload.target))
+						spin.Start()
 
 						if logdir != "" {
 							logger.Write(sanitizedURL, logdir,
@@ -270,9 +270,11 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	}
 	wg.Wait()
 
+	spin.Stop()
+
 	// summary
 	if len(result.Vulnerabilities) > 0 {
-		lfilog.Warnf("Found %d LFI vulnerabilities", len(result.Vulnerabilities))
+		log.Warn("Found %d LFI vulnerabilities", len(result.Vulnerabilities))
 		criticalCount := 0
 		highCount := 0
 		for _, v := range result.Vulnerabilities {
@@ -283,13 +285,15 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 			}
 		}
 		if criticalCount > 0 {
-			lfilog.Errorf("%d CRITICAL vulnerabilities found!", criticalCount)
+			log.Error("%d CRITICAL vulnerabilities found!", criticalCount)
 		}
 		if highCount > 0 {
-			lfilog.Warnf("%d HIGH severity vulnerabilities found", highCount)
+			log.Warn("%d HIGH severity vulnerabilities found", highCount)
 		}
+		log.Complete(len(result.Vulnerabilities), "found")
 	} else {
-		lfilog.Infof("No LFI vulnerabilities detected")
+		log.Info("No LFI vulnerabilities detected")
+		log.Complete(0, "found")
 		return nil, nil
 	}
 

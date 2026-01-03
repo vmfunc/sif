@@ -1,30 +1,17 @@
-/*
-·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
-:                                                                               :
-:   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :
-:   ▄█ █ █▀    ·   BSD 3-Clause License                                         :
-:                                                                               :
-:   (c) 2022-2025 vmfunc (Celeste Hickenlooper), xyzeva,                        :
-:                 lunchcat alumni & contributors                                :
-:                                                                               :
-·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
-*/
-
 package scan
 
 import (
 	"bufio"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/log"
+	charmlog "github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 const (
@@ -40,36 +27,20 @@ type DirectoryResult struct {
 }
 
 // Dirlist performs directory fuzzing on the target URL.
-//
-// Parameters:
-//   - size: determines the size of the directory list to use ("small", "medium", or "large")
-//   - url: the target URL to scan
-//   - timeout: maximum duration for each request
-//   - threads: number of concurrent threads to use
-//   - logdir: directory to store log files (empty string for no logging)
-//
-// Returns:
-//   - []DirectoryResult: a slice of discovered directories and their status codes
-//   - error: any error encountered during the scan
 func Dirlist(size string, url string, timeout time.Duration, threads int, logdir string) ([]DirectoryResult, error) {
-
-	fmt.Println(styles.Separator.Render("📂 Starting " + styles.Status.Render("directory fuzzing") + "..."))
+	log := output.Module("DIRLIST")
+	log.Start()
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, size+" directory fuzzing"); err != nil {
-			log.Errorf("Error creating log file: %v", err)
+			log.Error("Error creating log file: %v", err)
 			return nil, err
 		}
 	}
 
-	dirlog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "Dirlist 📂",
-	}).With("url", url)
-
 	var list string
-
 	switch size {
 	case "small":
 		list = directoryURL + smallFile
@@ -79,14 +50,13 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 		list = directoryURL + bigFile
 	}
 
-	dirlog.Infof("Starting %s directory listing", size)
-
 	resp, err := http.Get(list)
 	if err != nil {
-		log.Errorf("Error downloading directory list: %s", err)
+		log.Error("Error downloading directory list: %s", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	var directories []string
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
@@ -97,6 +67,8 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 	client := &http.Client{
 		Timeout: timeout,
 	}
+
+	progress := output.NewProgress(len(directories), "fuzzing")
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -112,15 +84,20 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 					continue
 				}
 
-				log.Debugf("%s", directory)
+				progress.Increment(directory)
+
+				charmlog.Debugf("%s", directory)
 				resp, err := client.Get(url + "/" + directory)
 				if err != nil {
-					log.Debugf("Error %s: %s", directory, err)
-					return
+					charmlog.Debugf("Error %s: %s", directory, err)
+					continue
 				}
 
 				if resp.StatusCode != 404 && resp.StatusCode != 403 {
-					dirlog.Infof("%s [%s]", styles.Status.Render(strconv.Itoa(resp.StatusCode)), styles.Highlight.Render(directory))
+					progress.Pause()
+					log.Success("found: %s [%s]", output.Highlight.Render(directory), output.Status.Render(strconv.Itoa(resp.StatusCode)))
+					progress.Resume()
+
 					if logdir != "" {
 						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s [%s]\n", strconv.Itoa(resp.StatusCode), directory))
 					}
@@ -137,6 +114,9 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 		}(thread)
 	}
 	wg.Wait()
+	progress.Done()
+
+	log.Complete(len(results), "found")
 
 	return results, nil
 }

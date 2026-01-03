@@ -13,16 +13,13 @@
 package scan
 
 import (
-	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 )
 
 type CMSResult struct {
@@ -31,20 +28,21 @@ type CMSResult struct {
 }
 
 func CMS(url string, timeout time.Duration, logdir string) (*CMSResult, error) {
-	fmt.Println(styles.Separator.Render("🔍 Starting " + styles.Status.Render("CMS detection") + "..."))
+	log := output.Module("CMS")
+	log.Start()
+
+	spin := output.NewSpinner("Detecting content management system")
+	spin.Start()
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "CMS detection"); err != nil {
-			log.Errorf("Error creating log file: %v", err)
+			spin.Stop()
+			log.Error("Error creating log file: %v", err)
 			return nil, err
 		}
 	}
-
-	cmslog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "CMS 🔍",
-	}).With("url", url)
 
 	client := &http.Client{
 		Timeout: timeout,
@@ -52,38 +50,48 @@ func CMS(url string, timeout time.Duration, logdir string) (*CMSResult, error) {
 
 	resp, err := client.Get(url)
 	if err != nil {
+		spin.Stop()
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
 	if err != nil {
+		spin.Stop()
 		return nil, err
 	}
 	bodyString := string(body)
 
 	// WordPress
 	if detectWordPress(url, client, bodyString) {
+		spin.Stop()
 		result := &CMSResult{Name: "WordPress", Version: "Unknown"}
-		cmslog.Infof("Detected CMS: %s", styles.Highlight.Render(result.Name))
+		log.Success("Detected CMS: %s", output.Highlight.Render(result.Name))
+		log.Complete(1, "detected")
 		return result, nil
 	}
 
 	// Drupal
 	if strings.Contains(resp.Header.Get("X-Drupal-Cache"), "HIT") || strings.Contains(bodyString, "Drupal.settings") {
+		spin.Stop()
 		result := &CMSResult{Name: "Drupal", Version: "Unknown"}
-		cmslog.Infof("Detected CMS: %s", styles.Highlight.Render(result.Name))
+		log.Success("Detected CMS: %s", output.Highlight.Render(result.Name))
+		log.Complete(1, "detected")
 		return result, nil
 	}
 
 	// Joomla
 	if strings.Contains(bodyString, "joomla") || strings.Contains(bodyString, "/media/system/js/core.js") {
+		spin.Stop()
 		result := &CMSResult{Name: "Joomla", Version: "Unknown"}
-		cmslog.Infof("Detected CMS: %s", styles.Highlight.Render(result.Name))
+		log.Success("Detected CMS: %s", output.Highlight.Render(result.Name))
+		log.Complete(1, "detected")
 		return result, nil
 	}
 
-	cmslog.Info("No CMS detected")
+	spin.Stop()
+	log.Info("No CMS detected")
+	log.Complete(0, "detected")
 	return nil, nil
 }
 

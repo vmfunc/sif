@@ -19,7 +19,6 @@ import (
 	"bufio"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,7 +26,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/dropalldatabases/sif/internal/output"
 	googlesearch "github.com/rocketlaunchr/google-search"
 )
 
@@ -55,27 +54,25 @@ type DorkResult struct {
 //   - []DorkResult: A slice of results from the dorking operation
 //   - error: Any error encountered during the dorking process
 func Dork(url string, timeout time.Duration, threads int, logdir string) ([]DorkResult, error) {
+	output.ScanStart("URL dorking")
 
-	fmt.Println(styles.Separator.Render("🤓 Starting " + styles.Status.Render("URL Dorking") + "..."))
+	spin := output.NewSpinner("Running Google dorks")
+	spin.Start()
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "URL dorking"); err != nil {
-			log.Errorf("Error creating log file: %v", err)
+			spin.Stop()
+			output.Error("Error creating log file: %v", err)
 			return nil, err
 		}
 	}
 
-	dorklog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "Dorking 🤓",
-	}).With("url", url)
-
-	dorklog.Infof("Starting URL dorking...")
-
 	resp, err := http.Get(dorkURL + dorkFile)
 	if err != nil {
-		log.Errorf("Error downloading dork list: %s", err)
+		spin.Stop()
+		output.Error("Error downloading dork list: %s", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -103,13 +100,15 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 
 				results, err := googlesearch.Search(nil, fmt.Sprintf("%s %s", dork, sanitizedURL))
 				if err != nil {
-					dorklog.Debugf("error searching for dork %s: %v", dork, err)
+					log.Debugf("error searching for dork %s: %v", dork, err)
 					continue
 				}
 				if len(results) > 0 {
-					dorklog.Infof("%s dork results found for dork [%s]", styles.Status.Render(strconv.Itoa(len(results))), styles.Highlight.Render(dork))
+					spin.Stop()
+					output.Success("%s dork results found for dork %s", output.Status.Render(strconv.Itoa(len(results))), output.Highlight.Render(dork))
+					spin.Start()
 					if logdir != "" {
-						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s dork results found for dork [%s]\n", strconv.Itoa(len(results)), dork))
+						logger.Write(sanitizedURL, logdir, strconv.Itoa(len(results))+" dork results found for dork ["+dork+"]\n")
 					}
 
 					result := DorkResult{
@@ -123,6 +122,8 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 		}(thread)
 	}
 	wg.Wait()
+	spin.Stop()
 
+	output.ScanComplete("URL dorking", len(dorkResults), "found")
 	return dorkResults, nil
 }

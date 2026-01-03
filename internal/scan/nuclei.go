@@ -22,7 +22,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/nuclei/format"
 	"github.com/dropalldatabases/sif/internal/nuclei/templates"
-	"github.com/dropalldatabases/sif/internal/styles"
+	sifoutput "github.com/dropalldatabases/sif/internal/output"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/config"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/disk"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/loader"
@@ -43,12 +43,15 @@ import (
 )
 
 func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]output.ResultEvent, error) {
-	fmt.Println(styles.Separator.Render("⚛️ Starting " + styles.Status.Render("nuclei template scanning") + "..."))
+	sifoutput.ScanStart("nuclei template scanning")
+
+	spin := sifoutput.NewSpinner("Running nuclei templates")
+	spin.Start()
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
 	nucleilog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "nuclei ⚛️",
+		Prefix: "nuclei",
 	}).With("url", url)
 
 	// Apply threads, timeout, log settings
@@ -127,6 +130,9 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 
 	_ = engine.Execute(store.Templates(), input)
 	engine.WorkPool().Wait()
+
+	spin.Stop()
+	sifoutput.ScanComplete("nuclei template scanning", len(results), "found")
 
 	return results, nil
 }
