@@ -1,3 +1,15 @@
+/*
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+:                                                                               :
+:   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :
+:   ▄█ █ █▀    ·   BSD 3-Clause License                                         :
+:                                                                               :
+:   (c) 2022-2025 vmfunc (vmfunc), xyzeva,                        :
+:                 lunchcat alumni & contributors                                :
+:                                                                               :
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+*/
+
 // Package sif provides the main functionality for the SIF (Security Information Finder) tool.
 // It handles the initialization, configuration, and execution of various security scanning modules.
 
@@ -45,8 +57,8 @@ func New(settings *config.Settings) (*App, error) {
 	app := &App{settings: settings}
 
 	if !settings.ApiMode {
-		fmt.Println(styles.Box.Render("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/    \n"))
-		fmt.Println(styles.Subheading.Render("\nhttps://sif.sh\nman's best friend\n\ncopyright (c) 2023-2024 lunchcat and contributors.\n\n"))
+		fmt.Println(styles.Box.Render("   █▀ █ █▀▀\n   ▄█ █ █▀ "))
+		fmt.Println(styles.Subheading.Render("\nblazing-fast pentesting suite\nman's best friend\n\nbsd 3-clause · (c) 2022-2025 vmfunc, xyzeva & contributors\n"))
 	}
 
 	if len(settings.URLs) > 0 {
