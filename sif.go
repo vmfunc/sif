@@ -58,7 +58,7 @@ func New(settings *config.Settings) (*App, error) {
 	app := &App{settings: settings}
 
 	if !settings.ApiMode {
-		fmt.Println(styles.Box.Render("   █▀ █ █▀▀\n   ▄█ █ █▀ "))
+		fmt.Println(styles.Box.Render("   █▀ █ █▀▀\n  ▄█ █ █▀ "))
 		fmt.Println(styles.Subheading.Render("\nblazing-fast pentesting suite\nman's best friend\n\nbsd 3-clause · (c) 2022-2025 vmfunc, xyzeva & contributors\n"))
 	}
 
