@@ -14,12 +14,13 @@ package builtin
 
 import "github.com/dropalldatabases/sif/internal/modules"
 
-// RegisterAll registers all Go-based built-in scans as modules.
+// Register registers all Go-based built-in scans as modules.
 // Allows complex Go scans to participate in the module system
-func RegisterAll() {
+func Register() {
 	modules.Register(&PortsModule{Scope: "common"})
 	modules.Register(&PortsModule{Scope: "full"})
 	modules.Register(&WhoisModule{})
 	modules.Register(&FrameworksModule{})
 	modules.Register(&ShodanModule{})
+	modules.Register(&NucleiModule{})
 }

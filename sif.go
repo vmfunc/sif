@@ -143,7 +143,7 @@ func (app *App) Run() error {
 		}
 
 		// Register built-in Go modules
-		builtin.RegisterAll()
+		builtin.Register()
 
 		fmt.Println("Available modules:")
 		for _, m := range modules.All() {
@@ -358,7 +358,7 @@ func (app *App) Run() error {
 				}
 
 				// Register built-in Go modules
-				builtin.RegisterAll()
+				builtin.Register()
 
 				// Determine which modules to run
 				var toRun []modules.Module
