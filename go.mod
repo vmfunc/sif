@@ -1,4 +1,4 @@
-module github.com/dropalldatabases/sif
+module github.com/vmfunc/sif
 
 go 1.24.0
 

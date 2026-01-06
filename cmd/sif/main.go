@@ -14,11 +14,11 @@ package main
 
 import (
 	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif"
-	"github.com/dropalldatabases/sif/internal/config"
+	"github.com/vmfunc/sif"
+	"github.com/vmfunc/sif/internal/config"
 
 	// Register framework detectors
-	_ "github.com/dropalldatabases/sif/internal/scan/frameworks/detectors"
+	_ "github.com/vmfunc/sif/internal/scan/frameworks/detectors"
 )
 
 func main() {

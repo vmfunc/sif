@@ -15,7 +15,7 @@ package sif
 import (
 	"testing"
 
-	"github.com/dropalldatabases/sif/internal/config"
+	"github.com/vmfunc/sif/internal/config"
 )
 
 // mockResult is a test implementation of ScanResult

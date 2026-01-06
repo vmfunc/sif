@@ -24,13 +24,13 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/config"
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/modules"
-	"github.com/dropalldatabases/sif/internal/output"
-	"github.com/dropalldatabases/sif/internal/scan"
-	"github.com/dropalldatabases/sif/internal/scan/frameworks"
-	jsscan "github.com/dropalldatabases/sif/internal/scan/js"
+	"github.com/vmfunc/sif/internal/config"
+	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/modules"
+	"github.com/vmfunc/sif/internal/output"
+	"github.com/vmfunc/sif/internal/scan"
+	"github.com/vmfunc/sif/internal/scan/frameworks"
+	jsscan "github.com/vmfunc/sif/internal/scan/js"
 )
 
 // App represents the main application structure for sif.
