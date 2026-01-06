@@ -20,4 +20,5 @@ func RegisterAll() {
 	modules.Register(&PortsModule{Scope: "common"})
 	modules.Register(&PortsModule{Scope: "full"})
 	modules.Register(&WhoisModule{})
+	modules.Register(&FrameworksModule{})
 }
