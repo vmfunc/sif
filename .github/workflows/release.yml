@@ -55,6 +55,45 @@ jobs:
             cd dist && zip -r "../${binary}.zip" "${binary}" && cd ..
           done
 
+      - name: Build Debian packages
+        run: |
+          VERSION="0.1.0"
+
+          declare -A arch_map=(
+            ["sif-linux-amd64"]="amd64"
+            ["sif-linux-386"]="i386"
+            ["sif-linux-arm64"]="arm64"
+          )
+
+          for binary in sif-linux-amd64 sif-linux-386 sif-linux-arm64; do
+            arch="${arch_map[$binary]}"
+            pkg_dir="sif_${VERSION}_${arch}"
+
+            mkdir -p "${pkg_dir}/DEBIAN"
+            mkdir -p "${pkg_dir}/usr/bin"
+            mkdir -p "${pkg_dir}/usr/share/sif/modules"
+
+            cp "${binary}" "${pkg_dir}/usr/bin/sif"
+            chmod 755 "${pkg_dir}/usr/bin/sif"
+            cp -r modules/* "${pkg_dir}/usr/share/sif/modules/"
+
+            cat > "${pkg_dir}/DEBIAN/control" << EOF
+          Package: sif
+          Version: ${VERSION}
+          Section: security
+          Priority: optional
+          Architecture: ${arch}
+          Maintainer: vmfunc <celeste@router.sex>
+          Homepage: https://github.com/vmfunc/sif
+          Description: Modular pentesting toolkit
+           sif is a fast, concurrent, and extensible pentesting toolkit written in Go.
+           It supports multiple scan types including directory fuzzing, subdomain
+           enumeration, port scanning, and vulnerability detection.
+          EOF
+
+            dpkg-deb --build "${pkg_dir}"
+          done
+
       - name: Set release version
         run: echo "RELEASE_VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
@@ -77,6 +116,9 @@ jobs:
             - Linux (64-bit): `sif-linux-amd64.tar.gz`
             - Linux (32-bit): `sif-linux-386.tar.gz`
             - Linux (64-bit ARM): `sif-linux-arm64.tar.gz`
+            - Debian/Ubuntu (64-bit): `sif_0.1.0_amd64.deb`
+            - Debian/Ubuntu (32-bit): `sif_0.1.0_i386.deb`
+            - Debian/Ubuntu (64-bit ARM): `sif_0.1.0_arm64.deb`
 
             ## Installation
 
@@ -97,5 +139,8 @@ jobs:
             sif-linux-amd64.tar.gz
             sif-linux-386.tar.gz
             sif-linux-arm64.tar.gz
+            sif_0.1.0_amd64.deb
+            sif_0.1.0_i386.deb
+            sif_0.1.0_arm64.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
