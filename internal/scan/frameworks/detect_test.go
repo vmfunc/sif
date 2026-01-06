@@ -18,9 +18,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/scan/frameworks"
+	"github.com/vmfunc/sif/internal/scan/frameworks"
 	// Import detectors to register them via init()
-	_ "github.com/dropalldatabases/sif/internal/scan/frameworks/detectors"
+	_ "github.com/vmfunc/sif/internal/scan/frameworks/detectors"
 )
 
 func TestExtractVersion_Laravel(t *testing.T) {
