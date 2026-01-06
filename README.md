@@ -9,6 +9,7 @@
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue?style=flat-square)](LICENSE)
 [![aur](https://img.shields.io/aur/version/sif?style=flat-square&logo=archlinux&logoColor=white&color=1793D1)](https://aur.archlinux.org/packages/sif)
 [![homebrew](https://img.shields.io/badge/homebrew-tap-FBB040?style=flat-square&logo=homebrew&logoColor=white)](https://github.com/vmfunc/homebrew-sif)
+[![apt](https://img.shields.io/badge/apt-cloudsmith-2A5ADF?style=flat-square&logo=debian&logoColor=white)](https://cloudsmith.io/~sif/repos/deb/packages/)
 [![discord](https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/sifcli)
 
 **[install](#install) · [usage](#usage) · [modules](#modules) · [docs](docs/) · [contribute](#contribute)**
@@ -42,6 +43,13 @@ install using your preferred aur helper:
 yay -S sif
 # or
 paru -S sif
+```
+
+### debian/ubuntu (apt)
+
+```bash
+curl -1sLf 'https://dl.cloudsmith.io/public/sif/deb/setup.deb.sh' | sudo -E bash
+sudo apt-get install sif
 ```
 
 ### from releases
