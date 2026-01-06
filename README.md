@@ -218,6 +218,9 @@ join our discord for support, feature discussions, and pentesting tips:
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/xyzeva"><img src="https://avatars.githubusercontent.com/u/133499694?v=4?s=100" width="100px;" alt="Eva"/><br /><sub><b>Eva</b></sub></a><br /><a href="#blog-xyzeva" title="Blogposts">📝</a> <a href="#content-xyzeva" title="Content">🖋</a> <a href="#research-xyzeva" title="Research">🔬</a> <a href="#security-xyzeva" title="Security">🛡️</a> <a href="https://github.com/lunchcat/sif/commits?author=xyzeva" title="Tests">⚠️</a> <a href="https://github.com/lunchcat/sif/commits?author=xyzeva" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/vxfemboy"><img src="https://avatars.githubusercontent.com/u/79362520?v=4?s=100" width="100px;" alt="Zoa Hickenlooper"/><br /><sub><b>Zoa Hickenlooper</b></sub></a><br /><a href="https://github.com/lunchcat/sif/commits?author=vxfemboy" title="Code">💻</a></td>
     </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/0xatrilla"><img src="https://avatars.githubusercontent.com/u/107285362?v=4?s=100" width="100px;" alt="acxtrilla"/><br /><sub><b>acxtrilla</b></sub></a><br /><a href="#platform-0xatrilla" title="Packaging/porting to new platform">📦</a></td>
+    </tr>
   </tbody>
 </table>
 
