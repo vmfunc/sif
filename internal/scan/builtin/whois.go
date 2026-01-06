@@ -27,7 +27,7 @@ func (m *WhoisModule) Info() modules.Info {
 		Author:      "sif",
 		Severity:    "info",
 		Description: "Performs WHOIS lookup for domain registration information",
-		Tags:        []string{"recon", "whois", "domain", "osint"},
+		Tags:        []string{"recon", "whois", "osint"},
 	}
 }
 

@@ -29,7 +29,7 @@ func (m *FrameworksModule) Info() modules.Info {
 		Author:      "sif",
 		Severity:    "info",
 		Description: "Detects web frameworks with version and CVE mapping",
-		Tags:        []string{"recon", "framework", "fingerprint", "cve"},
+		Tags:        []string{"recon", "framework", "cve"},
 	}
 }
 

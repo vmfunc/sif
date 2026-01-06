@@ -29,7 +29,7 @@ func (m *ShodanModule) Info() modules.Info {
 		Author:      "sif",
 		Severity:    "info",
 		Description: "Queries Shodan API for host information, open ports, and vulnerabilities (requires SHODAN_API_KEY)",
-		Tags:        []string{"recon", "osint", "shodan", "infrastructure", "vulns"},
+		Tags:        []string{"recon", "osint", "shodan", "vulns"},
 	}
 }
 

@@ -28,7 +28,7 @@ func (m *NucleiModule) Info() modules.Info {
 		Author:      "sif",
 		Severity:    "high",
 		Description: "Runs Nuclei vulnerability scanning templates against target",
-		Tags:        []string{"vuln", "nuclei", "templates", "comprehensive", "cve"},
+		Tags:        []string{"vuln", "nuclei", "cve"},
 	}
 }
 
