@@ -32,6 +32,16 @@ brew tap vmfunc/sif
 brew install sif
 ```
 
+### arch linux (aur)
+
+install using your preferred aur helper:
+
+```bash
+yay -S sif
+# or
+paru -S sif
+```
+
 ### from releases
 
 grab the latest binary from [releases](https://github.com/vmfunc/sif/releases).
@@ -46,17 +56,7 @@ make
 
 requires go 1.23+
 
-### arch linux (aur)
-
-install using your preferred aur helper:
-
-```bash
-yay -S sif
-# or
-paru -S sif
-```
-
-or manually:
+### aur (manual install)
 
 ```bash
 git clone https://aur.archlinux.org/sif.git
