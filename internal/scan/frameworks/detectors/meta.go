@@ -32,6 +32,7 @@ func init() {
 	fw.Register(&sveltekitDetector{})
 	fw.Register(&gatsbyDetector{})
 	fw.Register(&remixDetector{})
+	fw.Register(&astroDetector{})
 }
 
 // nextjsDetector detects Next.js framework.
@@ -149,6 +150,35 @@ func (d *remixDetector) Signatures() []fw.Signature {
 }
 
 func (d *remixDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// astroDetector detects Astro framework.
+type astroDetector struct{}
+
+func (d *astroDetector) Name() string { return "Astro" }
+
+func (d *astroDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `<meta name="generator" content="Astro`, Weight: 0.6},
+		{Pattern: "astro-island", Weight: 0.5},
+		{Pattern: "data-astro-cid-", Weight: 0.4},
+		{Pattern: "/_astro/", Weight: 0.4},
+		{Pattern: "data-astro-transition", Weight: 0.3},
+		{Pattern: "data-astro-reload", Weight: 0.3},
+		{Pattern: "data-astro-history", Weight: 0.3},
+	}
+}
+
+func (d *astroDetector) Detect(body string, headers http.Header) (float32, string) {
 	base := fw.NewBaseDetector(d.Name(), d.Signatures())
 	score := base.MatchSignatures(body, headers)
 	confidence := sigmoidConfidence(score)
