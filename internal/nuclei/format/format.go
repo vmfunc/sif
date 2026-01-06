@@ -15,7 +15,7 @@ package format
 import (
 	"fmt"
 
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/vmfunc/sif/internal/styles"
 	"github.com/projectdiscovery/nuclei/v2/pkg/output"
 )
 

@@ -16,7 +16,7 @@ package styles
 
 import (
 	"github.com/charmbracelet/lipgloss"
-	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/vmfunc/sif/internal/output"
 )
 
 // Re-export styles from output package

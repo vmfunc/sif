@@ -22,8 +22,8 @@ import (
 
 	"github.com/antchfx/htmlquery"
 	charmlog "github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/output"
-	"github.com/dropalldatabases/sif/internal/scan/js/frameworks"
+	"github.com/vmfunc/sif/internal/output"
+	"github.com/vmfunc/sif/internal/scan/js/frameworks"
 	urlutil "github.com/projectdiscovery/utils/url"
 )
 
