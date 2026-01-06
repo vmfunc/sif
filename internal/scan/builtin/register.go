@@ -21,4 +21,5 @@ func RegisterAll() {
 	modules.Register(&PortsModule{Scope: "full"})
 	modules.Register(&WhoisModule{})
 	modules.Register(&FrameworksModule{})
+	modules.Register(&ShodanModule{})
 }
