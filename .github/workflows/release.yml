@@ -144,3 +144,12 @@ jobs:
             sif_0.1.0_arm64.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to Cloudsmith
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        run: |
+          pip install cloudsmith-cli
+          for deb in sif_0.1.0_*.deb; do
+            cloudsmith push deb sif/deb/any-distro/any-version "$deb" -k "$CLOUDSMITH_API_KEY"
+          done
