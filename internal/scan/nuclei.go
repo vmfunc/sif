@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/nuclei/format"
-	"github.com/dropalldatabases/sif/internal/nuclei/templates"
-	sifoutput "github.com/dropalldatabases/sif/internal/output"
+	"github.com/vmfunc/sif/internal/nuclei/format"
+	"github.com/vmfunc/sif/internal/nuclei/templates"
+	sifoutput "github.com/vmfunc/sif/internal/output"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/config"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/disk"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/loader"
