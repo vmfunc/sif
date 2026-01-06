@@ -29,6 +29,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/modules"
 	"github.com/dropalldatabases/sif/internal/output"
 	"github.com/dropalldatabases/sif/internal/scan"
+	"github.com/dropalldatabases/sif/internal/scan/builtin"
 	"github.com/dropalldatabases/sif/internal/scan/frameworks"
 	jsscan "github.com/dropalldatabases/sif/internal/scan/js"
 )
@@ -140,6 +141,10 @@ func (app *App) Run() error {
 		if err := loader.LoadAll(); err != nil {
 			log.Warnf("Failed to load modules: %v", err)
 		}
+
+		// Register built-in Go modules
+		builtin.RegisterAll()
+
 		fmt.Println("Available modules:")
 		for _, m := range modules.All() {
 			info := m.Info()
@@ -351,6 +356,9 @@ func (app *App) Run() error {
 				if err := loader.LoadAll(); err != nil {
 					log.Warnf("Failed to load modules: %v", err)
 				}
+
+				// Register built-in Go modules
+				builtin.RegisterAll()
 
 				// Determine which modules to run
 				var toRun []modules.Module
