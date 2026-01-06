@@ -57,7 +57,7 @@ jobs:
 
       - name: Build Debian packages
         run: |
-          VERSION="0.1.0"
+          VERSION="0.1.0-$(git rev-parse --short HEAD)"
 
           declare -A arch_map=(
             ["sif-linux-amd64"]="amd64"
@@ -116,9 +116,9 @@ jobs:
             - Linux (64-bit): `sif-linux-amd64.tar.gz`
             - Linux (32-bit): `sif-linux-386.tar.gz`
             - Linux (64-bit ARM): `sif-linux-arm64.tar.gz`
-            - Debian/Ubuntu (64-bit): `sif_0.1.0_amd64.deb`
-            - Debian/Ubuntu (32-bit): `sif_0.1.0_i386.deb`
-            - Debian/Ubuntu (64-bit ARM): `sif_0.1.0_arm64.deb`
+            - Debian/Ubuntu (64-bit): `sif_*_amd64.deb`
+            - Debian/Ubuntu (32-bit): `sif_*_i386.deb`
+            - Debian/Ubuntu (64-bit ARM): `sif_*_arm64.deb`
 
             ## Installation
 
@@ -139,9 +139,9 @@ jobs:
             sif-linux-amd64.tar.gz
             sif-linux-386.tar.gz
             sif-linux-arm64.tar.gz
-            sif_0.1.0_amd64.deb
-            sif_0.1.0_i386.deb
-            sif_0.1.0_arm64.deb
+            sif_*_amd64.deb
+            sif_*_i386.deb
+            sif_*_arm64.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -150,6 +150,6 @@ jobs:
           CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
         run: |
           pip install cloudsmith-cli
-          for deb in sif_0.1.0_*.deb; do
+          for deb in sif_*.deb; do
             cloudsmith push deb sif/deb/any-distro/any-version "$deb" -k "$CLOUDSMITH_API_KEY"
           done
