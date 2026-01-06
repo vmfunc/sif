@@ -39,7 +39,7 @@ download `sif-windows-amd64.exe` from releases and add to your PATH.
 requires go 1.23+
 
 ```bash
-git clone https://github.com/dropalldatabases/sif.git
+git clone https://github.com/vmfunc/sif.git
 cd sif
 make
 ```
