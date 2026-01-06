@@ -46,6 +46,24 @@ make
 
 requires go 1.23+
 
+### arch linux (aur)
+
+install using your preferred aur helper:
+
+```bash
+yay -S sif
+# or
+paru -S sif
+```
+
+or manually:
+
+```bash
+git clone https://aur.archlinux.org/sif.git
+cd sif
+makepkg -si
+```
+
 ## usage
 
 ```bash
