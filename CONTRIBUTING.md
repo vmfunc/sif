@@ -4,17 +4,19 @@ Thank you for taking the time to contribute to sif! All contributions are valued
 If you want to contribute but don't know where to start, worry not; there is no shortage of things to do.  
 Even if you don't know any Go, don't let that stop you from trying to contribute! We're here to help.
 
-*By contributing to this repository, you agree to adhere to the sif [Code of Conduct](https://github.com/dropalldatabases/sif/blob/main/CODE_OF_CONDUCT.md). Not doing so may result in a ban.*
+_By contributing to this repository, you agree to adhere to the sif [Code of Conduct](https://github.com/vmfunc/sif/blob/main/CODE_OF_CONDUCT.md). Not doing so may result in a ban._
 
 ## How can I help?
 
 Here are some ways to get started:
-- Have a look at our [issue tracker](https://github.com/dropalldatabases/sif/issues).
+
+- Have a look at our [issue tracker](https://github.com/vmfunc/sif/issues).
 - If you've encountered a bug, discuss it with us, [report it](#reporting-issues).
 - Once you've found a bug you believe you can fix, open a [pull request](#contributing-code) for it.
 - Alternatively, consider [packaging sif for your distribution](#packaging).
 
 If you like the project, but don't have time to contribute, that's okay too! Here are other ways to show your appreciation for the project:
+
 - Use sif (seriously, that's enough)
 - Star the repository
 - Share sif with your friends
@@ -22,7 +24,7 @@ If you like the project, but don't have time to contribute, that's okay too! Her
 
 ## Reporting issues
 
-If you believe you've found a bug, or you have a new feature to request, please hop on the [Discord server](https://discord.gg/dropalldatabases) first to discuss it.  
+If you believe you've found a bug, or you have a new feature to request, please hop on the [Discord server](https://discord.com/invite/sifcli) first to discuss it.  
 This way, if it's an easy fix, we could help you solve it more quickly, and if it's a feature request we could workshop it together into something more mature.
 
 When opening an issue, please use the search tool and make sure that the issue has not been discussed before. In the case of a bug report, run sif with the `-d/-debug` flag for full debug logs.
@@ -33,7 +35,7 @@ When opening an issue, please use the search tool and make sure that the issue h
 
 To develop sif, you'll need version 1.23 or later of the Go toolchain. After making your changes, run the program using `go run ./cmd/sif` to make sure it compiles and runs properly.
 
-*Nix users:* the repository provides a flake that can be used to develop and run sif. Use `nix run`, `nix develop`, `nix build`, etc. Make sure to run `gomod2nix` if `go.mod` is changed.
+_Nix users:_ the repository provides a flake that can be used to develop and run sif. Use `nix run`, `nix develop`, `nix build`, etc. Make sure to run `gomod2nix` if `go.mod` is changed.
 
 ### Submitting a pull request
 
@@ -55,21 +57,40 @@ If you have any questions, feel free to ask around on the IRC channel.
 
 ## Contributing Framework Detection Patterns
 
-The framework detection module (`pkg/scan/frameworks/detect.go`) identifies web frameworks by analyzing HTTP headers and response bodies. To add support for a new framework:
+The framework detection module (`internal/scan/frameworks/`) identifies web frameworks by analyzing HTTP headers and response bodies. Detectors are organized by category in the `detectors/` subdirectory:
 
-### Adding a New Framework Signature
+### Adding a New Framework Detector
 
-1. Add your framework to the `frameworkSignatures` map:
+1. Create a detector struct in the appropriate file in `detectors/`:
 
 ```go
-"MyFramework": {
-    {Pattern: `unique-identifier`, Weight: 0.5},
-    {Pattern: `header-signature`, Weight: 0.4, HeaderOnly: true},
-    {Pattern: `body-signature`, Weight: 0.3},
-},
+// myframeworkDetector detects MyFramework.
+type myframeworkDetector struct{}
+
+func (d *myframeworkDetector) Name() string { return "MyFramework" }
+
+func (d *myframeworkDetector) Signatures() []fw.Signature {
+    return []fw.Signature{
+        {Pattern: "unique-identifier", Weight: 0.5},
+        {Pattern: "header-signature", Weight: 0.4, HeaderOnly: true},
+        {Pattern: "body-signature", Weight: 0.3},
+    }
+}
+
+...
+
+```
+
+2. Register the detector in the `init()` function of the same file:
+
+```go
+func init() {
+    fw.Register(&myframeworkDetector{})
+}
 ```
 
 **Pattern Guidelines:**
+
 - `Weight`: How much this signature contributes to detection (0.0-1.0)
 - `HeaderOnly`: Set to `true` for HTTP header patterns
 - Use unique identifiers that won't false-positive on other frameworks
@@ -77,10 +98,11 @@ The framework detection module (`pkg/scan/frameworks/detect.go`) identifies web 
 
 ### Adding Version Detection
 
-Add version patterns to `extractVersionWithConfidence()`:
+Add version patterns to `version.go` in the `rawPatterns` map inside `init()`:
 
 ```go
 "MyFramework": {
+    {`<meta name="generator" content="MyFramework v?(\d+\.\d+(?:\.\d+)?)"`, 0.95, "generator meta"},
     {`MyFramework[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
     {`"myframework":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
 },
@@ -88,7 +110,7 @@ Add version patterns to `extractVersionWithConfidence()`:
 
 ### Adding CVE Data
 
-Add known vulnerabilities to the `knownCVEs` map:
+Add known vulnerabilities to `cve.go` in the `knownCVEs` map:
 
 ```go
 "MyFramework": {
@@ -115,9 +137,15 @@ func TestDetectFramework_MyFramework(t *testing.T) {
     }))
     defer server.Close()
 
-    result, err := DetectFramework(server.URL, 5*time.Second, "")
+    result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
     // assertions...
 }
+```
+
+Also add your framework to the registry test in `TestDetectorRegistry`:
+
+```go
+expectedDetectors := []string{"Laravel", "Django", ..., "MyFramework"}
 ```
 
 ### Future Enhancements (Help Wanted)
@@ -131,18 +159,18 @@ func TestDetectFramework_MyFramework(t *testing.T) {
 
 ### Framework Detection Flags
 
-| Flag | Description |
-|------|-------------|
-| `-framework` | Enable framework detection |
-| `-timeout` | HTTP request timeout (affects all modules) |
-| `-threads` | Number of concurrent workers |
-| `-log` | Directory to save scan results |
-| `-debug` | Enable debug logging for verbose output |
+| Flag         | Description                                |
+| ------------ | ------------------------------------------ |
+| `-framework` | Enable framework detection                 |
+| `-timeout`   | HTTP request timeout (affects all modules) |
+| `-threads`   | Number of concurrent workers               |
+| `-log`       | Directory to save scan results             |
+| `-debug`     | Enable debug logging for verbose output    |
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
+| Variable         | Description                          |
+| ---------------- | ------------------------------------ |
 | `SHODAN_API_KEY` | API key for Shodan host intelligence |
 
 ## Packaging
