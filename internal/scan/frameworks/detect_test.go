@@ -424,6 +424,65 @@ func TestDetectFramework_Joomla(t *testing.T) {
 	}
 }
 
+func TestDetectFramework_Astro(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html data-astro-transition="forward">
+			<head>
+				<meta name="generator" content="Astro v5.16.6">
+				<link rel="stylesheet" href="/_astro/index.abc123.css">
+			</head>
+			<body>
+				<astro-island data-astro-cid-xyz789 data-astro-source-file="src/components/Counter.astro">
+					<div>Content</div>
+				</astro-island>
+				<nav>
+					<a href="/about" data-astro-history="push">About</a>
+					<a href="/external" data-astro-reload>External</a>
+				</nav>
+				<script src="/_astro/hoisted.def456.js"></script>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "Astro" {
+		t.Errorf("expected framework 'Astro', got '%s'", result.Name)
+	}
+}
+
+func TestExtractVersion_Astro(t *testing.T) {
+	tests := []struct {
+		body     string
+		expected string
+	}{
+		{`<meta name="generator" content="Astro v4.2.0">`, "4.2.0"},
+		{`<meta name="generator" content="Astro 3.5.1">`, "3.5.1"},
+		{"Astro 4.0.0", "4.0.0"},
+		{"Astro/3.2.1", "3.2.1"},
+		{`"astro": "^4.1.0"`, "4.1.0"},
+		{`"astro": "~3.0.5"`, "3.0.5"},
+		{"no version", "unknown"},
+	}
+
+	for _, tt := range tests {
+		result := frameworks.ExtractVersionOptimized(tt.body, "Astro").Version
+		if result != tt.expected {
+			t.Errorf("ExtractVersionOptimized(%q, 'Astro') = %q, want %q", tt.body, result, tt.expected)
+		}
+	}
+}
+
 func TestCVEEntry_Fields(t *testing.T) {
 	entry := frameworks.CVEEntry{
 		CVE:              "CVE-2021-3129",
@@ -452,7 +511,7 @@ func TestDetectorRegistry(t *testing.T) {
 	}
 
 	// Check that some expected detectors are registered
-	expectedDetectors := []string{"Laravel", "Django", "React", "Vue.js", "Angular", "Next.js", "WordPress"}
+	expectedDetectors := []string{"Laravel", "Django", "React", "Vue.js", "Angular", "Next.js", "WordPress", "Astro"}
 	for _, name := range expectedDetectors {
 		if _, ok := frameworks.GetDetector(name); !ok {
 			t.Errorf("expected detector %q to be registered", name)
