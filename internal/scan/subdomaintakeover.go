@@ -15,8 +15,8 @@ package scan
 import (
 	"fmt"
 	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/styles"
 	"io"
 	"net"
 	"net/http"

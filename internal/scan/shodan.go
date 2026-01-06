@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/output"
 )
 
 const shodanBaseURL = "https://api.shodan.io"
