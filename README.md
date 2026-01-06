@@ -25,6 +25,13 @@ sif is a modular pentesting toolkit written in go. it's designed to be fast, con
 
 ## install
 
+### homebrew (macos)
+
+```bash
+brew tap vmfunc/sif
+brew install sif
+```
+
 ### from releases
 
 grab the latest binary from [releases](https://github.com/vmfunc/sif/releases).
