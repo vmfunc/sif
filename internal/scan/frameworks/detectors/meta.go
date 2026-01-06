@@ -168,7 +168,7 @@ func (d *astroDetector) Name() string { return "Astro" }
 
 func (d *astroDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: `<meta name="generator" content="Astro`, Weight: 0.6},
+		{Pattern: `<meta name="generator" content="Astro`, Weight: 0.5},
 		{Pattern: "astro-island", Weight: 0.5},
 		{Pattern: "data-astro-cid-", Weight: 0.4},
 		{Pattern: "/_astro/", Weight: 0.4},
