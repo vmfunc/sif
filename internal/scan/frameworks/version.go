@@ -149,6 +149,11 @@ func init() {
 		"Ghost": {
 			{`Ghost[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
 		},
+		"Astro": {
+			{`<meta name="generator" content="Astro v?(\d+\.\d+(?:\.\d+)?)"`, 0.95, "generator meta"},
+			{`Astro[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
+			{`"astro":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+		},
 	}
 
 	// Compile all patterns
