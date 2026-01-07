@@ -10,7 +10,7 @@
 [![aur](https://img.shields.io/aur/version/sif?style=flat-square&logo=archlinux&logoColor=white&color=1793D1)](https://aur.archlinux.org/packages/sif)
 [![homebrew](https://img.shields.io/badge/homebrew-tap-FBB040?style=flat-square&logo=homebrew&logoColor=white)](https://github.com/vmfunc/homebrew-sif)
 [![apt](https://img.shields.io/badge/apt-cloudsmith-2A5ADF?style=flat-square&logo=debian&logoColor=white)](https://cloudsmith.io/~sif/repos/deb/packages/)
-[![discord](https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/sifcli)
+[![discord](https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/invite/sifcli)
 
 **[install](#install) · [usage](#usage) · [modules](#modules) · [docs](docs/) · [contribute](#contribute)**
 
@@ -208,7 +208,7 @@ go test ./...
 
 join our discord for support, feature discussions, and pentesting tips:
 
-[![discord](https://img.shields.io/badge/join%20our%20discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/sifcli)
+[![discord](https://img.shields.io/badge/join%20our%20discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/sifcli)
 
 ## contributors
 
@@ -218,13 +218,13 @@ join our discord for support, feature discussions, and pentesting tips:
 <table>
   <tbody>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://vmfunc.re"><img src="https://avatars.githubusercontent.com/u/59031302?v=4?s=100" width="100px;" alt="Celeste Hickenlooper"/><br /><sub><b>Celeste Hickenlooper</b></sub></a><br /><a href="#maintenance-vmfunc" title="Maintenance">🚧</a> <a href="#mentoring-vmfunc" title="Mentoring">🧑‍🏫</a> <a href="#projectManagement-vmfunc" title="Project Management">📆</a> <a href="#security-vmfunc" title="Security">🛡️</a> <a href="https://github.com/lunchcat/sif/commits?author=vmfunc" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://vmfunc.re"><img src="https://avatars.githubusercontent.com/u/59031302?v=4?s=100" width="100px;" alt="Celeste Hickenlooper"/><br /><sub><b>Celeste Hickenlooper</b></sub></a><br /><a href="#maintenance-vmfunc" title="Maintenance">🚧</a> <a href="#mentoring-vmfunc" title="Mentoring">🧑‍🏫</a> <a href="#projectManagement-vmfunc" title="Project Management">📆</a> <a href="#security-vmfunc" title="Security">🛡️</a> <a href="https://github.com/vmfunc/sif/commits?author=vmfunc" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://projectdiscovery.io"><img src="https://avatars.githubusercontent.com/u/50994705?v=4?s=100" width="100px;" alt="ProjectDiscovery"/><br /><sub><b>ProjectDiscovery</b></sub></a><br /><a href="#platform-projectdiscovery" title="Packaging/porting to new platform">📦</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/macdoos"><img src="https://avatars.githubusercontent.com/u/127897805?v=4?s=100" width="100px;" alt="macdoos"/><br /><sub><b>macdoos</b></sub></a><br /><a href="https://github.com/lunchcat/sif/commits?author=macdoos" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/macdoos"><img src="https://avatars.githubusercontent.com/u/127897805?v=4?s=100" width="100px;" alt="macdoos"/><br /><sub><b>macdoos</b></sub></a><br /><a href="https://github.com/vmfunc/sif/commits?author=macdoos" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://epitech.eu"><img src="https://avatars.githubusercontent.com/u/75166283?v=4?s=100" width="100px;" alt="Matthieu Witrowiez"/><br /><sub><b>Matthieu Witrowiez</b></sub></a><br /><a href="#ideas-D3adPlays" title="Ideas, Planning, & Feedback">🤔</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/tessa-u-k"><img src="https://avatars.githubusercontent.com/u/109355732?v=4?s=100" width="100px;" alt="tessa "/><br /><sub><b>tessa </b></sub></a><br /><a href="#infra-tessa-u-k" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="#question-tessa-u-k" title="Answering Questions">💬</a> <a href="#userTesting-tessa-u-k" title="User Testing">📓</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/xyzeva"><img src="https://avatars.githubusercontent.com/u/133499694?v=4?s=100" width="100px;" alt="Eva"/><br /><sub><b>Eva</b></sub></a><br /><a href="#blog-xyzeva" title="Blogposts">📝</a> <a href="#content-xyzeva" title="Content">🖋</a> <a href="#research-xyzeva" title="Research">🔬</a> <a href="#security-xyzeva" title="Security">🛡️</a> <a href="https://github.com/lunchcat/sif/commits?author=xyzeva" title="Tests">⚠️</a> <a href="https://github.com/lunchcat/sif/commits?author=xyzeva" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/vxfemboy"><img src="https://avatars.githubusercontent.com/u/79362520?v=4?s=100" width="100px;" alt="Zoa Hickenlooper"/><br /><sub><b>Zoa Hickenlooper</b></sub></a><br /><a href="https://github.com/lunchcat/sif/commits?author=vxfemboy" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/xyzeva"><img src="https://avatars.githubusercontent.com/u/133499694?v=4?s=100" width="100px;" alt="Eva"/><br /><sub><b>Eva</b></sub></a><br /><a href="#blog-xyzeva" title="Blogposts">📝</a> <a href="#content-xyzeva" title="Content">🖋</a> <a href="#research-xyzeva" title="Research">🔬</a> <a href="#security-xyzeva" title="Security">🛡️</a> <a href="https://github.com/vmfunc/sif/commits?author=xyzeva" title="Tests">⚠️</a> <a href="https://github.com/vmfunc/sif/commits?author=xyzeva" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/vxfemboy"><img src="https://avatars.githubusercontent.com/u/79362520?v=4?s=100" width="100px;" alt="Zoa Hickenlooper"/><br /><sub><b>Zoa Hickenlooper</b></sub></a><br /><a href="https://github.com/vmfunc/sif/commits?author=vxfemboy" title="Code">💻</a></td>
     </tr>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/0xatrilla"><img src="https://avatars.githubusercontent.com/u/107285362?v=4?s=100" width="100px;" alt="acxtrilla"/><br /><sub><b>acxtrilla</b></sub></a><br /><a href="#platform-0xatrilla" title="Packaging/porting to new platform">📦</a></td>
