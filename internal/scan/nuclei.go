@@ -23,6 +23,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/nuclei/format"
 	"github.com/dropalldatabases/sif/internal/nuclei/templates"
 	sifoutput "github.com/dropalldatabases/sif/internal/output"
+	"github.com/logrusorgru/aurora"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/config"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/disk"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/loader"
@@ -107,6 +108,7 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 	protocolinit.Init(options)
 
 	executorOpts := protocols.ExecutorOptions{
+		Colorizer:       aurora.NewAurora(false),
 		Output:          outputWriter,
 		Progress:        progressClient,
 		Catalog:         catalog,
