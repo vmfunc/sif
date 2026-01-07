@@ -109,7 +109,7 @@ func (m *NucleiModule) Execute(ctx context.Context, target string, opts modules.
 		}
 
 		// Tags
-		if len(event.Info.Tags.ToSlice()) > 0 {
+		if !event.Info.Tags.IsEmpty() {
 			tagStr := ""
 			for _, tag := range event.Info.Tags.ToSlice() {
 				if tagStr != "" {
@@ -122,7 +122,7 @@ func (m *NucleiModule) Execute(ctx context.Context, target string, opts modules.
 		}
 
 		// Reference
-		if len(event.Info.Reference.ToSlice()) > 0 {
+		if event.Info.Reference != nil && !event.Info.Reference.IsEmpty() {
 			refStr := ""
 			for _, ref := range event.Info.Reference.ToSlice() {
 				if refStr != "" {
