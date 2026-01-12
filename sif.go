@@ -140,6 +140,10 @@ func (app *App) Run() error {
 		if err := loader.LoadAll(); err != nil {
 			log.Warnf("Failed to load modules: %v", err)
 		}
+
+		// Register built-in Go modules
+		builtin.Register()
+
 		fmt.Println("Available modules:")
 		for _, m := range modules.All() {
 			info := m.Info()
@@ -351,6 +355,9 @@ func (app *App) Run() error {
 				if err := loader.LoadAll(); err != nil {
 					log.Warnf("Failed to load modules: %v", err)
 				}
+
+				// Register built-in Go modules
+				builtin.Register()
 
 				// Determine which modules to run
 				var toRun []modules.Module
