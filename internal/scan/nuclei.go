@@ -23,6 +23,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/nuclei/format"
 	"github.com/dropalldatabases/sif/internal/nuclei/templates"
 	sifoutput "github.com/dropalldatabases/sif/internal/output"
+	"github.com/logrusorgru/aurora"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/config"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/disk"
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/loader"
@@ -58,6 +59,12 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 	options := types.DefaultOptions()
 	options.TemplateThreads = threads
 	options.Timeout = int(timeout.Seconds())
+
+	if logdir != "" {
+		options.ProjectPath = logdir
+	}
+
+	options.Headless = false
 
 	// Get templates
 	templates.Install(nucleilog)
@@ -101,14 +108,16 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 	protocolinit.Init(options)
 
 	executorOpts := protocols.ExecutorOptions{
-		Output:       outputWriter,
-		Progress:     progressClient,
-		Catalog:      catalog,
-		Options:      options,
-		IssuesClient: reportingClient,
-		RateLimiter:  ratelimit.New(context.Background(), 150, time.Second),
-		Interactsh:   interactClient,
-		ResumeCfg:    types.NewResumeCfg(),
+		Colorizer:       aurora.NewAurora(false),
+		Output:          outputWriter,
+		Progress:        progressClient,
+		Catalog:         catalog,
+		Options:         options,
+		IssuesClient:    reportingClient,
+		RateLimiter:     ratelimit.New(context.Background(), 150, time.Second),
+		Interactsh:      interactClient,
+		HostErrorsCache: cache,
+		ResumeCfg:       types.NewResumeCfg(),
 	}
 	engine := core.New(options)
 	engine.SetExecuterOptions(executorOpts)
