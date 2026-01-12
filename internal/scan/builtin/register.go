@@ -18,4 +18,5 @@ import "github.com/dropalldatabases/sif/internal/modules"
 // Allows complex Go scans to participate in the module system
 func Register() {
 	modules.Register(&ShodanModule{})
+	modules.Register(&NucleiModule{})
 }
