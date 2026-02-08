@@ -17,5 +17,6 @@ import "github.com/dropalldatabases/sif/internal/modules"
 // Register registers all Go-based built-in scans as modules.
 // Allows complex Go scans to participate in the module system
 func Register() {
+	modules.Register(&FrameworksModule{})
 	modules.Register(&NucleiModule{})
 }
