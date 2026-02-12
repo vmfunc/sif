@@ -8,6 +8,7 @@
 [![build](https://img.shields.io/github/actions/workflow/status/vmfunc/sif/go.yml?style=flat-square)](https://github.com/vmfunc/sif/actions)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue?style=flat-square)](LICENSE)
 [![aur](https://img.shields.io/aur/version/sif?style=flat-square&logo=archlinux&logoColor=white&color=1793D1)](https://aur.archlinux.org/packages/sif)
+[![nixpkgs](https://img.shields.io/badge/nixpkgs-sif-5277C3?style=flat-square&logo=nixos&logoColor=white)](https://search.nixos.org/packages?query=sif)
 [![homebrew](https://img.shields.io/badge/homebrew-tap-FBB040?style=flat-square&logo=homebrew&logoColor=white)](https://github.com/vmfunc/homebrew-sif)
 [![apt](https://img.shields.io/badge/apt-cloudsmith-2A5ADF?style=flat-square&logo=debian&logoColor=white)](https://cloudsmith.io/~sif/repos/deb/packages/)
 [![discord](https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/sifcli)
@@ -43,6 +44,25 @@ install using your preferred aur helper:
 yay -S sif
 # or
 paru -S sif
+```
+
+### nix
+
+```bash
+# nixpkgs (declarative — add to configuration.nix or home-manager)
+environment.systemPackages = [ pkgs.sif ];
+
+# or imperatively
+nix profile install nixpkgs#sif
+
+# or just run it without installing
+nix run nixpkgs#sif -- -u https://example.com -all
+```
+
+the repo also ships a flake if you want to build from source:
+
+```bash
+nix run github:vmfunc/sif
 ```
 
 ### debian/ubuntu (apt)
