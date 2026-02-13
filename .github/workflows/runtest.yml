@@ -1,4 +1,4 @@
-name: Functional Test
+name: functional test
 
 on:
   push:
@@ -12,13 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: set up go
+        uses: actions/setup-go@v5
         with:
           go-version: "1.24"
-      - name: Build Sif
+      - name: build sif
         run: make
-      - name: Run Sif with features
+      - name: run sif with features
         run: |
           ./sif -u https://example.com -dnslist small -dirlist small -dork -git -whois -cms -framework
           if [ $? -eq 0 ]; then
@@ -28,7 +28,7 @@ jobs:
             exit 1
           fi
 
-      - name: Test module system
+      - name: test module system
         run: |
           echo "Listing modules..."
           ./sif -lm

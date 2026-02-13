@@ -1,4 +1,4 @@
-name: Release
+name: release
 
 on:
   push:
@@ -19,28 +19,28 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: set up go
+        uses: actions/setup-go@v5
         with:
           go-version: "1.24"
 
-      - name: Build for Windows
+      - name: build for windows
         run: |
           GOOS=windows GOARCH=amd64 go build -o sif-windows-amd64.exe ./cmd/sif
           GOOS=windows GOARCH=386 go build -o sif-windows-386.exe ./cmd/sif
 
-      - name: Build for macOS
+      - name: build for macOS
         run: |
           GOOS=darwin GOARCH=amd64 go build -o sif-macos-amd64 ./cmd/sif
           GOOS=darwin GOARCH=arm64 go build -o sif-macos-arm64 ./cmd/sif
 
-      - name: Build for Linux
+      - name: build for linux
         run: |
           GOOS=linux GOARCH=amd64 go build -o sif-linux-amd64 ./cmd/sif
           GOOS=linux GOARCH=386 go build -o sif-linux-386 ./cmd/sif
           GOOS=linux GOARCH=arm64 go build -o sif-linux-arm64 ./cmd/sif
 
-      - name: Package releases with modules
+      - name: package releases with modules
         run: |
           for binary in sif-linux-amd64 sif-linux-386 sif-linux-arm64 sif-macos-amd64 sif-macos-arm64; do
             mkdir -p "dist/${binary}"
@@ -55,7 +55,7 @@ jobs:
             cd dist && zip -r "../${binary}.zip" "${binary}" && cd ..
           done
 
-      - name: Build Debian packages
+      - name: build debian packages
         run: |
           VERSION="0.1.0-$(git rev-parse --short HEAD)"
 
@@ -94,10 +94,29 @@ jobs:
             dpkg-deb --build "${pkg_dir}"
           done
 
-      - name: Set release version
+      - name: generate checksums
+        run: |
+          sha256sum \
+            sif-windows-amd64.zip \
+            sif-windows-386.zip \
+            sif-macos-amd64.tar.gz \
+            sif-macos-arm64.tar.gz \
+            sif-linux-amd64.tar.gz \
+            sif-linux-386.tar.gz \
+            sif-linux-arm64.tar.gz \
+            sif_*.deb \
+            > checksums-sha256.txt
+
+      - name: generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          artifact-name: sbom.spdx.json
+          output-file: sbom.spdx.json
+
+      - name: set release version
         run: echo "RELEASE_VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Create Release and Upload Assets
+      - name: create release and upload assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: automated-release-${{ env.RELEASE_VERSION }}
@@ -120,12 +139,10 @@ jobs:
             - Debian/Ubuntu (32-bit): `sif_*_i386.deb`
             - Debian/Ubuntu (64-bit ARM): `sif_*_arm64.deb`
 
-            ## Installation
+            ## Verification
 
             ```bash
-            tar -xzf sif-linux-amd64.tar.gz
-            cd sif-linux-amd64
-            ./sif -h
+            sha256sum -c checksums-sha256.txt
             ```
 
             For more details, check the [commit history](https://github.com/${{ github.repository }}/commits/main).
@@ -142,10 +159,12 @@ jobs:
             sif_*_amd64.deb
             sif_*_i386.deb
             sif_*_arm64.deb
+            checksums-sha256.txt
+            sbom.spdx.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push to Cloudsmith
+      - name: push to cloudsmith
         env:
           CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
         run: |

@@ -1,4 +1,4 @@
-name: Update Report Card
+name: update report card
 
 on:
   push:
@@ -7,10 +7,14 @@ on:
     branches: [main]
   workflow_call:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   update-report-card:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Update Go Report Card
+      - name: update go report card
         uses: creekorful/goreportcard-action@v1.0
