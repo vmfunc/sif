@@ -9,7 +9,7 @@ require (
 	github.com/likexian/whois v1.15.1
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/projectdiscovery/goflags v0.1.74
-	github.com/projectdiscovery/nuclei/v2 v2.9.14
+	github.com/projectdiscovery/nuclei/v2 v2.9.15
 	github.com/projectdiscovery/ratelimit v0.0.9
 	github.com/projectdiscovery/utils v0.9.0
 	github.com/rocketlaunchr/google-search v1.1.6
@@ -144,7 +144,7 @@ require (
 	github.com/projectdiscovery/blackrock v0.0.1 // indirect
 	github.com/projectdiscovery/cdncheck v1.0.9 // indirect
 	github.com/projectdiscovery/clistats v0.0.19 // indirect
-	github.com/projectdiscovery/dsl v0.0.20 // indirect
+	github.com/projectdiscovery/dsl v0.0.21 // indirect
 	github.com/projectdiscovery/fastdialer v0.5.2 // indirect
 	github.com/projectdiscovery/fasttemplate v0.0.2 // indirect
 	github.com/projectdiscovery/freeport v0.0.5 // indirect

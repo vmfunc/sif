@@ -436,8 +436,8 @@ github.com/projectdiscovery/cdncheck v1.0.9 h1:BS15gzj9gb5AVSKqTDzPamfSgStu7nJQO
 github.com/projectdiscovery/cdncheck v1.0.9/go.mod h1:18SSl1w7rMj53CGeRIZTbDoa286a6xZIxGbaiEo4Fxs=
 github.com/projectdiscovery/clistats v0.0.19 h1:SA/qRHbmS9VEbVEPzX/ka01hZDYATL9ZjAnDatybhLw=
 github.com/projectdiscovery/clistats v0.0.19/go.mod h1:NQDAW/O7cK9xBIgk46kJjwGRkjSg5JkB8E4DvuxXr+c=
-github.com/projectdiscovery/dsl v0.0.20 h1:CKgstMXRMFe+R8NKaQbI0W2XSSlApXlC+Uw3MvwmHgY=
-github.com/projectdiscovery/dsl v0.0.20/go.mod h1:dYgXhuJCqQtdezpBH8zFiwaAjohuIg9Au3vvamMzY5U=
+github.com/projectdiscovery/dsl v0.0.21 h1:usf8J/JmhYQNm0r3qehnLM9qb5ZCPw47d6VyhrJxuxo=
+github.com/projectdiscovery/dsl v0.0.21/go.mod h1:0X21hFJdxUtn9sy6JyBNo0yeC6yi+NMGGyeMqdL7e6Y=
 github.com/projectdiscovery/fastdialer v0.5.2 h1:BrK23yWc0XD57DMLqnF5oM5tBy8xx9brin+zoSo6gCw=
 github.com/projectdiscovery/fastdialer v0.5.2/go.mod h1:euoxS1E93LDnl0OnNN0UALedAFF+EehBxyU3z+79l0g=
 github.com/projectdiscovery/fasttemplate v0.0.2 h1:h2cISk5xDhlJEinlBQS6RRx0vOlOirB2y3Yu4PJzpiA=
@@ -464,8 +464,8 @@ github.com/projectdiscovery/mapcidr v1.1.34 h1:udr83vQ7oz3kEOwlsU6NC6o08leJzSDQt
 github.com/projectdiscovery/mapcidr v1.1.34/go.mod h1:1+1R6OkKSAKtWDXE9RvxXtXPoajXTYX0eiEdkqlhQqQ=
 github.com/projectdiscovery/networkpolicy v0.1.33 h1:bVgp+XpLEsQ7ZEJt3UaUqIwhI01MMdt7F2dfIKFQg/w=
 github.com/projectdiscovery/networkpolicy v0.1.33/go.mod h1:YAPddAXUc/lhoU85AFdvgOQKx8Qh8r0vzSjexRWk6Yk=
-github.com/projectdiscovery/nuclei/v2 v2.9.14 h1:EbVr499igs8h2i0ZTElqdxsB4GZd/fm51T4eZzJWNck=
-github.com/projectdiscovery/nuclei/v2 v2.9.14/go.mod h1:qX2JstMclY4MzvvVxngqDGS7SH/evg22ou9lz/JLsec=
+github.com/projectdiscovery/nuclei/v2 v2.9.15 h1:QYwD496nU64LBCGz8qgpJgyDYj40/E7NCDIIOd27rHs=
+github.com/projectdiscovery/nuclei/v2 v2.9.15/go.mod h1:02mbEM5FYAfSyOgnx1euguiXbsg5LRR+eJWPIWVL4pI=
 github.com/projectdiscovery/ratelimit v0.0.9 h1:28t2xDHUnyss1irzqPG3Oxz5hkRjl+3Q2I/aes7nau8=
 github.com/projectdiscovery/ratelimit v0.0.9/go.mod h1:f98UxLsHt0dWrHTbRDxos4+RvOLE0UFpyECfrfKBz1I=
 github.com/projectdiscovery/rawhttp v0.1.18 h1:wTs6CePrjcIz5/SrxkluOrCGOk3F9Ddt31kQO6P+41s=
