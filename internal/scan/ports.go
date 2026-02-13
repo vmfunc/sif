@@ -14,6 +14,7 @@ package scan
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -44,7 +45,12 @@ func Ports(scope string, url string, timeout time.Duration, threads int, logdir 
 	var ports []int
 	switch scope {
 	case "common":
-		resp, err := http.Get(commonPorts)
+		req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, commonPorts, http.NoBody)
+		if err != nil {
+			log.Error("Error creating request: %s", err)
+			return nil, err
+		}
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			log.Error("Error downloading ports list: %s", err)
 			return nil, err

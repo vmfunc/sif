@@ -14,6 +14,7 @@ package scan
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -47,7 +48,12 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 		list = dnsURL + dnsBigFile
 	}
 
-	resp, err := http.Get(list)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, list, http.NoBody)
+	if err != nil {
+		log.Error("Error creating request: %s", err)
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Error("Error downloading DNS list: %s", err)
 		return nil, err
@@ -95,13 +101,19 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 				charmlog.Debugf("Looking up: %s", domain)
 
 				// Check HTTP
-				resp, err := client.Get("http://" + domain + "." + sanitizedURL)
+				httpReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "http://"+domain+"."+sanitizedURL, http.NoBody)
+				if err != nil {
+					charmlog.Debugf("Error %s: %s", domain, err)
+					continue
+				}
+				resp, err := client.Do(httpReq)
 				if err != nil {
 					charmlog.Debugf("Error %s: %s", domain, err)
 				} else {
 					mu.Lock()
 					urls = append(urls, resp.Request.URL.String())
 					mu.Unlock()
+					resp.Body.Close()
 
 					progress.Pause()
 					log.Success("found: %s.%s [http]", output.Highlight.Render(domain), sanitizedURL)
@@ -113,20 +125,26 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 				}
 
 				// Check HTTPS
-				resp, err = client.Get("https://" + domain + "." + sanitizedURL)
+				httpsReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "https://"+domain+"."+sanitizedURL, http.NoBody)
+				if err != nil {
+					charmlog.Debugf("Error %s: %s", domain, err)
+					continue
+				}
+				resp, err = client.Do(httpsReq)
 				if err != nil {
 					charmlog.Debugf("Error %s: %s", domain, err)
 				} else {
 					mu.Lock()
 					urls = append(urls, resp.Request.URL.String())
 					mu.Unlock()
+					resp.Body.Close()
 
 					progress.Pause()
 					log.Success("found: %s.%s [https]", output.Highlight.Render(domain), sanitizedURL)
 					progress.Resume()
 
 					if logdir != "" {
-						logger.Write(sanitizedURL, logdir, fmt.Sprintf("[https] %s.%s\n", domain, sanitizedURL))
+						_ = logger.Write(sanitizedURL, logdir, fmt.Sprintf("[https] %s.%s\n", domain, sanitizedURL))
 					}
 				}
 			}

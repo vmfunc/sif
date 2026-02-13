@@ -13,6 +13,7 @@
 package scan
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"regexp"
@@ -164,7 +165,12 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 				adminPath := sqlAdminPaths[idx]
 				checkURL := strings.TrimSuffix(targetURL, "/") + adminPath.path
 
-				resp, err := client.Get(checkURL)
+				req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, checkURL, http.NoBody)
+				if err != nil {
+					charmlog.Debugf("Error creating request for %s: %v", checkURL, err)
+					continue
+				}
+				resp, err := client.Do(req)
 				if err != nil {
 					charmlog.Debugf("Error checking %s: %v", checkURL, err)
 					continue
@@ -243,7 +249,7 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	if totalFindings == 0 {
 		log.Info("No SQL exposures found")
 		log.Complete(0, "found")
-		return nil, nil
+		return nil, nil //nolint:nilnil // no SQLi found is not an error
 	}
 
 	log.Complete(totalFindings, "found")
@@ -285,7 +291,11 @@ func isAdminPanel(body string, panelType string) bool {
 }
 
 func checkDatabaseErrors(client *http.Client, checkURL, sanitizedURL string, result *SQLResult, logdir string, mu *sync.Mutex, seen map[string]bool) {
-	resp, err := client.Get(checkURL)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, checkURL, http.NoBody)
+	if err != nil {
+		return
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return
 	}

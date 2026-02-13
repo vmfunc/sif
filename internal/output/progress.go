@@ -138,11 +138,12 @@ func (p *Progress) render() {
 
 	bar := ""
 	for i := 0; i < progressWidth; i++ {
-		if i < filled {
+		switch {
+		case i < filled:
 			bar += progressFilled
-		} else if i == filled && current < total {
+		case i == filled && current < total:
 			bar += progressCurrent
-		} else {
+		default:
 			bar += progressEmpty
 		}
 	}

@@ -13,6 +13,7 @@
 package scan
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -214,7 +215,12 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 					parsedURL.Path,
 					testParams.Encode())
 
-				resp, err := client.Get(testURL)
+				req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, testURL, http.NoBody)
+				if err != nil {
+					charmlog.Debugf("Error creating request for %s: %v", testURL, err)
+					continue
+				}
+				resp, err := client.Do(req)
 				if err != nil {
 					charmlog.Debugf("Error testing %s: %v", testURL, err)
 					continue
@@ -294,7 +300,7 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	} else {
 		log.Info("No LFI vulnerabilities detected")
 		log.Complete(0, "found")
-		return nil, nil
+		return nil, nil //nolint:nilnil // no LFI found is not an error
 	}
 
 	return result, nil
