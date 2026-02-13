@@ -1,18 +1,26 @@
-name: Check Large Files
+name: check large files
 
 on:
   pull_request:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-large-files:
-    name: Check for large files
+    name: check for large files
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check for large files
+      - name: check for large files
         run: |
-          find . -type f -size +5M | while read file; do
-            echo "::error file=${file}::File ${file} is larger than 5MB"
-          done
+          large_files=$(find . -path ./.git -prune -o -type f -size +5M -print)
+          if [ -n "$large_files" ]; then
+            echo "$large_files" | while read -r file; do
+              echo "::error file=${file}::File ${file} is larger than 5MB"
+            done
+            exit 1
+          fi

@@ -1,4 +1,4 @@
-name: "Dependency Review"
+name: dependency review
 on:
   pull_request:
   push:
@@ -7,16 +7,20 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
     steps:
-      - name: "Checkout Repository"
+      - name: checkout repository
         uses: actions/checkout@v4
-      - name: "Dependency Review"
+      - name: dependency review
         uses: actions/dependency-review-action@v4
         continue-on-error: ${{ github.event_name == 'push' }}
-      - name: "Check Dependency Review Outcome"
+      - name: check dependency review outcome
         if: github.event_name == 'push' && failure()
         run: |
           echo "::warning::Dependency review failed. Please check the dependencies for potential issues."
