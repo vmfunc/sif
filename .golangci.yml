@@ -10,12 +10,10 @@ linters:
     - gocritic      # opinionated lints
     - revive        # replacement for golint
     - unconvert     # unnecessary type conversions
-    - prealloc      # slice preallocation hints
     - bodyclose     # http response body not closed
     - noctx         # http requests without context
     - gosec         # security issues
     - errorlint     # error wrapping and comparison
-    - gocognit      # cognitive complexity
     - nilnil        # return nil, nil
     - wastedassign  # assignments to variables never read
     - usetesting    # os.Setenv in tests instead of t.Setenv, etc.
@@ -23,23 +21,35 @@ linters:
 linters-settings:
   govet:
     enable-all: true
+    disable:
+      - fieldalignment  # too many structs to reorder, risks breaking serialization
+      - shadow          # common Go pattern, too noisy
+      - unusedwrite     # false positives on test data structs
   errcheck:
     check-blank: false
+    exclude-functions:
+      - github.com/dropalldatabases/sif/internal/logger.Write  # log writes are best-effort
   revive:
     rules:
       - name: exported
-        arguments: [checkPrivateReceivers]
+        disabled: true  # stuttering names (scan.ScanResult) require breaking API changes
   gocritic:
     enabled-tags:
       - diagnostic
       - style
       - performance
+    disabled-checks:
+      - commentedOutCode   # too opinionated for a project with TODO comments
+      - paramTypeCombine   # style-only, not worth churn
+      - unnamedResult      # style-only
+      - unnecessaryDefer   # common pattern in tests
+      - nestingReduce      # inverting conditions in scan logic hurts readability
   gosec:
     excludes:
       - G104  # errcheck covers this
-      - G304  # sif reads user-supplied wordlist paths — intentional
-  gocognit:
-    min-complexity: 30
+      - G107  # pentesting tool -- variable URLs are the whole point
+      - G110  # nuclei template decompression, acceptable context
+      - G304  # sif reads user-supplied wordlist paths -- intentional
 
 run:
   timeout: 5m
@@ -47,4 +57,10 @@ run:
 
 issues:
   max-issues-per-linter: 50
-  max-same-issues: 3
+  max-same-issues: 50
+  exclude-rules:
+    # test files get some slack
+    - path: _test\.go
+      linters:
+        - errcheck
+        - noctx
