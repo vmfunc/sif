@@ -1,4 +1,4 @@
-name: Shell Check
+name: shell check
 
 on:
   pull_request:

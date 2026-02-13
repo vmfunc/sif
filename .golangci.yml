@@ -13,7 +13,12 @@ linters:
     - prealloc      # slice preallocation hints
     - bodyclose     # http response body not closed
     - noctx         # http requests without context
-    - exportloopref # loop variable capture
+    - gosec         # security issues
+    - errorlint     # error wrapping and comparison
+    - gocognit      # cognitive complexity
+    - nilnil        # return nil, nil
+    - wastedassign  # assignments to variables never read
+    - usetesting    # os.Setenv in tests instead of t.Setenv, etc.
 
 linters-settings:
   govet:
@@ -29,6 +34,12 @@ linters-settings:
       - diagnostic
       - style
       - performance
+  gosec:
+    excludes:
+      - G104  # errcheck covers this
+      - G304  # sif reads user-supplied wordlist paths — intentional
+  gocognit:
+    min-complexity: 30
 
 run:
   timeout: 5m
