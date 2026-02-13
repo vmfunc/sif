@@ -6,7 +6,7 @@ require (
 	github.com/antchfx/htmlquery v1.3.5
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/charmbracelet/log v0.4.2
-	github.com/likexian/whois v1.15.1
+	github.com/likexian/whois v1.15.7
 	github.com/projectdiscovery/goflags v0.1.74
 	github.com/projectdiscovery/nuclei/v3 v3.7.0
 	github.com/projectdiscovery/utils v0.9.0
