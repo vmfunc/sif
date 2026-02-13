@@ -13,10 +13,8 @@
 package format
 
 import (
-	"fmt"
-
 	"github.com/dropalldatabases/sif/internal/styles"
-	"github.com/projectdiscovery/nuclei/v2/pkg/output"
+	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
 
 func FormatLine(event *output.ResultEvent) string {
@@ -29,7 +27,7 @@ func FormatLine(event *output.ResultEvent) string {
 	}
 
 	output += " [" + event.Type + "]"
-	output += " [" + formatSeverity(fmt.Sprintf("%s", event.Info.SeverityHolder.Severity)) + "]"
+	output += " [" + formatSeverity(event.Info.SeverityHolder.Severity.String()) + "]"
 
 	return output
 }

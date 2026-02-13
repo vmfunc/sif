@@ -14,33 +14,17 @@ package scan
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/nuclei/format"
 	"github.com/dropalldatabases/sif/internal/nuclei/templates"
 	sifoutput "github.com/dropalldatabases/sif/internal/output"
-	"github.com/logrusorgru/aurora"
-	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/config"
-	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/disk"
-	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/loader"
-	"github.com/projectdiscovery/nuclei/v2/pkg/core"
-	"github.com/projectdiscovery/nuclei/v2/pkg/core/inputs"
-	"github.com/projectdiscovery/nuclei/v2/pkg/output"
-	"github.com/projectdiscovery/nuclei/v2/pkg/parsers"
-	"github.com/projectdiscovery/nuclei/v2/pkg/protocols"
-	"github.com/projectdiscovery/nuclei/v2/pkg/protocols/common/contextargs"
-	"github.com/projectdiscovery/nuclei/v2/pkg/protocols/common/hosterrorscache"
-	"github.com/projectdiscovery/nuclei/v2/pkg/protocols/common/interactsh"
-	"github.com/projectdiscovery/nuclei/v2/pkg/protocols/common/protocolinit"
-	"github.com/projectdiscovery/nuclei/v2/pkg/protocols/common/protocolstate"
-	"github.com/projectdiscovery/nuclei/v2/pkg/reporting"
-	"github.com/projectdiscovery/nuclei/v2/pkg/testutils"
-	"github.com/projectdiscovery/nuclei/v2/pkg/types"
-	"github.com/projectdiscovery/ratelimit"
+	nuclei "github.com/projectdiscovery/nuclei/v3/lib"
+	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
 
 func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]output.ResultEvent, error) {
@@ -49,99 +33,59 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 	spin := sifoutput.NewSpinner("Running nuclei templates")
 	spin.Start()
 
-	sanitizedURL := strings.Split(url, "://")[1]
-
 	nucleilog := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "nuclei",
 	}).With("url", url)
 
-	// Apply threads, timeout, log settings
-	options := types.DefaultOptions()
-	options.TemplateThreads = threads
-	options.Timeout = int(timeout.Seconds())
-
-	if logdir != "" {
-		options.ProjectPath = logdir
-	}
-
-	options.Headless = false
-
-	// Get templates
 	templates.Install(nucleilog)
 	pwd, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get working directory: %w", err)
+		spin.Stop()
+		return nil, err
 	}
-	config.DefaultConfig.SetTemplatesDir(pwd)
-	catalog := disk.NewCatalog(pwd)
 
-	results := []output.ResultEvent{}
-	// Custom output
-	outputWriter := testutils.NewMockOutputWriter()
-	outputWriter.WriteCallback = func(event *output.ResultEvent) {
+	ctx := context.Background()
+	ne, err := nuclei.NewNucleiEngineCtx(ctx,
+		nuclei.WithTemplatesOrWorkflows(nuclei.TemplateSources{
+			Templates: []string{pwd + "/nuclei-templates"},
+		}),
+		nuclei.WithConcurrency(nuclei.Concurrency{
+			TemplateConcurrency:           threads,
+			HostConcurrency:               1,
+			HeadlessHostConcurrency:       1,
+			HeadlessTemplateConcurrency:   1,
+			JavascriptTemplateConcurrency: 1,
+			TemplatePayloadConcurrency:    25,
+			ProbeConcurrency:              50,
+		}),
+		nuclei.WithNetworkConfig(nuclei.NetworkConfig{
+			Timeout: int(timeout.Seconds()),
+		}),
+		nuclei.DisableUpdateCheck(),
+	)
+	if err != nil {
+		spin.Stop()
+		return nil, err
+	}
+	defer ne.Close()
+
+	sanitizedURL := strings.Split(url, "://")[1]
+	ne.LoadTargets([]string{sanitizedURL}, false)
+
+	var results []output.ResultEvent
+	var mu sync.Mutex
+
+	err = ne.ExecuteCallbackWithCtx(ctx, func(event *output.ResultEvent) {
 		if event.Matched != "" {
 			nucleilog.Infof("%s", format.FormatLine(event))
-
+			mu.Lock()
 			results = append(results, *event)
-			// TODO: metasploit
+			mu.Unlock()
 		}
-	}
-
-	cache := hosterrorscache.New(30, hosterrorscache.DefaultMaxHostsCount, nil)
-	defer cache.Close()
-
-	progressClient := &testutils.MockProgressClient{}
-	reportingClient, err := reporting.New(&reporting.Options{}, "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create reporting client: %w", err)
-	}
-	defer reportingClient.Close()
-
-	interactOpts := interactsh.DefaultOptions(outputWriter, reportingClient, progressClient)
-	interactClient, err := interactsh.New(interactOpts)
-	if err != nil {
-		return nil, err
-	}
-	defer interactClient.Close()
-
-	protocolstate.Init(options)
-	protocolinit.Init(options)
-
-	executorOpts := protocols.ExecutorOptions{
-		Colorizer:       aurora.NewAurora(false),
-		Output:          outputWriter,
-		Progress:        progressClient,
-		Catalog:         catalog,
-		Options:         options,
-		IssuesClient:    reportingClient,
-		RateLimiter:     ratelimit.New(context.Background(), 150, time.Second),
-		Interactsh:      interactClient,
-		HostErrorsCache: cache,
-		ResumeCfg:       types.NewResumeCfg(),
-	}
-	engine := core.New(options)
-	engine.SetExecuterOptions(executorOpts)
-
-	workflowLoader, err := parsers.NewLoader(&executorOpts)
-	if err != nil {
-		return nil, err
-	}
-	executorOpts.WorkflowLoader = workflowLoader
-
-	store, err := loader.New(loader.NewConfig(options, catalog, executorOpts))
-	if err != nil {
-		return nil, err
-	}
-	store.Load()
-
-	inputArgs := []*contextargs.MetaInput{{Input: sanitizedURL}}
-	input := &inputs.SimpleInputProvider{Inputs: inputArgs}
-
-	_ = engine.Execute(store.Templates(), input)
-	engine.WorkPool().Wait()
+	})
 
 	spin.Stop()
 	sifoutput.ScanComplete("nuclei template scanning", len(results), "found")
 
-	return results, nil
+	return results, err
 }
