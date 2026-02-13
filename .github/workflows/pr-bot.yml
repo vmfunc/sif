@@ -1,0 +1,139 @@
+name: pr bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          configuration-path: .github/labeler.yml
+
+  size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: label pr size
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+
+            const changes = files.reduce((sum, f) => sum + f.additions + f.deletions, 0);
+
+            let size;
+            if (changes < 10) size = "size/xs";
+            else if (changes < 50) size = "size/s";
+            else if (changes < 200) size = "size/m";
+            else if (changes < 500) size = "size/l";
+            else size = "size/xl";
+
+            const sizeLabels = ["size/xs", "size/s", "size/m", "size/l", "size/xl"];
+            const currentLabels = context.payload.pull_request.labels.map(l => l.name);
+            const toRemove = currentLabels.filter(l => sizeLabels.includes(l) && l !== size);
+
+            for (const label of toRemove) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                name: label,
+              }).catch(() => {});
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: [size],
+            });
+
+  ci-summary:
+    runs-on: ubuntu-latest
+    needs: [label, size]
+    if: always()
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const { data: checks } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: pr.head.sha,
+              per_page: 100,
+            });
+
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+
+            const additions = files.reduce((sum, f) => sum + f.additions, 0);
+            const deletions = files.reduce((sum, f) => sum + f.deletions, 0);
+            const fileCount = files.length;
+
+            let body = `### pr summary\n\n`;
+            body += `**${fileCount}** files changed (+${additions} -${deletions})\n\n`;
+
+            const goFiles = files.filter(f => f.filename.endsWith('.go')).length;
+            const testFiles = files.filter(f => f.filename.endsWith('_test.go')).length;
+            const ciFiles = files.filter(f => f.filename.startsWith('.github/')).length;
+            const modFiles = files.filter(f => f.filename === 'go.mod' || f.filename === 'go.sum').length;
+
+            if (goFiles > 0 || testFiles > 0 || ciFiles > 0 || modFiles > 0) {
+              body += `| category | files |\n|----------|-------|\n`;
+              if (goFiles > 0) body += `| go source | ${goFiles} |\n`;
+              if (testFiles > 0) body += `| tests | ${testFiles} |\n`;
+              if (ciFiles > 0) body += `| ci/workflows | ${ciFiles} |\n`;
+              if (modFiles > 0) body += `| deps | ${modFiles} |\n`;
+              body += `\n`;
+            }
+
+            // find existing bot comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+            });
+
+            const marker = '<!-- sif-pr-bot -->';
+            body = marker + '\n' + body;
+
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body,
+              });
+            }
