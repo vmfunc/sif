@@ -1,4 +1,4 @@
-name: Mind your language
+name: mind your language
 on:
   issues:
     types:
