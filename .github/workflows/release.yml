@@ -2,7 +2,8 @@ name: release
 
 on:
   push:
-    branches: [main]
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -24,21 +25,24 @@ jobs:
         with:
           go-version: "1.24"
 
+      - name: extract version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
       - name: build for windows
         run: |
-          GOOS=windows GOARCH=amd64 go build -o sif-windows-amd64.exe ./cmd/sif
-          GOOS=windows GOARCH=386 go build -o sif-windows-386.exe ./cmd/sif
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-windows-amd64.exe ./cmd/sif
+          GOOS=windows GOARCH=386 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-windows-386.exe ./cmd/sif
 
       - name: build for macOS
         run: |
-          GOOS=darwin GOARCH=amd64 go build -o sif-macos-amd64 ./cmd/sif
-          GOOS=darwin GOARCH=arm64 go build -o sif-macos-arm64 ./cmd/sif
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-macos-amd64 ./cmd/sif
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-macos-arm64 ./cmd/sif
 
       - name: build for linux
         run: |
-          GOOS=linux GOARCH=amd64 go build -o sif-linux-amd64 ./cmd/sif
-          GOOS=linux GOARCH=386 go build -o sif-linux-386 ./cmd/sif
-          GOOS=linux GOARCH=arm64 go build -o sif-linux-arm64 ./cmd/sif
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-linux-amd64 ./cmd/sif
+          GOOS=linux GOARCH=386 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-linux-386 ./cmd/sif
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-linux-arm64 ./cmd/sif
 
       - name: package releases with modules
         run: |
@@ -57,8 +61,6 @@ jobs:
 
       - name: build debian packages
         run: |
-          VERSION="0.1.0-$(git rev-parse --short HEAD)"
-
           declare -A arch_map=(
             ["sif-linux-amd64"]="amd64"
             ["sif-linux-386"]="i386"
@@ -67,7 +69,7 @@ jobs:
 
           for binary in sif-linux-amd64 sif-linux-386 sif-linux-arm64; do
             arch="${arch_map[$binary]}"
-            pkg_dir="sif_${VERSION}_${arch}"
+            pkg_dir="sif_${{ env.VERSION }}_${arch}"
 
             mkdir -p "${pkg_dir}/DEBIAN"
             mkdir -p "${pkg_dir}/usr/bin"
@@ -79,11 +81,11 @@ jobs:
 
             cat > "${pkg_dir}/DEBIAN/control" << EOF
           Package: sif
-          Version: ${VERSION}
+          Version: ${{ env.VERSION }}
           Section: security
           Priority: optional
           Architecture: ${arch}
-          Maintainer: Celeste Hickenlooper <celeste@router.sex>
+          Maintainer: Celeste Hickenlooper <celeste@linux.com>
           Homepage: https://github.com/vmfunc/sif
           Description: Modular pentesting toolkit
            sif is a fast, concurrent, and extensible pentesting toolkit written in Go.
@@ -113,41 +115,71 @@ jobs:
           artifact-name: sbom.spdx.json
           output-file: sbom.spdx.json
 
-      - name: set release version
-        run: echo "RELEASE_VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - name: generate changelog
+        id: changelog
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 1,
+            });
 
-      - name: create release and upload assets
+            const prev = releases.length > 0 ? releases[0].tag_name : '';
+            const range = prev ? `${prev}...${context.ref}` : '';
+
+            const { data: commits } = await github.rest.repos.compareCommitsWithBasehead({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              basehead: prev ? `${prev}...${{ github.ref_name }}` : `${{ github.sha }}~10...${{ github.sha }}`,
+            }).catch(() => ({ data: { commits: [] } }));
+
+            let log = '';
+            for (const c of commits.commits || []) {
+              const msg = c.commit.message.split('\n')[0];
+              const sha = c.sha.substring(0, 7);
+              log += `- ${msg} (${sha})\n`;
+            }
+
+            return log || 'initial release';
+
+      - name: create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: automated-release-${{ env.RELEASE_VERSION }}
-          name: Release ${{ env.RELEASE_VERSION }}
+          name: sif v${{ env.VERSION }}
           body: |
-            Automated release v${{ env.RELEASE_VERSION }}
+            ## what's changed
 
-            ## Assets
+            ${{ steps.changelog.outputs.result }}
 
-            Each archive contains the sif binary and built-in modules.
+            ## install
 
-            - Windows (64-bit): `sif-windows-amd64.zip`
-            - Windows (32-bit): `sif-windows-386.zip`
-            - macOS (64-bit Intel): `sif-macos-amd64.tar.gz`
-            - macOS (64-bit ARM): `sif-macos-arm64.tar.gz`
-            - Linux (64-bit): `sif-linux-amd64.tar.gz`
-            - Linux (32-bit): `sif-linux-386.tar.gz`
-            - Linux (64-bit ARM): `sif-linux-arm64.tar.gz`
-            - Debian/Ubuntu (64-bit): `sif_*_amd64.deb`
-            - Debian/Ubuntu (32-bit): `sif_*_i386.deb`
-            - Debian/Ubuntu (64-bit ARM): `sif_*_arm64.deb`
+            **homebrew / linuxbrew**
+            ```bash
+            # coming soon
+            ```
 
-            ## Verification
+            **debian / ubuntu**
+            ```bash
+            sudo dpkg -i sif_${{ env.VERSION }}_amd64.deb
+            ```
+
+            **go install**
+            ```bash
+            go install github.com/dropalldatabases/sif/cmd/sif@v${{ env.VERSION }}
+            ```
+
+            **binary download** - grab the right archive from below.
+
+            ## verification
 
             ```bash
             sha256sum -c checksums-sha256.txt
             ```
-
-            For more details, check the [commit history](https://github.com/${{ github.repository }}/commits/main).
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             sif-windows-amd64.zip
             sif-windows-386.zip
@@ -165,6 +197,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: push to cloudsmith
+        if: ${{ !contains(github.ref_name, '-') }}
         env:
           CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
         run: |

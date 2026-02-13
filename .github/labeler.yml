@@ -1,0 +1,44 @@
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+deps:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "go.mod"
+          - "go.sum"
+          - "flake.nix"
+          - "flake.lock"
+
+scan:
+  - changed-files:
+      - any-glob-to-any-file: "internal/scan/**"
+
+nuclei:
+  - changed-files:
+      - any-glob-to-any-file: "internal/nuclei/**"
+
+modules:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "internal/modules/**"
+          - "internal/scan/builtin/**"
+          - "internal/scan/js/**"
+          - "modules/**"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: "**/*_test.go"
+
+config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "internal/config/**"
+          - ".golangci.yml"
+          - ".editorconfig"
