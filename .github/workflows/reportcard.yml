@@ -18,6 +18,6 @@ jobs:
   update-report-card:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: update go report card
         uses: creekorful/goreportcard-action@v1.0
