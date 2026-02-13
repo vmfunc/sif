@@ -5,6 +5,10 @@ on:
     paths:
       - "**/*.md"
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   markdownlint:
     name: runner / markdownlint

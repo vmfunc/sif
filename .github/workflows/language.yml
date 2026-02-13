@@ -12,6 +12,12 @@ on:
     types:
       - created
       - edited
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   echo_issue_comment:
     runs-on: ubuntu-latest
