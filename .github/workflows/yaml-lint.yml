@@ -6,6 +6,10 @@ on:
       - "**/*.yml"
       - "**/*.yaml"
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   yamllint:
     name: runner / yamllint

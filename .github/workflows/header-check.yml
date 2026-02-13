@@ -8,6 +8,9 @@ on:
     paths:
       - '**.go'
 
+permissions:
+  contents: read
+
 jobs:
   check-headers:
     runs-on: ubuntu-latest
