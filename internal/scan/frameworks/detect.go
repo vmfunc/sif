@@ -13,6 +13,7 @@
 package frameworks
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -47,7 +48,12 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 
 	client := &http.Client{Timeout: timeout}
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
+	if err != nil {
+		spin.Stop()
+		return nil, err
+	}
+	resp, err := client.Do(req) //nolint:bodyclose // closed via defer below
 	if err != nil {
 		spin.Stop()
 		return nil, err
@@ -66,7 +72,7 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	if len(detectors) == 0 {
 		spin.Stop()
 		log.Warn("No framework detectors registered")
-		return nil, nil
+		return nil, nil //nolint:nilnil // no detectors registered is not an error
 	}
 
 	// Run all detectors concurrently
@@ -105,7 +111,7 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	if best.confidence <= detectionThreshold {
 		log.Info("No framework detected with sufficient confidence")
 		log.Complete(0, "detected")
-		return nil, nil
+		return nil, nil //nolint:nilnil // no framework detected is not an error
 	}
 
 	// Get version match details
@@ -124,7 +130,7 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 			logEntry += fmt.Sprintf("  CVEs: %v\n", cves)
 			logEntry += fmt.Sprintf("  Recommendations: %v\n", suggestions)
 		}
-		logger.Write(url, logdir, logEntry)
+		_ = logger.Write(url, logdir, logEntry)
 	}
 
 	log.Success("Detected %s framework (version: %s, confidence: %.2f)",

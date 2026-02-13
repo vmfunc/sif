@@ -202,7 +202,7 @@ func ExtractVersionOptimized(body string, framework string) VersionMatch {
 
 // isValidVersionString checks if a version string looks like a valid semver
 func isValidVersionString(v string) bool {
-	if len(v) == 0 || len(v) > 20 {
+	if v == "" || len(v) > 20 {
 		return false
 	}
 

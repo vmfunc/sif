@@ -13,6 +13,7 @@
 package scan
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -54,7 +55,7 @@ func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStor
 	var results []CloudStorageResult
 
 	for _, bucket := range potentialBuckets {
-		isPublic, err := checkS3Bucket(bucket, client)
+		isPublic, err := checkS3Bucket(context.TODO(), bucket, client)
 		if err != nil {
 			cloudlog.Errorf("Error checking S3 bucket %s: %v", bucket, err)
 			continue
@@ -69,7 +70,7 @@ func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStor
 		if isPublic {
 			cloudlog.Warnf("Public S3 bucket found: %s", styles.Highlight.Render(bucket))
 			if logdir != "" {
-				logger.Write(sanitizedURL, logdir, fmt.Sprintf("Public S3 bucket found: %s\n", bucket))
+				_ = logger.Write(sanitizedURL, logdir, fmt.Sprintf("Public S3 bucket found: %s\n", bucket))
 			}
 		} else {
 			cloudlog.Infof("S3 bucket is not public/found: %s", bucket)
@@ -85,22 +86,23 @@ func extractPotentialBuckets(url string) []string {
 	parts := strings.Split(url, ".")
 	var buckets []string
 	for i, part := range parts {
-		buckets = append(buckets, part)
-		buckets = append(buckets, part+"-s3")
-		buckets = append(buckets, "s3-"+part)
+		buckets = append(buckets, part, part+"-s3", "s3-"+part)
 
 		if i < len(parts)-1 {
 			domainExtension := part + "-" + parts[i+1]
-			buckets = append(buckets, domainExtension)
-			buckets = append(buckets, parts[i+1]+"-"+part)
+			buckets = append(buckets, domainExtension, parts[i+1]+"-"+part)
 		}
 	}
 	return buckets
 }
 
-func checkS3Bucket(bucket string, client *http.Client) (bool, error) {
+func checkS3Bucket(ctx context.Context, bucket string, client *http.Client) (bool, error) {
 	url := fmt.Sprintf("https://%s.s3.amazonaws.com", bucket)
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return false, err
 	}

@@ -16,6 +16,7 @@ package js
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -70,7 +71,7 @@ type supabaseOpenAPIResponse struct {
 
 // getSupabaseArrayResponse fetches a Supabase endpoint that returns an array.
 func getSupabaseArrayResponse(projectId, path, apikey string, auth *string) (*supabaseArrayResponse, error) {
-	body, resp, err := doSupabaseRequest(projectId, path, apikey, auth)
+	body, resp, err := doSupabaseRequest(projectId, path, apikey, auth) //nolint:bodyclose // closed in doSupabaseRequest
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +96,7 @@ func getSupabaseArrayResponse(projectId, path, apikey string, auth *string) (*su
 
 // getSupabaseOpenAPI fetches the OpenAPI spec from Supabase.
 func getSupabaseOpenAPI(projectId, apikey string, auth *string) (*supabaseOpenAPIResponse, error) {
-	body, _, err := doSupabaseRequest(projectId, "/rest/v1/", apikey, auth)
+	body, _, err := doSupabaseRequest(projectId, "/rest/v1/", apikey, auth) //nolint:bodyclose // closed in doSupabaseRequest
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +112,7 @@ func getSupabaseOpenAPI(projectId, apikey string, auth *string) (*supabaseOpenAP
 func doSupabaseRequest(projectId, path, apikey string, auth *string) ([]byte, *http.Response, error) {
 	client := http.Client{}
 
-	req, err := http.NewRequest("GET", "https://"+projectId+".supabase.co"+path, nil)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "https://"+projectId+".supabase.co"+path, http.NoBody)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -170,7 +171,7 @@ func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) 
 
 		supabaselog.Debugf("JWT body: %s", decoded)
 		var supabaseJwt *supabaseJwtBody
-		err = json.Unmarshal([]byte(decoded), &supabaseJwt)
+		err = json.Unmarshal(decoded, &supabaseJwt)
 		if err != nil {
 			supabaselog.Debugf("Failed to json parse JWT %s: %s", jwt, err)
 			continue
@@ -183,7 +184,7 @@ func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) 
 		supabaselog.Infof("Found valid supabase project %s with role %s", *supabaseJwt.ProjectId, *supabaseJwt.Role)
 		client := http.Client{}
 
-		req, err := http.NewRequest("POST", "https://"+*supabaseJwt.ProjectId+".supabase.co/auth/v1/signup", bytes.NewBufferString(`{"email":"automated`+strconv.Itoa(int(time.Now().Unix()))+`@sif.sh","password":"automatedacct"}`))
+		req, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, "https://"+*supabaseJwt.ProjectId+".supabase.co/auth/v1/signup", bytes.NewBufferString(`{"email":"automated`+strconv.Itoa(int(time.Now().Unix()))+`@sif.sh","password":"automatedacct"}`))
 		if err != nil {
 			supabaselog.Errorf("Error while creating HTTP req for creating user: %s", err)
 			continue

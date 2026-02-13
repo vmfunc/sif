@@ -13,6 +13,7 @@
 package scan
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -182,7 +183,11 @@ func queryShodanHost(ip string, apiKey string, timeout time.Duration) (*ShodanRe
 	client := &http.Client{Timeout: timeout}
 
 	reqURL := fmt.Sprintf("%s/shodan/host/%s?key=%s", shodanBaseURL, ip, apiKey)
-	resp, err := client.Get(reqURL)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, reqURL, http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Shodan request: %w", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query Shodan: %w", err)
 	}
@@ -232,14 +237,14 @@ func queryShodanHost(ip string, apiKey string, timeout time.Duration) (*ShodanRe
 		Services:     make([]ShodanService, 0, len(shodanResp.Data)),
 	}
 
-	for _, data := range shodanResp.Data {
+	for i := range shodanResp.Data {
 		service := ShodanService{
-			Port:     data.Port,
-			Protocol: data.Transport,
-			Product:  data.Product,
-			Version:  data.Version,
-			Banner:   truncateBanner(data.Data, 200),
-			Module:   data.Shodan.Module,
+			Port:     shodanResp.Data[i].Port,
+			Protocol: shodanResp.Data[i].Transport,
+			Product:  shodanResp.Data[i].Product,
+			Version:  shodanResp.Data[i].Version,
+			Banner:   truncateBanner(shodanResp.Data[i].Data, 200),
+			Module:   shodanResp.Data[i].Shodan.Module,
 		}
 		result.Services = append(result.Services, service)
 	}

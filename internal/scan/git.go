@@ -14,6 +14,7 @@ package scan
 
 import (
 	"bufio"
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -47,7 +48,13 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 		}
 	}
 
-	resp, err := http.Get(gitURL + gitFile)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, gitURL+gitFile, http.NoBody)
+	if err != nil {
+		spin.Stop()
+		log.Error("Error creating git list request: %s", err)
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		spin.Stop()
 		log.Error("Error downloading git list: %s", err)
@@ -80,9 +87,15 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 				}
 
 				charmlog.Debugf("%s", repourl)
-				resp, err := client.Get(url + "/" + repourl)
+				gitReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url+"/"+repourl, http.NoBody)
+				if err != nil {
+					charmlog.Debugf("Error creating request for %s: %s", repourl, err)
+					continue
+				}
+				resp, err := client.Do(gitReq)
 				if err != nil {
 					charmlog.Debugf("Error %s: %s", repourl, err)
+					continue
 				}
 
 				if resp.StatusCode == 200 && !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
@@ -95,6 +108,7 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 
 					foundUrls = append(foundUrls, resp.Request.URL.String())
 				}
+				resp.Body.Close()
 			}
 		}(thread)
 	}

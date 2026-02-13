@@ -14,6 +14,7 @@ package scan
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -62,7 +63,12 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 		list = directoryURL + bigFile
 	}
 
-	resp, err := http.Get(list)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, list, http.NoBody)
+	if err != nil {
+		log.Error("Error creating directory list request: %s", err)
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Error("Error downloading directory list: %s", err)
 		return nil, err
@@ -99,7 +105,12 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 				progress.Increment(directory)
 
 				charmlog.Debugf("%s", directory)
-				resp, err := client.Get(url + "/" + directory)
+				dirReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url+"/"+directory, http.NoBody)
+				if err != nil {
+					charmlog.Debugf("Error creating request for %s: %s", directory, err)
+					continue
+				}
+				resp, err := client.Do(dirReq)
 				if err != nil {
 					charmlog.Debugf("Error %s: %s", directory, err)
 					continue
@@ -111,7 +122,7 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 					progress.Resume()
 
 					if logdir != "" {
-						logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s [%s]\n", strconv.Itoa(resp.StatusCode), directory))
+						_ = logger.Write(sanitizedURL, logdir, fmt.Sprintf("%s [%s]\n", strconv.Itoa(resp.StatusCode), directory))
 					}
 
 					result := DirectoryResult{
@@ -122,6 +133,7 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 					results = append(results, result)
 					mu.Unlock()
 				}
+				resp.Body.Close()
 			}
 		}(thread)
 	}

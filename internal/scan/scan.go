@@ -19,6 +19,7 @@ package scan
 
 import (
 	"bufio"
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -31,7 +32,12 @@ import (
 )
 
 func fetchRobotsTXT(url string, client *http.Client) *http.Response {
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
+	if err != nil {
+		log.Debugf("Error creating request for robots.txt: %s", err)
+		return nil
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Debugf("Error fetching robots.txt: %s", err)
 		return nil
@@ -110,7 +116,12 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 
 					_, sanitizedRobot, _ := strings.Cut(robot, ": ")
 					log.Debugf("%s", robot)
-					resp, err := client.Get(url + "/" + sanitizedRobot)
+					robotReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url+"/"+sanitizedRobot, http.NoBody)
+					if err != nil {
+						log.Debugf("Error creating request for %s: %s", sanitizedRobot, err)
+						continue
+					}
+					resp, err := client.Do(robotReq)
 					if err != nil {
 						log.Debugf("Error %s: %s", sanitizedRobot, err)
 						continue

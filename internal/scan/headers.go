@@ -13,6 +13,7 @@
 package scan
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -43,7 +44,11 @@ func Headers(url string, timeout time.Duration, logdir string) ([]HeaderResult, 
 		Timeout: timeout,
 	}
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
