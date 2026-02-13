@@ -228,9 +228,9 @@ func checkMatchers(matchers []Matcher, resp *http.Response, body string) bool {
 	}
 
 	// Default to AND condition across matchers
-	for _, m := range matchers {
-		matched := checkMatcher(m, resp, body)
-		if m.Negative {
+	for i := range matchers {
+		matched := checkMatcher(&matchers[i], resp, body)
+		if matchers[i].Negative {
 			matched = !matched
 		}
 		if !matched {
@@ -242,7 +242,7 @@ func checkMatchers(matchers []Matcher, resp *http.Response, body string) bool {
 }
 
 // checkMatcher evaluates a single matcher.
-func checkMatcher(m Matcher, resp *http.Response, body string) bool {
+func checkMatcher(m *Matcher, resp *http.Response, body string) bool {
 	part := getPart(m.Part, resp, body)
 
 	switch m.Type {
@@ -352,8 +352,7 @@ func runExtractors(extractors []Extractor, resp *http.Response, body string) map
 	for _, e := range extractors {
 		part := getPart(e.Part, resp, body)
 
-		switch e.Type {
-		case "regex":
+		if e.Type == "regex" {
 			for _, pattern := range e.Regex {
 				re, err := regexp.Compile(pattern)
 				if err != nil {

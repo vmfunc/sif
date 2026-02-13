@@ -86,9 +86,10 @@ func New(settings *config.Settings) (*App, error) {
 		return app, nil
 	}
 
-	if len(settings.URLs) > 0 {
+	switch {
+	case len(settings.URLs) > 0:
 		app.targets = settings.URLs
-	} else if settings.File != "" {
+	case settings.File != "":
 		if _, err := os.Stat(settings.File); err != nil {
 			return nil, err
 		}
@@ -104,7 +105,7 @@ func New(settings *config.Settings) (*App, error) {
 		for scanner.Scan() {
 			app.targets = append(app.targets, scanner.Text())
 		}
-	} else {
+	default:
 		return nil, fmt.Errorf("target(s) must be supplied with -u or -f\n\nSee 'sif -h' for more information")
 	}
 
@@ -362,13 +363,14 @@ func (app *App) Run() error {
 
 				// Determine which modules to run
 				var toRun []modules.Module
-				if app.settings.AllModules {
+				switch {
+				case app.settings.AllModules:
 					toRun = modules.All()
-				} else if app.settings.ModuleTags != "" {
+				case app.settings.ModuleTags != "":
 					for _, tag := range strings.Split(app.settings.ModuleTags, ",") {
 						toRun = append(toRun, modules.ByTag(strings.TrimSpace(tag))...)
 					}
-				} else if app.settings.Modules != "" {
+				case app.settings.Modules != "":
 					for _, id := range strings.Split(app.settings.Modules, ",") {
 						if m, ok := modules.Get(strings.TrimSpace(id)); ok {
 							toRun = append(toRun, m)
@@ -411,7 +413,8 @@ func (app *App) Run() error {
 
 			marshalled, err := json.Marshal(result)
 			if err != nil {
-				log.Fatalf("failed to marshal result: %s", err)
+				log.Errorf("failed to marshal result: %s", err)
+				continue
 			}
 			fmt.Println(string(marshalled))
 		}

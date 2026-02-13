@@ -17,6 +17,7 @@ package scan
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -69,7 +70,14 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 		}
 	}
 
-	resp, err := http.Get(dorkURL + dorkFile)
+	ctx := context.TODO()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dorkURL+dorkFile, http.NoBody)
+	if err != nil {
+		spin.Stop()
+		output.Error("Error creating dork list request: %s", err)
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		spin.Stop()
 		output.Error("Error downloading dork list: %s", err)
@@ -98,7 +106,7 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 					continue
 				}
 
-				results, err := googlesearch.Search(nil, fmt.Sprintf("%s %s", dork, sanitizedURL))
+				results, err := googlesearch.Search(context.TODO(), fmt.Sprintf("%s %s", dork, sanitizedURL))
 				if err != nil {
 					log.Debugf("error searching for dork %s: %v", dork, err)
 					continue
@@ -108,7 +116,7 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 					output.Success("%s dork results found for dork %s", output.Status.Render(strconv.Itoa(len(results))), output.Highlight.Render(dork))
 					spin.Start()
 					if logdir != "" {
-						logger.Write(sanitizedURL, logdir, strconv.Itoa(len(results))+" dork results found for dork ["+dork+"]\n")
+						_ = logger.Write(sanitizedURL, logdir, strconv.Itoa(len(results))+" dork results found for dork ["+dork+"]\n")
 					}
 
 					result := DorkResult{

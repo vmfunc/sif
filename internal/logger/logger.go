@@ -37,7 +37,7 @@ var defaultLogger = &Logger{
 // Init creates the log directory if it doesn't exist.
 func Init(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err = os.Mkdir(dir, 0755); err != nil {
+		if err := os.Mkdir(dir, 0o755); err != nil {
 			return err
 		}
 	}
@@ -62,7 +62,7 @@ func (l *Logger) getWriter(path string) (*bufio.Writer, error) {
 		return w, nil
 	}
 
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
 		return nil, err
 	}

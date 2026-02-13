@@ -13,6 +13,7 @@
 package scan
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -48,7 +49,13 @@ func CMS(url string, timeout time.Duration, logdir string) (*CMSResult, error) {
 		Timeout: timeout,
 	}
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
+	if err != nil {
+		spin.Stop()
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		spin.Stop()
 		return nil, err
@@ -92,7 +99,7 @@ func CMS(url string, timeout time.Duration, logdir string) (*CMSResult, error) {
 	spin.Stop()
 	log.Info("No CMS detected")
 	log.Complete(0, "detected")
-	return nil, nil
+	return nil, nil //nolint:nilnil // no CMS found is not an error
 }
 
 func detectWordPress(url string, client *http.Client, bodyString string) bool {
@@ -118,7 +125,11 @@ func detectWordPress(url string, client *http.Client, bodyString string) bool {
 	}
 
 	for _, file := range wpFiles {
-		resp, err := client.Get(url + file)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url+file, http.NoBody)
+		if err != nil {
+			continue
+		}
+		resp, err := client.Do(req)
 		if err == nil {
 			found := resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound
 			resp.Body.Close()

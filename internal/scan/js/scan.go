@@ -14,6 +14,7 @@ package js
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"net/http"
 	"slices"
@@ -47,7 +48,12 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 		spin.Stop()
 		return nil, err
 	}
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
+	if err != nil {
+		spin.Stop()
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		spin.Stop()
 		return nil, err
@@ -109,7 +115,12 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 	supabaseResults := make([]supabaseScanResult, 0, len(scripts))
 	for _, script := range scripts {
 		charmlog.Debugf("Scanning %s", script)
-		resp, err := http.Get(script)
+		req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, script, http.NoBody)
+		if err != nil {
+			charmlog.Warnf("Failed to create request: %s", err)
+			continue
+		}
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			charmlog.Warnf("Failed to fetch script: %s", err)
 			continue

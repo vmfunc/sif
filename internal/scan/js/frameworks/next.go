@@ -24,6 +24,7 @@ package frameworks
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -41,7 +42,13 @@ func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
 		return nil, err
 	}
 
-	resp, err := http.Get(scriptUrl)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, scriptUrl, http.NoBody)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err

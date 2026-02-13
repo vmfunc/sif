@@ -13,10 +13,8 @@
 package scan
 
 import (
+	"context"
 	"fmt"
-	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/styles"
 	"io"
 	"net"
 	"net/http"
@@ -24,6 +22,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/logger"
+	"github.com/dropalldatabases/sif/internal/styles"
 )
 
 // SubdomainTakeoverResult represents the outcome of a subdomain takeover vulnerability check.
@@ -114,7 +116,11 @@ func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, t
 }
 
 func checkSubdomainTakeover(subdomain string, client *http.Client) (bool, string) {
-	resp, err := client.Get("http://" + subdomain)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "http://"+subdomain, http.NoBody)
+	if err != nil {
+		return false, ""
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such host") {
 			// Check if CNAME exists

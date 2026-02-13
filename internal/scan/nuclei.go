@@ -37,7 +37,7 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 		Prefix: "nuclei",
 	}).With("url", url)
 
-	templates.Install(nucleilog)
+	_ = templates.Install(nucleilog)
 	pwd, err := os.Getwd()
 	if err != nil {
 		spin.Stop()

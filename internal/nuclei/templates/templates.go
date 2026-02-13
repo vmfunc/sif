@@ -15,6 +15,7 @@ package templates
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -37,7 +38,12 @@ func Install(logger *log.Logger) error {
 
 	logger.Infof("nuclei-templates directory not found. Installing...")
 
-	resp, err := http.Get(fmt.Sprintf(archive, ref))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf(archive, ref), http.NoBody)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -53,7 +59,7 @@ func Install(logger *log.Logger) error {
 
 	for {
 		header, err := data.Next()
-		if errors.Is(io.EOF, err) {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -62,7 +68,7 @@ func Install(logger *log.Logger) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.Mkdir(header.Name, 0755); err != nil {
+			if err := os.Mkdir(header.Name, 0o755); err != nil {
 				return err
 			}
 		case tar.TypeReg:
@@ -77,7 +83,7 @@ func Install(logger *log.Logger) error {
 		}
 	}
 
-	if err = os.Rename(fmt.Sprintf("nuclei-templates-%s", ref), "nuclei-templates"); err != nil {
+	if err := os.Rename(fmt.Sprintf("nuclei-templates-%s", ref), "nuclei-templates"); err != nil {
 		return err
 	}
 
