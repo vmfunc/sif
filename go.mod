@@ -10,7 +10,7 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/projectdiscovery/goflags v0.1.74
 	github.com/projectdiscovery/nuclei/v2 v2.9.14
-	github.com/projectdiscovery/ratelimit v0.0.9
+	github.com/projectdiscovery/ratelimit v0.0.83
 	github.com/projectdiscovery/utils v0.9.0
 	github.com/rocketlaunchr/google-search v1.1.6
 	gopkg.in/yaml.v3 v3.0.1
