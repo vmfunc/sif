@@ -5,6 +5,10 @@ on:
     paths:
       - "**/*.sh"
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   shellcheck:
     name: runner / shellcheck
