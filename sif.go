@@ -169,6 +169,15 @@ func (app *App) Run() error {
 		defer logger.Close()
 	}
 
+	// target expansion - securitytrails discovers new domains before scanning
+	if app.settings.SecurityTrails {
+		expanded := app.expandTargets()
+		if len(expanded) > 0 {
+			output.Info("SecurityTrails discovered %d additional targets", len(expanded))
+			app.targets = append(app.targets, expanded...)
+		}
+	}
+
 	scansRun := make([]string, 0, 16)
 
 	for _, url := range app.targets {
@@ -425,4 +434,39 @@ func (app *App) Run() error {
 	}
 
 	return nil
+}
+
+// expandTargets queries SecurityTrails for each original target and returns
+// newly discovered domains (subdomains + associated) for target expansion
+func (app *App) expandTargets() []string {
+	seen := make(map[string]struct{})
+	for _, t := range app.targets {
+		seen[t] = struct{}{}
+	}
+
+	// snapshot original targets - don't expand discovered ones
+	originals := make([]string, len(app.targets))
+	copy(originals, app.targets)
+
+	var expanded []string
+
+	for _, url := range originals {
+		result, err := scan.SecurityTrails(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("SecurityTrails error for %s: %v", url, err)
+			continue
+		}
+		if result == nil {
+			continue
+		}
+
+		for _, d := range result.DiscoveredURLs() {
+			if _, exists := seen[d]; !exists {
+				seen[d] = struct{}{}
+				expanded = append(expanded, d)
+			}
+		}
+	}
+
+	return expanded
 }

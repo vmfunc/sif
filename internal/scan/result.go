@@ -31,10 +31,11 @@ type ScanResult interface {
 
 // ResultType implementations for pointer result types.
 
-func (r *ShodanResult) ResultType() string { return "shodan" }
-func (r *SQLResult) ResultType() string    { return "sql" }
-func (r *LFIResult) ResultType() string    { return "lfi" }
-func (r *CMSResult) ResultType() string    { return "cms" }
+func (r *ShodanResult) ResultType() string         { return "shodan" }
+func (r *SQLResult) ResultType() string            { return "sql" }
+func (r *LFIResult) ResultType() string            { return "lfi" }
+func (r *CMSResult) ResultType() string            { return "cms" }
+func (r *SecurityTrailsResult) ResultType() string { return "securitytrails" }
 
 // ResultType implementations for slice result types.
 
@@ -50,6 +51,7 @@ var (
 	_ ScanResult = (*SQLResult)(nil)
 	_ ScanResult = (*LFIResult)(nil)
 	_ ScanResult = (*CMSResult)(nil)
+	_ ScanResult = (*SecurityTrailsResult)(nil)
 	_ ScanResult = HeaderResults(nil)
 	_ ScanResult = DirectoryResults(nil)
 	_ ScanResult = CloudStorageResults(nil)

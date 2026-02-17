@@ -115,6 +115,10 @@ makepkg -si
 # shodan host intelligence (requires SHODAN_API_KEY env var)
 ./sif -u https://example.com -shodan
 
+# securitytrails domain discovery (requires SECURITYTRAILS_API_KEY env var)
+# discovers subdomains + associated domains, then scans all of them
+./sif -u https://example.com -securitytrails -headers
+
 # sql recon + lfi scanning
 ./sif -u https://example.com -sql -lfi
 
@@ -148,6 +152,7 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-whois` | whois lookups |
 | `-git` | exposed git repository detection |
 | `-shodan` | shodan lookup (requires SHODAN_API_KEY) |
+| `-securitytrails` | domain discovery + target expansion (requires SECURITYTRAILS_API_KEY) |
 | `-sql` | sql recon |
 | `-lfi` | local file inclusion |
 | `-framework` | framework detection with cve lookup |

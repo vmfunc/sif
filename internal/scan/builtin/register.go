@@ -21,4 +21,5 @@ func Register() {
 	modules.Register(&FrameworksModule{})
 	modules.Register(&NucleiModule{})
 	modules.Register(&WhoisModule{})
+	modules.Register(&SecurityTrailsModule{})
 }

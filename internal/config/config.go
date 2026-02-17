@@ -42,6 +42,7 @@ type Settings struct {
 	CloudStorage      bool
 	SubdomainTakeover bool
 	Shodan            bool
+	SecurityTrails    bool
 	SQL               bool
 	LFI               bool
 	Framework         bool
@@ -92,6 +93,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.CloudStorage, "c3", false, "Enable C3 Misconfiguration Scan"),
 		flagSet.BoolVar(&settings.SubdomainTakeover, "st", false, "Enable Subdomain Takeover Check"),
 		flagSet.BoolVar(&settings.Shodan, "shodan", false, "Enable Shodan lookup (requires SHODAN_API_KEY env var)"),
+		flagSet.BoolVar(&settings.SecurityTrails, "securitytrails", false, "Enable SecurityTrails domain discovery (requires SECURITYTRAILS_API_KEY env var)"),
 		flagSet.BoolVar(&settings.SQL, "sql", false, "Enable SQL reconnaissance (admin panels, error disclosure)"),
 		flagSet.BoolVar(&settings.LFI, "lfi", false, "Enable LFI (Local File Inclusion) reconnaissance"),
 		flagSet.BoolVar(&settings.Framework, "framework", false, "Enable framework detection"),
