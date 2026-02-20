@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: yamllint
-        uses: reviewdog/action-yamllint@v1.19.0
+        uses: reviewdog/action-yamllint@v1.21.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-review
