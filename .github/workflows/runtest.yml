@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: set up go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.24"
       - name: build sif
