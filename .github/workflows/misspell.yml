@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: misspell
-        uses: reviewdog/action-misspell@v1.26.0
+        uses: reviewdog/action-misspell@v1.27.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-review
