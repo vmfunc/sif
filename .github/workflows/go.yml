@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: set up go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.24"
       - name: golangci-lint
@@ -31,11 +31,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ["1.23", "1.24"]
+        go-version: ["1.24"]
     steps:
       - uses: actions/checkout@v6
       - name: set up go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
       - name: build
@@ -43,7 +43,6 @@ jobs:
       - name: run tests with coverage
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
       - name: upload coverage to codecov
-        if: matrix.go-version == '1.24'
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage.out
