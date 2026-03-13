@@ -5,7 +5,7 @@ go 1.24.2
 require (
 	github.com/antchfx/htmlquery v1.3.6
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
-	github.com/charmbracelet/log v0.4.2
+	github.com/charmbracelet/log v1.0.0
 	github.com/likexian/whois v1.15.7
 	github.com/projectdiscovery/goflags v0.1.74
 	github.com/projectdiscovery/nuclei/v3 v3.7.1
@@ -136,7 +136,7 @@ require (
 	github.com/go-git/go-billy/v5 v5.6.2 // indirect
 	github.com/go-git/go-git/v5 v5.16.5 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.11 // indirect
-	github.com/go-logfmt/logfmt v0.6.0 // indirect
+	github.com/go-logfmt/logfmt v0.6.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
