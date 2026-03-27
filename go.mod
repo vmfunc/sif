@@ -9,7 +9,7 @@ require (
 	github.com/likexian/whois v1.15.7
 	github.com/projectdiscovery/goflags v0.1.74
 	github.com/projectdiscovery/nuclei/v3 v3.7.1
-	github.com/projectdiscovery/utils v0.9.0
+	github.com/projectdiscovery/utils v0.10.0
 	github.com/rocketlaunchr/google-search v1.1.6
 	gopkg.in/yaml.v3 v3.0.1
 )
