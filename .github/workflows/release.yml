@@ -146,7 +146,7 @@ jobs:
             return log || 'initial release';
 
       - name: create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: sif v${{ env.VERSION }}
           body: |
