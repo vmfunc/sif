@@ -1,10 +1,16 @@
+---
+version: "2"
+
+run:
+  timeout: 5m
+  issues-exit-code: 1
+
 linters:
   enable:
     - errcheck      # check error returns
     - govet         # suspicious constructs
-    - staticcheck   # advanced static analysis
+    - staticcheck   # advanced static analysis (absorbs gosimple in v2)
     - unused        # unused code
-    - gosimple      # simplifications
     - ineffassign   # useless assignments
     - misspell      # spelling mistakes
     - gocritic      # opinionated lints
@@ -18,49 +24,90 @@ linters:
     - wastedassign  # assignments to variables never read
     - usetesting    # os.Setenv in tests instead of t.Setenv, etc.
 
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment  # too many structs to reorder, risks breaking serialization
-      - shadow          # common Go pattern, too noisy
-      - unusedwrite     # false positives on test data structs
-  errcheck:
-    check-blank: false
-    exclude-functions:
-      - github.com/dropalldatabases/sif/internal/logger.Write  # log writes are best-effort
-  revive:
-    rules:
-      - name: exported
-        disabled: true  # stuttering names (scan.ScanResult) require breaking API changes
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - commentedOutCode   # too opinionated for a project with TODO comments
-      - paramTypeCombine   # style-only, not worth churn
-      - unnamedResult      # style-only
-      - unnecessaryDefer   # common pattern in tests
-      - nestingReduce      # inverting conditions in scan logic hurts readability
-  gosec:
-    excludes:
-      - G104  # errcheck covers this
-      - G107  # pentesting tool -- variable URLs are the whole point
-      - G110  # nuclei template decompression, acceptable context
-      - G304  # sif reads user-supplied wordlist paths -- intentional
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        # too many structs to reorder, risks breaking serialization
+        - fieldalignment
+        - shadow          # common Go pattern, too noisy
+        - unusedwrite     # false positives on test data structs
+    errcheck:
+      check-blank: false
+      exclude-functions:
+        # log writes are best-effort
+        - github.com/dropalldatabases/sif/internal/logger.Write
+        # Close on io.Closer is idiomatic best-effort
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (*net/http.Response).Body.Close
+        # fmt.Fprint* returns are rarely actionable
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+    staticcheck:
+      # QF1003/QF1012 are v2 quickfix suggestions, not bugs.
+      # ST1000/ST1003 were the stylecheck linter in v1
+      # (not previously enabled); skipping to match prior parity.
+      checks:
+        - all
+        - -QF1003
+        - -QF1012
+        - -ST1000
+        - -ST1003
+    revive:
+      rules:
+        # stuttering names (scan.ScanResult) need breaking API changes
+        - name: exported
+          disabled: true
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - commentedOutCode   # too opinionated for a project with TODOs
+        - paramTypeCombine   # style-only, not worth churn
+        - unnamedResult      # style-only
+        - unnecessaryDefer   # common pattern in tests
+        # inverting conditions in scan logic hurts readability
+        - nestingReduce
+        - importShadow       # nuclei output pkg alias conflict, intentional
+        - rangeValCopy       # nuclei module iterates value types, fine here
+    gosec:
+      excludes:
+        - G104  # errcheck covers this
+        - G107  # pentesting tool -- variable URLs are the whole point
+        - G110  # nuclei template decompression, acceptable context
+        - G301  # log/template dirs need 0755 for common tooling
+        - G302  # log files intentionally world-readable for tailing
+        - G304  # sif reads user-supplied wordlist paths -- intentional
 
-run:
-  timeout: 5m
-  issues-exit-code: 1
+  exclusions:
+    rules:
+      # test files get some slack
+      - path: _test\.go
+        linters:
+          - errcheck
+          - noctx
+      # net.* calls predate context plumbing; refactor tracked separately
+      - path: internal/scan/(ports|shodan|subdomaintakeover)\.go
+        linters:
+          - noctx
+      # Close on concrete types errcheck can't match to (io.Closer).Close
+      - path: internal/nuclei/templates/templates\.go
+        text: "tarball.Close"
+        linters:
+          - errcheck
+      - path: internal/scan/ports\.go
+        text: "tcp.Close"
+        linters:
+          - errcheck
+      - path: sif\.go
+        text: "logger.Close"
+        linters:
+          - errcheck
 
 issues:
   max-issues-per-linter: 50
   max-same-issues: 50
-  exclude-rules:
-    # test files get some slack
-    - path: _test\.go
-      linters:
-        - errcheck
-        - noctx

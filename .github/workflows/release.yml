@@ -23,7 +23,7 @@ jobs:
       - name: set up go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
 
       - name: extract version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
