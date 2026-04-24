@@ -1,3 +1,4 @@
+---
 version: "2"
 
 run:
@@ -27,33 +28,55 @@ linters:
     govet:
       enable-all: true
       disable:
-        - fieldalignment  # too many structs to reorder, risks breaking serialization
+        # too many structs to reorder, risks breaking serialization
+        - fieldalignment
         - shadow          # common Go pattern, too noisy
         - unusedwrite     # false positives on test data structs
     errcheck:
       check-blank: false
       exclude-functions:
-        - github.com/dropalldatabases/sif/internal/logger.Write  # log writes are best-effort
+        # log writes are best-effort
+        - github.com/dropalldatabases/sif/internal/logger.Write
+        # Close on io.Closer is idiomatic best-effort
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (*net/http.Response).Body.Close
+        # fmt.Fprint* returns are rarely actionable
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+    staticcheck:
+      # disable QF (quickfix) category -- stylistic, not bugs
+      checks:
+        - all
+        - -QF1003
+        - -QF1012
     revive:
       rules:
+        # stuttering names (scan.ScanResult) need breaking API changes
         - name: exported
-          disabled: true  # stuttering names (scan.ScanResult) require breaking API changes
+          disabled: true
     gocritic:
       enabled-tags:
         - diagnostic
         - style
         - performance
       disabled-checks:
-        - commentedOutCode   # too opinionated for a project with TODO comments
+        - commentedOutCode   # too opinionated for a project with TODOs
         - paramTypeCombine   # style-only, not worth churn
         - unnamedResult      # style-only
         - unnecessaryDefer   # common pattern in tests
-        - nestingReduce      # inverting conditions in scan logic hurts readability
+        # inverting conditions in scan logic hurts readability
+        - nestingReduce
+        - importShadow       # nuclei output pkg alias conflict, intentional
+        - rangeValCopy       # nuclei module iterates value types, fine here
     gosec:
       excludes:
         - G104  # errcheck covers this
         - G107  # pentesting tool -- variable URLs are the whole point
         - G110  # nuclei template decompression, acceptable context
+        - G301  # log/template dirs need 0755 for common tooling
+        - G302  # log files intentionally world-readable for tailing
         - G304  # sif reads user-supplied wordlist paths -- intentional
 
   exclusions:
@@ -62,6 +85,10 @@ linters:
       - path: _test\.go
         linters:
           - errcheck
+          - noctx
+      # net.* calls predate context plumbing; refactor tracked separately
+      - path: internal/scan/(ports|shodan|subdomaintakeover)\.go
+        linters:
           - noctx
 
 issues:
