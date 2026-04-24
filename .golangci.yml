@@ -46,11 +46,15 @@ linters:
         - fmt.Fprintf
         - fmt.Fprintln
     staticcheck:
-      # disable QF (quickfix) category -- stylistic, not bugs
+      # QF1003/QF1012 are v2 quickfix suggestions, not bugs.
+      # ST1000/ST1003 were the stylecheck linter in v1
+      # (not previously enabled); skipping to match prior parity.
       checks:
         - all
         - -QF1003
         - -QF1012
+        - -ST1000
+        - -ST1003
     revive:
       rules:
         # stuttering names (scan.ScanResult) need breaking API changes
@@ -90,6 +94,19 @@ linters:
       - path: internal/scan/(ports|shodan|subdomaintakeover)\.go
         linters:
           - noctx
+      # Close on concrete types errcheck can't match to (io.Closer).Close
+      - path: internal/nuclei/templates/templates\.go
+        text: "tarball.Close"
+        linters:
+          - errcheck
+      - path: internal/scan/ports\.go
+        text: "tcp.Close"
+        linters:
+          - errcheck
+      - path: sif\.go
+        text: "logger.Close"
+        linters:
+          - errcheck
 
 issues:
   max-issues-per-linter: 50
