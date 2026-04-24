@@ -21,17 +21,17 @@ jobs:
       - name: set up go
         uses: actions/setup-go@v6
         with:
-          go-version: "1.24"
+          go-version: "1.25"
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
+          version: v2.11.4
 
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ["1.24"]
+        go-version: ["1.25"]
     steps:
       - uses: actions/checkout@v6
       - name: set up go
