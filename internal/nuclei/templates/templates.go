@@ -53,7 +53,11 @@ func Install(logger *log.Logger) error {
 	if err != nil {
 		return err
 	}
-	defer tarball.Close()
+	defer func() {
+		if cerr := tarball.Close(); cerr != nil {
+			logger.Warnf("closing gzip reader: %v", cerr)
+		}
+	}()
 
 	data := tar.NewReader(tarball)
 
@@ -68,7 +72,7 @@ func Install(logger *log.Logger) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.Mkdir(header.Name, 0o755); err != nil {
+			if err := os.Mkdir(header.Name, 0o750); err != nil {
 				return err
 			}
 		case tar.TypeReg:

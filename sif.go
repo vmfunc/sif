@@ -166,7 +166,11 @@ func (app *App) Run() error {
 		if err := logger.Init(app.settings.LogDir); err != nil {
 			return err
 		}
-		defer logger.Close()
+		defer func() {
+			if err := logger.Close(); err != nil {
+				log.Errorf("closing logger: %v", err)
+			}
+		}()
 	}
 
 	// target expansion - securitytrails discovers new domains before scanning
@@ -253,7 +257,7 @@ func (app *App) Run() error {
 		}
 
 		if app.settings.Ports != "none" {
-			result, err := scan.Ports(app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.Ports(context.Background(), app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 			if err != nil {
 				log.Errorf("Error while running port scan: %s", err)
 			} else {

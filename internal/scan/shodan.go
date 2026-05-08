@@ -160,20 +160,20 @@ func resolveHostname(hostname string) (string, error) {
 		return hostname, nil
 	}
 
-	ips, err := net.LookupIP(hostname)
+	addrs, err := net.DefaultResolver.LookupIPAddr(context.TODO(), hostname)
 	if err != nil {
 		return "", err
 	}
 
 	// prefer IPv4
-	for _, ip := range ips {
-		if ip.To4() != nil {
-			return ip.String(), nil
+	for _, addr := range addrs {
+		if addr.IP.To4() != nil {
+			return addr.IP.String(), nil
 		}
 	}
 
-	if len(ips) > 0 {
-		return ips[0].String(), nil
+	if len(addrs) > 0 {
+		return addrs[0].IP.String(), nil
 	}
 
 	return "", fmt.Errorf("no IP addresses found for %s", hostname)

@@ -51,7 +51,8 @@ func (m *NucleiModule) Execute(ctx context.Context, target string, opts modules.
 	}
 
 	// Process nuclei results into module findings
-	for _, event := range nucleiResults {
+	for i := range nucleiResults {
+		event := &nucleiResults[i]
 		severity := "info"
 
 		switch event.Info.SeverityHolder.Severity.String() {

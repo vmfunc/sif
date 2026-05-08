@@ -124,7 +124,7 @@ func checkSubdomainTakeover(subdomain string, client *http.Client) (bool, string
 	if err != nil {
 		if strings.Contains(err.Error(), "no such host") {
 			// Check if CNAME exists
-			cname, err := net.LookupCNAME(subdomain)
+			cname, err := net.DefaultResolver.LookupCNAME(context.TODO(), subdomain)
 			if err == nil && cname != "" {
 				return true, "Dangling CNAME"
 			}
