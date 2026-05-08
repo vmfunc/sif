@@ -14,22 +14,22 @@ package format
 
 import (
 	"github.com/dropalldatabases/sif/internal/styles"
-	"github.com/projectdiscovery/nuclei/v3/pkg/output"
+	nucleiout "github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
 
-func FormatLine(event *output.ResultEvent) string {
-	output := event.TemplateID
+func FormatLine(event *nucleiout.ResultEvent) string {
+	line := event.TemplateID
 
 	if event.MatcherName != "" {
-		output += ":" + styles.Highlight.Render(event.MatcherName)
+		line += ":" + styles.Highlight.Render(event.MatcherName)
 	} else if event.ExtractorName != "" {
-		output += ":" + styles.Highlight.Render(event.ExtractorName)
+		line += ":" + styles.Highlight.Render(event.ExtractorName)
 	}
 
-	output += " [" + event.Type + "]"
-	output += " [" + formatSeverity(event.Info.SeverityHolder.Severity.String()) + "]"
+	line += " [" + event.Type + "]"
+	line += " [" + formatSeverity(event.Info.SeverityHolder.Severity.String()) + "]"
 
-	return output
+	return line
 }
 
 func formatSeverity(severity string) string {
