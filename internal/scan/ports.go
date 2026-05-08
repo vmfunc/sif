@@ -30,7 +30,7 @@ import (
 
 const commonPorts = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/ports/top-ports.txt"
 
-func Ports(scope string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
+func Ports(ctx context.Context, scope string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
 	log := output.Module("PORTS")
 	log.Start()
 
@@ -89,7 +89,8 @@ func Ports(scope string, url string, timeout time.Duration, threads int, logdir 
 				progress.Increment(strconv.Itoa(port))
 
 				charmlog.Debugf("Looking up: %d", port)
-				tcp, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", sanitizedURL, port), timeout)
+				addr := fmt.Sprintf("%s:%d", sanitizedURL, port)
+				tcp, err := (&net.Dialer{Timeout: timeout}).DialContext(ctx, "tcp", addr)
 				if err != nil {
 					charmlog.Debugf("Error %d: %v", port, err)
 				} else {
@@ -100,7 +101,7 @@ func Ports(scope string, url string, timeout time.Duration, threads int, logdir 
 					mu.Lock()
 					openPorts = append(openPorts, strconv.Itoa(port))
 					mu.Unlock()
-					tcp.Close()
+					_ = tcp.Close()
 				}
 			}
 		}(thread)
