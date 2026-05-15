@@ -18,7 +18,7 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@v6
       - name: dependency review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
         continue-on-error: ${{ github.event_name == 'push' }}
       - name: check dependency review outcome
         if: github.event_name == 'push' && failure()
