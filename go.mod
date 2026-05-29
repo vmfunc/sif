@@ -9,7 +9,7 @@ require (
 	github.com/likexian/whois v1.15.7
 	github.com/projectdiscovery/goflags v0.1.74
 	github.com/projectdiscovery/nuclei/v3 v3.8.0
-	github.com/projectdiscovery/utils v0.10.1
+	github.com/projectdiscovery/utils v0.11.1
 	github.com/rocketlaunchr/google-search v1.1.6
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -267,7 +267,7 @@ require (
 	github.com/projectdiscovery/cdncheck v1.2.31 // indirect
 	github.com/projectdiscovery/clistats v0.1.1 // indirect
 	github.com/projectdiscovery/dsl v0.8.14 // indirect
-	github.com/projectdiscovery/fastdialer v0.5.6 // indirect
+	github.com/projectdiscovery/fastdialer v0.5.7 // indirect
 	github.com/projectdiscovery/fasttemplate v0.0.2 // indirect
 	github.com/projectdiscovery/freeport v0.0.7 // indirect
 	github.com/projectdiscovery/gcache v0.0.0-20241015120333-12546c6e3f4c // indirect
@@ -282,12 +282,12 @@ require (
 	github.com/projectdiscovery/machineid v0.0.0-20250715113114-c77eb3567582 // indirect
 	github.com/projectdiscovery/mapcidr v1.1.97 // indirect
 	github.com/projectdiscovery/n3iwf v0.0.0-20230523120440-b8cd232ff1f5 // indirect
-	github.com/projectdiscovery/networkpolicy v0.1.36 // indirect
+	github.com/projectdiscovery/networkpolicy v0.1.38 // indirect
 	github.com/projectdiscovery/ratelimit v0.0.85 // indirect
 	github.com/projectdiscovery/rawhttp v0.1.90 // indirect
 	github.com/projectdiscovery/rdap v0.9.1-0.20221108103045-9865884d1917 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.114 // indirect
-	github.com/projectdiscovery/retryablehttp-go v1.3.8 // indirect
+	github.com/projectdiscovery/retryablehttp-go v1.3.11 // indirect
 	github.com/projectdiscovery/sarif v0.0.1 // indirect
 	github.com/projectdiscovery/tlsx v1.2.2 // indirect
 	github.com/projectdiscovery/uncover v1.2.0 // indirect
