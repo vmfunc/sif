@@ -11,7 +11,7 @@
 [![nixpkgs](https://img.shields.io/badge/nixpkgs-sif-5277C3?style=flat-square&logo=nixos&logoColor=white)](https://search.nixos.org/packages?query=sif)
 [![homebrew](https://img.shields.io/badge/homebrew-tap-FBB040?style=flat-square&logo=homebrew&logoColor=white)](https://github.com/vmfunc/homebrew-sif)
 [![apt](https://img.shields.io/badge/apt-cloudsmith-2A5ADF?style=flat-square&logo=debian&logoColor=white)](https://cloudsmith.io/~sif/repos/deb/packages/)
-[![discord](https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/sifcli)
+[![discord](https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/Yksy9J2BvE)
 
 **[install](#install) · [usage](#usage) · [modules](#modules) · [docs](docs/) · [contribute](#contribute)**
 
