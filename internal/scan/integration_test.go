@@ -20,6 +20,7 @@ package scan
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -40,6 +41,9 @@ func newVulnApp() *httptest.Server {
 	})
 	mux.HandleFunc("/directory-list-2.3-small.txt", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("admin\nlogin\nnope\n"))
+	})
+	mux.HandleFunc("/subdomains-100.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("dev\nstaging\n"))
 	})
 
 	// an exposed git repo: HEAD is a real find, config is html so it's excluded
@@ -207,6 +211,164 @@ func TestIntegrationPorts(t *testing.T) {
 	if !found {
 		t.Errorf("expected open port %d in %v", port, open)
 	}
+}
+
+func TestIntegrationShodan(t *testing.T) {
+	// a local server stands in for api.shodan.io; example.com resolves to a real
+	// IP but the lookup never leaves the box.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("key") != "test-key" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		json.NewEncoder(w).Encode(shodanHostResponse{
+			IP:        "93.184.216.34",
+			Hostnames: []string{"example.com"},
+			Org:       "EDGECAST",
+			Ports:     []int{80, 443},
+			Data: []shodanData{
+				{Port: 80, Transport: "tcp", Product: "nginx", Version: "1.18.0"},
+			},
+		})
+	}))
+	defer srv.Close()
+	orig := shodanBaseURL
+	shodanBaseURL = srv.URL
+	defer func() { shodanBaseURL = orig }()
+
+	t.Setenv("SHODAN_API_KEY", "test-key")
+
+	result, err := Shodan("https://example.com", 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("Shodan: %v", err)
+	}
+	if result == nil || result.IP != "93.184.216.34" {
+		t.Fatalf("expected parsed shodan result, got %+v", result)
+	}
+	if len(result.Services) != 1 || result.Services[0].Product != "nginx" {
+		t.Errorf("expected one nginx service, got %+v", result.Services)
+	}
+}
+
+func TestIntegrationSecurityTrails(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("APIKEY") != "test-key" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/subdomains"):
+			json.NewEncoder(w).Encode(stSubdomainsResponse{Subdomains: []string{"www", "api"}})
+		case strings.HasSuffix(r.URL.Path, "/associated"):
+			json.NewEncoder(w).Encode(stAssociatedResponse{Records: []stAssociatedRecord{{Hostname: "example.org"}}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	orig := securityTrailsBaseURL
+	securityTrailsBaseURL = srv.URL
+	defer func() { securityTrailsBaseURL = orig }()
+
+	t.Setenv("SECURITYTRAILS_API_KEY", "test-key")
+
+	result, err := SecurityTrails("https://example.com", 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("SecurityTrails: %v", err)
+	}
+	if len(result.Subdomains) != 2 {
+		t.Errorf("expected 2 subdomains, got %v", result.Subdomains)
+	}
+	if len(result.AssociatedDomains) != 1 || result.AssociatedDomains[0] != "example.org" {
+		t.Errorf("expected example.org associated, got %v", result.AssociatedDomains)
+	}
+
+	urls := result.DiscoveredURLs()
+	if !contains(urls, "https://www.example.com") || !contains(urls, "https://example.org") {
+		t.Errorf("expected discovered urls to expand subs and associated, got %v", urls)
+	}
+}
+
+func TestIntegrationCloudStorage(t *testing.T) {
+	// the fixture returns 200 only for the planted bucket, so any candidate that
+	// matches it is reported public.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/example" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+	orig := s3EndpointFmt
+	s3EndpointFmt = srv.URL + "/%s"
+	defer func() { s3EndpointFmt = orig }()
+
+	results, err := CloudStorage("https://example.com", 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("CloudStorage: %v", err)
+	}
+
+	var public bool
+	for _, r := range results {
+		if r.BucketName == "example" && r.IsPublic {
+			public = true
+		}
+	}
+	if !public {
+		t.Errorf("expected the example bucket to be flagged public, got %+v", results)
+	}
+}
+
+func TestIntegrationDnslist(t *testing.T) {
+	// the probe server answers any host routed to it; dnsTransport pins every
+	// dial here so no real DNS is touched.
+	probe := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer probe.Close()
+	probeAddr := strings.TrimPrefix(probe.URL, "http://")
+
+	list := newVulnApp()
+	defer list.Close()
+	origURL := dnsURL
+	dnsURL = list.URL + "/"
+	defer func() { dnsURL = origURL }()
+
+	origTr := dnsTransport
+	dnsTransport = &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, probeAddr)
+		},
+	}
+	defer func() { dnsTransport = origTr }()
+
+	found, err := Dnslist("small", "http://example.com", 5*time.Second, 2, "")
+	if err != nil {
+		t.Fatalf("Dnslist: %v", err)
+	}
+	// http probes land on the plain-http probe server; https fails the tls
+	// handshake and is dropped, which is fine - the planted sub still shows up.
+	if !hasSuffixIn(sliceSet(found), "dev.example.com") {
+		t.Errorf("expected dev.example.com among findings, got %v", found)
+	}
+}
+
+func contains(s []string, v string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == v {
+			return true
+		}
+	}
+	return false
+}
+
+func sliceSet(s []string) map[string]bool {
+	set := make(map[string]bool, len(s))
+	for i := 0; i < len(s); i++ {
+		set[s[i]] = true
+	}
+	return set
 }
 
 func hasSuffixIn(set map[string]bool, suffix string) bool {

@@ -28,7 +28,8 @@ import (
 	"github.com/dropalldatabases/sif/internal/output"
 )
 
-const shodanBaseURL = "https://api.shodan.io"
+// shodanBaseURL is a var so integration tests can repoint it at a fixture.
+var shodanBaseURL = "https://api.shodan.io"
 
 // ShodanResult represents the results from a Shodan host lookup
 type ShodanResult struct {

@@ -27,7 +27,8 @@ import (
 	"github.com/dropalldatabases/sif/internal/output"
 )
 
-const securityTrailsBaseURL = "https://api.securitytrails.com/v1"
+// securityTrailsBaseURL is a var so integration tests can repoint it at a fixture.
+var securityTrailsBaseURL = "https://api.securitytrails.com/v1"
 
 // SecurityTrailsResult holds discovered domains from SecurityTrails API
 type SecurityTrailsResult struct {
