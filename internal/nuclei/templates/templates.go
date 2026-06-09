@@ -21,6 +21,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/log"
 )
@@ -61,6 +63,12 @@ func Install(logger *log.Logger) error {
 
 	data := tar.NewReader(tarball)
 
+	dest, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	cleanDest := filepath.Clean(dest)
+
 	for {
 		header, err := data.Next()
 		if errors.Is(err, io.EOF) {
@@ -70,17 +78,25 @@ func Install(logger *log.Logger) error {
 			return err
 		}
 
+		// guard against path traversal ("Zip Slip"): the resolved path must
+		// stay within the extraction directory before any filesystem op.
+		target := filepath.Join(cleanDest, header.Name)
+		if !strings.HasPrefix(target, cleanDest+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid archive entry %q: escapes extraction directory", header.Name)
+		}
+
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.Mkdir(header.Name, 0o750); err != nil {
+			if err := os.Mkdir(target, 0o750); err != nil {
 				return err
 			}
 		case tar.TypeReg:
-			file, err := os.Create(header.Name)
+			file, err := os.Create(target)
 			if err != nil {
 				return err
 			}
 			if _, err := io.Copy(file, data); err != nil {
+				file.Close()
 				return err
 			}
 			file.Close()

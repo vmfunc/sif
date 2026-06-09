@@ -78,6 +78,8 @@ linters:
         - G107  # pentesting tool -- variable URLs are the whole point
         - G110  # nuclei template decompression, acceptable context
         - G304  # sif reads user-supplied wordlist paths -- intentional
+        - G305  # tar extraction is traversal-guarded (HasPrefix on the
+                # cleaned target); gosec flags filepath.Join regardless
 
   exclusions:
     rules:
