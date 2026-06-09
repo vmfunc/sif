@@ -135,7 +135,7 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 		content := string(bodyBytes)
 
 		charmlog.Debugf("Running supabase scanner on %s", script)
-		scriptSupabaseResults, err := ScanSupabase(content, script)
+		scriptSupabaseResults, err := ScanSupabase(content, script, timeout)
 
 		if err != nil {
 			charmlog.Errorf("Error while scanning supabase: %s", err)
