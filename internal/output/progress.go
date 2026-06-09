@@ -28,12 +28,13 @@ const (
 
 // Progress displays a progress bar for operations with known counts
 type Progress struct {
-	total    int64
-	current  int64
-	message  string
-	lastItem string
-	mu       sync.Mutex
-	paused   bool
+	total     int64
+	current   int64
+	message   string
+	lastItem  string
+	mu        sync.Mutex
+	paused    bool
+	lastShown int // last printed milestone bucket in non-tty mode
 }
 
 // NewProgress creates a new progress bar
@@ -110,8 +111,30 @@ func (p *Progress) render() {
 		}
 		percent := int(current * 100 / total)
 
-		// Print at 0%, 25%, 50%, 75%, 100%
-		if current == 1 || percent == 25 || percent == 50 || percent == 75 || current == total {
+		// map current to a milestone bucket (0=none,1..5). concurrent workers
+		// hammer the same bucket, so only print when the bucket advances.
+		bucket := 0
+		switch {
+		case current >= total:
+			bucket = 5
+		case percent >= 75:
+			bucket = 4
+		case percent >= 50:
+			bucket = 3
+		case percent >= 25:
+			bucket = 2
+		case current >= 1:
+			bucket = 1
+		}
+
+		p.mu.Lock()
+		advanced := bucket > p.lastShown
+		if advanced {
+			p.lastShown = bucket
+		}
+		p.mu.Unlock()
+
+		if advanced {
 			fmt.Printf("    [%d%%] %d/%d\n", percent, current, total)
 		}
 		return
