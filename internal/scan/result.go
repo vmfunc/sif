@@ -24,7 +24,6 @@ type (
 )
 
 // ScanResult is the interface that all scan result types implement.
-// This enables type-safe handling of heterogeneous scan results.
 type ScanResult interface {
 	// ResultType returns the unique identifier for this result type.
 	ResultType() string

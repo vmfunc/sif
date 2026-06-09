@@ -144,7 +144,7 @@ func doSupabaseRequest(projectId, path, apikey string, auth *string) ([]byte, *h
 
 func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) {
 	supabaselog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "🚧 JavaScript > Supabase ⚡️",
+		Prefix: "JavaScript > Supabase",
 	}).With("url", jsUrl)
 
 	var results = []supabaseScanResult{}
