@@ -1,0 +1,164 @@
+.\" man page for sif - the blazing-fast pentesting suite
+.TH sif 1 "2026-06-08" "sif" "sif manual"
+.SH NAME
+sif \- blazing-fast pentesting suite
+.SH SYNOPSIS
+.B sif
+.B \-u
+.I url
+.RI [ scans ]
+.RI [ options ]
+.br
+.B sif
+.B \-f
+.I file
+.RI [ scans ]
+.RI [ options ]
+.br
+.B sif
+.RB { patchnote | version }
+.SH DESCRIPTION
+.B sif
+is a modular recon and exploitation suite. it runs multiple scan types
+concurrently against one or more targets, and can be extended with yaml
+modules. targets must include a
+.B http://
+or
+.B https://
+scheme.
+.SH TARGETS
+.TP
+.BR \-u ", " \-\-urls " \fIlist\fR"
+comma\-separated list of urls to scan.
+.TP
+.BR \-f ", " \-\-file " \fIpath\fR"
+file with one url per line.
+.SH SCANS
+.TP
+.BR \-dirlist " \fIsize\fR"
+directory and file fuzzing (small/medium/large).
+.TP
+.BR \-dnslist " \fIsize\fR"
+subdomain enumeration (small/medium/large).
+.TP
+.BR \-ports " \fIscope\fR"
+port scanning (common/full).
+.TP
+.B \-nuclei
+vulnerability scanning with nuclei templates.
+.TP
+.B \-dork
+automated google dorking.
+.TP
+.B \-js
+javascript analysis.
+.TP
+.B \-c3
+cloud storage misconfiguration scan.
+.TP
+.B \-headers
+dump the target's response headers.
+.TP
+.BR \-sh ", " \-\-security\-headers
+flag missing or weak security headers and headers that leak server internals.
+.TP
+.B \-st
+subdomain takeover detection (requires \fB\-dnslist\fR).
+.TP
+.B \-cms
+cms detection.
+.TP
+.B \-whois
+whois lookup.
+.TP
+.B \-git
+exposed git repository detection.
+.TP
+.B \-shodan
+shodan host lookup (requires \fBSHODAN_API_KEY\fR).
+.TP
+.B \-securitytrails
+domain discovery and target expansion (requires \fBSECURITYTRAILS_API_KEY\fR).
+.TP
+.B \-sql
+sql reconnaissance (admin panels, error disclosure).
+.TP
+.B \-lfi
+local file inclusion reconnaissance.
+.TP
+.B \-framework
+framework detection with cve lookup.
+.TP
+.B \-noscan
+skip the base url scan (robots.txt, etc).
+.SH OPTIONS
+.TP
+.BR \-d ", " \-\-debug
+enable debug logging.
+.TP
+.BR \-t ", " \-\-timeout " \fIduration\fR"
+per\-request timeout (default 10s).
+.TP
+.BR \-l ", " \-\-log " \fIdir\fR"
+directory to write logs to.
+.TP
+.BR \-\-threads " \fIn\fR"
+number of concurrent workers (default 10).
+.TP
+.BR \-\-template " \fIname\fR"
+sif runtime template to use.
+.TP
+.B \-api
+emit json results and suppress the interactive output.
+.SH MODULES
+.TP
+.BR \-m ", " \-\-modules " \fIids\fR"
+comma\-separated module ids to run.
+.TP
+.BR \-mt ", " \-\-module\-tags " \fItags\fR"
+run modules matching these tags.
+.TP
+.BR \-am ", " \-\-all\-modules
+run all loaded modules.
+.TP
+.BR \-lm ", " \-\-list\-modules
+list available modules and exit.
+.SH COMMANDS
+.TP
+.B sif patchnote
+fetch the latest github release and print its notes. also available as
+.BR \-pn .
+.TP
+.B sif version
+print the sif version and exit.
+.SH ENVIRONMENT
+.TP
+.B SHODAN_API_KEY
+api key used by \fB\-shodan\fR.
+.TP
+.B SECURITYTRAILS_API_KEY
+api key used by \fB\-securitytrails\fR.
+.TP
+.B SIF_NO_PATCHNOTES
+set to any value to suppress the once\-per\-version patch note shown at startup.
+.SH FILES
+.TP
+.I ~/.config/sif/modules/
+user\-defined yaml modules.
+.TP
+.I ~/.config/sif/seen_version
+records the last release whose notes were shown at startup.
+.SH EXAMPLES
+.TP
+run a few scans against a host:
+.B sif \-u https://example.com \-headers \-sh \-cms \-framework
+.TP
+fuzz directories and enumerate subdomains:
+.B sif \-u https://example.com \-dirlist medium \-dnslist medium
+.TP
+scan a list of targets and write logs:
+.B sif \-f targets.txt \-headers \-l ./logs
+.SH SEE ALSO
+project page: https://github.com/vmfunc/sif
+.SH AUTHORS
+vmfunc, xyzeva, and the lunchcat contributors.
