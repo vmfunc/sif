@@ -74,6 +74,7 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 	}
 
 	var wg sync.WaitGroup
+	var mu sync.Mutex
 	wg.Add(threads)
 
 	foundUrls := []string{}
@@ -106,7 +107,9 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 						logger.Write(sanitizedURL, logdir, strconv.Itoa(resp.StatusCode)+" git found at ["+repourl+"]\n")
 					}
 
+					mu.Lock()
 					foundUrls = append(foundUrls, resp.Request.URL.String())
+					mu.Unlock()
 				}
 				resp.Body.Close()
 			}

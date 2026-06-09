@@ -93,6 +93,7 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 
 	// util.InitProgressBar()
 	var wg sync.WaitGroup
+	var mu sync.Mutex
 	wg.Add(threads)
 
 	dorkResults := []DorkResult{}
@@ -124,7 +125,9 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 						Count: len(results),
 					}
 
+					mu.Lock()
 					dorkResults = append(dorkResults, result)
+					mu.Unlock()
 				}
 			}
 		}(thread)

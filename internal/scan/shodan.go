@@ -73,7 +73,6 @@ type shodanHostResponse struct {
 }
 
 // shodanMetadata represents the _shodan field in Shodan API responses.
-// This provides type safety instead of using map[string]interface{}.
 type shodanMetadata struct {
 	Module  string `json:"module"`
 	Crawler string `json:"crawler,omitempty"`

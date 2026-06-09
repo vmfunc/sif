@@ -36,7 +36,7 @@ download `sif-windows-amd64.exe` from releases and add to your PATH.
 
 ## from source
 
-requires go 1.23+
+requires go 1.25+
 
 ```bash
 git clone https://github.com/dropalldatabases/sif.git

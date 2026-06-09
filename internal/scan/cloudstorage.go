@@ -31,7 +31,7 @@ type CloudStorageResult struct {
 }
 
 func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStorageResult, error) {
-	fmt.Println(styles.Separator.Render("☁️ Starting " + styles.Status.Render("Cloud Storage Misconfiguration Scan") + "..."))
+	fmt.Println(styles.Separator.Render("Starting " + styles.Status.Render("Cloud Storage Misconfiguration Scan") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
@@ -43,7 +43,7 @@ func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStor
 	}
 
 	cloudlog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "C3 ☁️",
+		Prefix: "C3",
 	}).With("url", url)
 
 	client := &http.Client{
@@ -81,8 +81,7 @@ func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStor
 }
 
 func extractPotentialBuckets(url string) []string {
-	// This is a simple implementation.
-	// TODO: add more cases
+	// TODO: handle non-adjacent label combos and strip the tld
 	parts := strings.Split(url, ".")
 	var buckets []string
 	for i, part := range parts {

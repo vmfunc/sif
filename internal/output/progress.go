@@ -105,6 +105,9 @@ func (p *Progress) render() {
 	if !IsTTY {
 		current := atomic.LoadInt64(&p.current)
 		total := p.total
+		if total <= 0 {
+			return
+		}
 		percent := int(current * 100 / total)
 
 		// Print at 0%, 25%, 50%, 75%, 100%

@@ -95,10 +95,18 @@ scopes: `common` (top ports), `full` (all ports)
 
 ### http headers
 
-`-headers` - analyze security headers
+`-headers` - dump the target's response headers
 
 ```bash
 ./sif -u https://example.com -headers
+```
+
+### security headers
+
+`-sh` - flag missing/weak security headers (hsts, csp, x-frame-options, ...) and headers that leak server internals
+
+```bash
+./sif -u https://example.com -sh
 ```
 
 ### cloud storage

@@ -36,20 +36,10 @@ type SubdomainTakeoverResult struct {
 	Service    string `json:"service,omitempty"`
 }
 
-// SubdomainTakeover checks for potential subdomain takeover vulnerabilities.
-//
-// Parameters:
-//   - url: the target URL to scan
-//   - dnsResults: a slice of subdomains to check (typically from Dnslist function)
-//   - timeout: maximum duration for each subdomain check
-//   - threads: number of concurrent threads to use
-//   - logdir: directory to store log files (empty string for no logging)
-//
-// Returns:
-//   - []SubdomainTakeoverResult: a slice of results for each checked subdomain
-//   - error: any error encountered during the scan
+// SubdomainTakeover checks dnsResults for dangling subdomains pointing at
+// unclaimed third-party services.
 func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, threads int, logdir string) ([]SubdomainTakeoverResult, error) {
-	fmt.Println(styles.Separator.Render("🔍 Starting " + styles.Status.Render("Subdomain Takeover Vulnerability Check") + "..."))
+	fmt.Println(styles.Separator.Render("Starting " + styles.Status.Render("Subdomain Takeover Vulnerability Check") + "..."))
 
 	sanitizedURL := strings.Split(url, "://")[1]
 
@@ -61,7 +51,7 @@ func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, t
 	}
 
 	subdomainlog := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "Subdomain Takeover 🔍",
+		Prefix: "Subdomain Takeover",
 	})
 
 	client := &http.Client{
