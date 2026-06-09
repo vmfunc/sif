@@ -72,16 +72,14 @@ linters:
         - unnecessaryDefer   # common pattern in tests
         # inverting conditions in scan logic hurts readability
         - nestingReduce
-        - importShadow       # nuclei output pkg alias conflict, intentional
-        - rangeValCopy       # nuclei module iterates value types, fine here
     gosec:
       excludes:
         - G104  # errcheck covers this
         - G107  # pentesting tool -- variable URLs are the whole point
         - G110  # nuclei template decompression, acceptable context
-        - G301  # log/template dirs need 0755 for common tooling
-        - G302  # log files intentionally world-readable for tailing
         - G304  # sif reads user-supplied wordlist paths -- intentional
+        - G305  # tar extraction is traversal-guarded (HasPrefix on the
+                # cleaned target); gosec flags filepath.Join regardless
 
   exclusions:
     rules:
@@ -90,23 +88,6 @@ linters:
         linters:
           - errcheck
           - noctx
-      # net.* calls predate context plumbing; refactor tracked separately
-      - path: internal/scan/(ports|shodan|subdomaintakeover)\.go
-        linters:
-          - noctx
-      # Close on concrete types errcheck can't match to (io.Closer).Close
-      - path: internal/nuclei/templates/templates\.go
-        text: "tarball.Close"
-        linters:
-          - errcheck
-      - path: internal/scan/ports\.go
-        text: "tcp.Close"
-        linters:
-          - errcheck
-      - path: sif\.go
-        text: "logger.Close"
-        linters:
-          - errcheck
 
 issues:
   max-issues-per-linter: 50
