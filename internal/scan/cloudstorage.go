@@ -25,6 +25,10 @@ import (
 	"github.com/dropalldatabases/sif/internal/styles"
 )
 
+// s3EndpointFmt is a var so integration tests can repoint it at a fixture; the
+// %s is the bucket name.
+var s3EndpointFmt = "https://%s.s3.amazonaws.com"
+
 type CloudStorageResult struct {
 	BucketName string `json:"bucket_name"`
 	IsPublic   bool   `json:"is_public"`
@@ -96,7 +100,7 @@ func extractPotentialBuckets(url string) []string {
 }
 
 func checkS3Bucket(ctx context.Context, bucket string, client *http.Client) (bool, error) {
-	url := fmt.Sprintf("https://%s.s3.amazonaws.com", bucket)
+	url := fmt.Sprintf(s3EndpointFmt, bucket)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return false, err

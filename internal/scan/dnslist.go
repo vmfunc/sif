@@ -28,6 +28,10 @@ import (
 // dnsURL is a var so integration tests can repoint it at a fixture.
 var dnsURL = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/dnslist/"
 
+// dnsTransport is a var so integration tests can route the per-host probes at a
+// local server instead of resolving real DNS. nil keeps http.DefaultTransport.
+var dnsTransport http.RoundTripper
+
 const (
 	dnsSmallFile  = "subdomains-100.txt"
 	dnsMediumFile = "subdomains-1000.txt"
@@ -78,7 +82,8 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 	}
 
 	client := &http.Client{
-		Timeout: timeout,
+		Timeout:   timeout,
+		Transport: dnsTransport,
 	}
 
 	progress := output.NewProgress(len(dns), "enumerating")
