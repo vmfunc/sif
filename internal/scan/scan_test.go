@@ -200,3 +200,24 @@ func TestHeaderResult(t *testing.T) {
 		t.Errorf("expected value 'application/json', got '%s'", result.Value)
 	}
 }
+
+func TestStripScheme(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+		want string
+	}{
+		{"https with path", "https://example.com/path", "example.com/path"},
+		{"http", "http://example.com", "example.com"},
+		{"no scheme stays put", "example.com", "example.com"},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stripScheme(tt.url); got != tt.want {
+				t.Errorf("stripScheme(%q) = %q, want %q", tt.url, got, tt.want)
+			}
+		})
+	}
+}

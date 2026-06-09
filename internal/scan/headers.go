@@ -15,7 +15,6 @@ package scan
 import (
 	"context"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/dropalldatabases/sif/internal/logger"
@@ -31,7 +30,7 @@ func Headers(url string, timeout time.Duration, logdir string) ([]HeaderResult, 
 	log := output.Module("HEADERS")
 	log.Start()
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "HTTP Header Analysis"); err != nil {

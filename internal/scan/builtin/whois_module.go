@@ -14,6 +14,7 @@ package builtin
 
 import (
 	"context"
+
 	"github.com/dropalldatabases/sif/internal/modules"
 	"github.com/dropalldatabases/sif/internal/scan"
 )

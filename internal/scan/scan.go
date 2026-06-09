@@ -31,6 +31,15 @@ import (
 	"github.com/dropalldatabases/sif/internal/output"
 )
 
+// stripScheme drops the scheme:// prefix from url, or returns it unchanged when
+// there's no scheme (so a bare host doesn't panic).
+func stripScheme(url string) string {
+	if _, rest, ok := strings.Cut(url, "://"); ok {
+		return rest
+	}
+	return url
+}
+
 func fetchRobotsTXT(url string, client *http.Client) *http.Response {
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 	if err != nil {
@@ -67,7 +76,7 @@ func fetchRobotsTXT(url string, client *http.Client) *http.Response {
 func Scan(url string, timeout time.Duration, threads int, logdir string) {
 	output.ScanStart("base URL scanning")
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "URL scanning"); err != nil {

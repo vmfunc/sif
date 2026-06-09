@@ -41,7 +41,7 @@ type SubdomainTakeoverResult struct {
 func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, threads int, logdir string) ([]SubdomainTakeoverResult, error) {
 	fmt.Println(styles.Separator.Render("Starting " + styles.Status.Render("Subdomain Takeover Vulnerability Check") + "..."))
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "Subdomain Takeover Vulnerability Check"); err != nil {

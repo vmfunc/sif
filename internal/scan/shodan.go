@@ -134,7 +134,7 @@ func Shodan(targetURL string, timeout time.Duration, logdir string) (*ShodanResu
 
 	// log results
 	if logdir != "" {
-		sanitizedURL := strings.Split(targetURL, "://")[1]
+		sanitizedURL := stripScheme(targetURL)
 		if err := logger.WriteHeader(sanitizedURL, logdir, "Shodan lookup"); err != nil {
 			output.Error("Error writing log header: %v", err)
 		}

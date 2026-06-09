@@ -15,7 +15,6 @@ package scan
 import (
 	"context"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -69,7 +68,7 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 	}
 	defer ne.Close()
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 	ne.LoadTargets([]string{sanitizedURL}, false)
 
 	var results []output.ResultEvent

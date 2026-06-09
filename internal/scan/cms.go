@@ -35,7 +35,7 @@ func CMS(url string, timeout time.Duration, logdir string) (*CMSResult, error) {
 	spin := output.NewSpinner("Detecting content management system")
 	spin.Start()
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "CMS detection"); err != nil {

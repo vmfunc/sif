@@ -121,7 +121,7 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	spin := output.NewSpinner("Scanning for SQL exposures")
 	spin.Start()
 
-	sanitizedURL := strings.Split(targetURL, "://")[1]
+	sanitizedURL := stripScheme(targetURL)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "SQL reconnaissance"); err != nil {

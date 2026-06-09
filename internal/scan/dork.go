@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -60,7 +59,7 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 	spin := output.NewSpinner("Running Google dorks")
 	spin.Start()
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "URL dorking"); err != nil {
