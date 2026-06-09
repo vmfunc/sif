@@ -131,6 +131,20 @@ makepkg -si
 
 run `./sif -h` for all options.
 
+## commands
+
+a couple of subcommands run without scanning:
+
+```bash
+# print the version (release builds are stamped; local builds use git describe)
+./sif version
+
+# show the latest release notes (also -pn)
+./sif patchnote
+```
+
+the first time you run a new release, sif prints that release's notes once. set `SIF_NO_PATCHNOTES=1` to turn that off.
+
 ## modules
 
 sif has a modular architecture. modules are defined in yaml and can be extended by users.

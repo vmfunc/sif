@@ -10,54 +10,34 @@
 ·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
 */
 
-package main
+package version
 
-import (
-	"fmt"
-	"os"
+import "testing"
 
-	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif"
-	"github.com/dropalldatabases/sif/internal/config"
-	"github.com/dropalldatabases/sif/internal/patchnotes"
-	ver "github.com/dropalldatabases/sif/internal/version"
-
-	// Register framework detectors
-	_ "github.com/dropalldatabases/sif/internal/scan/frameworks/detectors"
-)
-
-// version is stamped at release time via -ldflags "-X main.version=...";
-// ver.Resolve falls back to the build info or "dev" for other builds.
-var version = "dev"
-
-func main() {
-	version = ver.Resolve(version)
-	sif.Version = version
-
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "patchnote", "patchnotes", "-pn", "--patchnotes":
-			patchnotes.Print("")
-			return
-		case "version", "-version", "--version":
-			fmt.Printf("sif %s\n", version)
-			return
-		}
+func TestResolveLdflag(t *testing.T) {
+	tests := []struct {
+		name   string
+		ldflag string
+		want   string
+	}{
+		{"tag with v", "v2026.6.7", "2026.6.7"},
+		{"tag without v", "2026.6.7", "2026.6.7"},
+		{"pseudo version", "2026.2.17-57-geb33321", "2026.2.17-57-geb33321"},
 	}
 
-	settings := config.Parse()
-
-	app, err := sif.New(settings)
-	if err != nil {
-		log.Fatal(err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Resolve(tt.ldflag); got != tt.want {
+				t.Errorf("Resolve(%q) = %q, want %q", tt.ldflag, got, tt.want)
+			}
+		})
 	}
+}
 
-	if !settings.ApiMode {
-		patchnotes.ShowOnce(version)
-	}
-
-	err = app.Run()
-	if err != nil {
-		log.Fatal(err)
+// with no ldflag, Resolve falls back to build info; in a test binary that's
+// non-deterministic, so just assert it never returns an empty string.
+func TestResolveFallbackNonEmpty(t *testing.T) {
+	if Resolve("dev") == "" {
+		t.Error("Resolve fallback should never be empty")
 	}
 }

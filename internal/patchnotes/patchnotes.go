@@ -98,7 +98,9 @@ func Print(tag string) {
 // then records it so it isn't shown again. best-effort: dev builds, the
 // SIF_NO_PATCHNOTES opt-out, and any network failure stay silent.
 func ShowOnce(version string) {
-	if version == "" || version == "dev" || os.Getenv("SIF_NO_PATCHNOTES") != "" {
+	// only clean release tags (e.g. 2026.6.7) map to a github release; skip dev
+	// and pseudo-versions (a commit/dirty build) so we don't make a doomed call.
+	if version == "" || version == "dev" || strings.ContainsAny(version, "-+") || os.Getenv("SIF_NO_PATCHNOTES") != "" {
 		return
 	}
 

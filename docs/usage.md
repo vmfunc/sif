@@ -259,6 +259,28 @@ enable api mode for json output:
 
 output is a json object with scan results.
 
+## commands
+
+these run without scanning a target.
+
+### version
+
+print the sif version. release builds are stamped via ldflags, local `make` builds derive it from `git describe`, and `go install`ed builds read it from the module build info:
+
+```bash
+./sif version
+```
+
+### patchnote
+
+show the latest release's notes, fetched from github (also `-pn`):
+
+```bash
+./sif patchnote
+```
+
+the first time you run a new release sif also prints that release's notes once. set `SIF_NO_PATCHNOTES=1` to disable that.
+
 ## examples
 
 ### quick recon
