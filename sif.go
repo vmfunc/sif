@@ -321,6 +321,16 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.SecurityHeaders {
+			result, err := scan.SecurityHeaders(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running Security Header Analysis: %s", err)
+			} else {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "Security Headers")
+			}
+		}
+
 		if app.settings.CloudStorage {
 			result, err := scan.CloudStorage(url, app.settings.Timeout, app.settings.LogDir)
 			if err != nil {

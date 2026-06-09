@@ -16,6 +16,7 @@ package scan
 // These provide better type safety and allow method implementations.
 type (
 	HeaderResults            []HeaderResult
+	SecurityHeaderResults    []SecurityHeaderResult
 	DirectoryResults         []DirectoryResult
 	CloudStorageResults      []CloudStorageResult
 	DorkResults              []DorkResult
@@ -40,6 +41,7 @@ func (r *SecurityTrailsResult) ResultType() string { return "securitytrails" }
 // ResultType implementations for slice result types.
 
 func (r HeaderResults) ResultType() string            { return "headers" }
+func (r SecurityHeaderResults) ResultType() string    { return "security_headers" }
 func (r DirectoryResults) ResultType() string         { return "dirlist" }
 func (r CloudStorageResults) ResultType() string      { return "cloudstorage" }
 func (r DorkResults) ResultType() string              { return "dork" }
@@ -53,6 +55,7 @@ var (
 	_ ScanResult = (*CMSResult)(nil)
 	_ ScanResult = (*SecurityTrailsResult)(nil)
 	_ ScanResult = HeaderResults(nil)
+	_ ScanResult = SecurityHeaderResults(nil)
 	_ ScanResult = DirectoryResults(nil)
 	_ ScanResult = CloudStorageResults(nil)
 	_ ScanResult = DorkResults(nil)

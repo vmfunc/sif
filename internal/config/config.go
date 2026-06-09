@@ -39,6 +39,7 @@ type Settings struct {
 	Template          string
 	CMS               bool
 	Headers           bool
+	SecurityHeaders   bool
 	CloudStorage      bool
 	SubdomainTakeover bool
 	Shodan            bool
@@ -90,6 +91,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.JavaScript, "js", false, "Enable JavaScript scans"),
 		flagSet.BoolVar(&settings.CMS, "cms", false, "Enable CMS detection"),
 		flagSet.BoolVar(&settings.Headers, "headers", false, "Enable HTTP Header Analysis"),
+		flagSet.BoolVarP(&settings.SecurityHeaders, "security-headers", "sh", false, "Enable security header analysis (missing/weak headers)"),
 		flagSet.BoolVar(&settings.CloudStorage, "c3", false, "Enable C3 Misconfiguration Scan"),
 		flagSet.BoolVar(&settings.SubdomainTakeover, "st", false, "Enable Subdomain Takeover Check"),
 		flagSet.BoolVar(&settings.Shodan, "shodan", false, "Enable Shodan lookup (requires SHODAN_API_KEY env var)"),
