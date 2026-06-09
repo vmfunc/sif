@@ -13,8 +13,6 @@
 package scan
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
@@ -24,7 +22,7 @@ import (
 func Whois(url string, logdir string) {
 	output.ScanStart("WHOIS lookup")
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, " WHOIS scanning"); err != nil {
 			output.Error("Error creating log file: %v", err)

@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -119,7 +118,7 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	spin := output.NewSpinner("Scanning for LFI vulnerabilities")
 	spin.Start()
 
-	sanitizedURL := strings.Split(targetURL, "://")[1]
+	sanitizedURL := stripScheme(targetURL)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "LFI reconnaissance"); err != nil {

@@ -100,7 +100,7 @@ func SecurityTrails(targetURL string, timeout time.Duration, logdir string) (*Se
 	spin.Stop()
 
 	if logdir != "" {
-		sanitizedURL := strings.Split(targetURL, "://")[1]
+		sanitizedURL := stripScheme(targetURL)
 		if err := logger.WriteHeader(sanitizedURL, logdir, "SecurityTrails lookup"); err != nil {
 			output.Error("error writing log header: %v", err)
 		}

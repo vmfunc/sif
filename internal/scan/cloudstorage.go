@@ -33,7 +33,7 @@ type CloudStorageResult struct {
 func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStorageResult, error) {
 	fmt.Println(styles.Separator.Render("Starting " + styles.Status.Render("Cloud Storage Misconfiguration Scan") + "..."))
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "Cloud Storage Misconfiguration Scan"); err != nil {

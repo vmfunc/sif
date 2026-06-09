@@ -19,7 +19,6 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -34,7 +33,7 @@ func Ports(ctx context.Context, scope string, url string, timeout time.Duration,
 	log := output.Module("PORTS")
 	log.Start()
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, scope+" port scanning"); err != nil {
 			log.Error("Error creating log file: %v", err)

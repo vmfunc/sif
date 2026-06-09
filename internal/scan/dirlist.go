@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -44,7 +43,7 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 	log := output.Module("DIRLIST")
 	log.Start()
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, size+" directory fuzzing"); err != nil {

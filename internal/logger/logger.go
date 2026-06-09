@@ -124,7 +124,10 @@ func (l *Logger) Close() error {
 
 // CreateFile initializes a log file for the given URL and writes the header.
 func CreateFile(logFiles *[]string, url string, dir string) error {
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := url
+	if _, after, ok := strings.Cut(url, "://"); ok {
+		sanitizedURL = after
+	}
 	path := filepath.Join(dir, sanitizedURL+".log")
 
 	header := fmt.Sprintf("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/    \n\nsif log file for %s\nhttps://sif.sh\n\n", url)

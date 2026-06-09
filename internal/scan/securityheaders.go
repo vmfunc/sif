@@ -55,7 +55,7 @@ func SecurityHeaders(url string, timeout time.Duration, logdir string) (Security
 	log := output.Module("SECHEADERS")
 	log.Start()
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "Security Header Analysis"); err != nil {

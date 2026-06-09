@@ -38,7 +38,7 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 	spin := output.NewSpinner("Scanning for exposed git repositories")
 	spin.Start()
 
-	sanitizedURL := strings.Split(url, "://")[1]
+	sanitizedURL := stripScheme(url)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "git directory fuzzing"); err != nil {
