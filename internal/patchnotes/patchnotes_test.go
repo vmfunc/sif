@@ -10,49 +10,33 @@
 ·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
 */
 
-package main
+package patchnotes
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif"
-	"github.com/dropalldatabases/sif/internal/config"
-	"github.com/dropalldatabases/sif/internal/patchnotes"
-
-	// Register framework detectors
-	_ "github.com/dropalldatabases/sif/internal/scan/frameworks/detectors"
+	"path/filepath"
+	"strings"
+	"testing"
 )
 
-// version is filled in at release time via -ldflags "-X main.version=...".
-var version = "dev"
+func TestSeenRoundTrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sif", "seen_version")
 
-func main() {
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "patchnote", "patchnotes", "-pn", "--patchnotes":
-			patchnotes.Print("")
-			return
-		case "version", "-version", "--version":
-			fmt.Printf("sif %s\n", version)
-			return
-		}
+	if hasSeen(path, "2026.6.7") {
+		t.Fatal("nothing recorded yet, hasSeen should be false")
 	}
 
-	settings := config.Parse()
-
-	app, err := sif.New(settings)
-	if err != nil {
-		log.Fatal(err)
+	recordSeen(path, "2026.6.7")
+	if !hasSeen(path, "2026.6.7") {
+		t.Error("recorded version should read back as seen")
 	}
-
-	if !settings.ApiMode {
-		patchnotes.ShowOnce(version)
+	if hasSeen(path, "2026.6.8") {
+		t.Error("a different version should not be seen")
 	}
+}
 
-	err = app.Run()
-	if err != nil {
-		log.Fatal(err)
+func TestRenderIncludesTag(t *testing.T) {
+	out := render(&release{TagName: "v2026.6.7", Body: "## what's changed\n- a thing"})
+	if !strings.Contains(out, "v2026.6.7") {
+		t.Errorf("rendered notes should include the tag, got %q", out)
 	}
 }
