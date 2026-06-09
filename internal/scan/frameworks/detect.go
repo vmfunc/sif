@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -99,9 +100,11 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	}()
 
 	// Find the best match
+	// results arrive in goroutine-completion order; tie-break on name so the
+	// winner is deterministic when two detectors land on the same confidence.
 	var best detectionResult
 	for r := range results {
-		if r.confidence > best.confidence {
+		if r.confidence > best.confidence || (r.confidence == best.confidence && r.name < best.name) {
 			best = r
 		}
 	}
@@ -169,7 +172,7 @@ func getVulnerabilities(framework, version string) ([]string, []string) {
 
 	for _, entry := range entries {
 		for _, affectedVer := range entry.AffectedVersions {
-			if version == affectedVer || hasPrefix(version, affectedVer) {
+			if versionAffected(version, affectedVer) {
 				cves = append(cves, fmt.Sprintf("%s (%s)", entry.CVE, entry.Severity))
 				for _, rec := range entry.Recommendations {
 					if !seenRecs[rec] {
@@ -185,7 +188,9 @@ func getVulnerabilities(framework, version string) ([]string, []string) {
 	return cves, recommendations
 }
 
-// hasPrefix is a simple prefix check without importing strings.
-func hasPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+// versionAffected reports whether version falls under an affected-version
+// entry. the entry is a version prefix, matched only on dotted boundaries, so
+// "4.2" covers 4.2 and 4.2.1 but not 4.20.
+func versionAffected(version, affected string) bool {
+	return version == affected || strings.HasPrefix(version, affected+".")
 }
