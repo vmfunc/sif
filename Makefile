@@ -9,6 +9,7 @@ RM ?= rm
 GOFLAGS ?=
 PREFIX ?= /usr/local
 BINDIR ?= bin
+MANDIR ?= share/man/man1
 
 define COPYRIGHT_ASCII
 ╭────────────────────────────────────────────────────────────╮
@@ -76,6 +77,9 @@ install: check_go_version
 	fi
 	@mkdir -p $(DESTDIR)$(PREFIX)/$(BINDIR) || (echo "🔒 Permission denied. Trying with sudo..." && sudo mkdir -p $(DESTDIR)$(PREFIX)/$(BINDIR))
 	@cp -f sif $(DESTDIR)$(PREFIX)/$(BINDIR) || (echo "🔒 Permission denied. Trying with sudo..." && sudo cp -f sif $(DESTDIR)$(PREFIX)/$(BINDIR))
+	@echo "📖 Installing man page..."
+	@mkdir -p $(DESTDIR)$(PREFIX)/$(MANDIR) || (echo "🔒 Permission denied. Trying with sudo..." && sudo mkdir -p $(DESTDIR)$(PREFIX)/$(MANDIR))
+	@cp -f man/sif.1 $(DESTDIR)$(PREFIX)/$(MANDIR) || (echo "🔒 Permission denied. Trying with sudo..." && sudo cp -f man/sif.1 $(DESTDIR)$(PREFIX)/$(MANDIR))
 	@echo "✅ sif installed successfully! 🎊"
 
 uninstall:
@@ -86,6 +90,7 @@ uninstall:
 		exit 1; \
 	fi
 	@$(RM) $(DESTDIR)$(PREFIX)/$(BINDIR)/sif || (echo "🔒 Permission denied. Trying with sudo..." && sudo $(RM) $(DESTDIR)$(PREFIX)/$(BINDIR)/sif)
+	@$(RM) $(DESTDIR)$(PREFIX)/$(MANDIR)/sif.1 || (echo "🔒 Permission denied. Trying with sudo..." && sudo $(RM) $(DESTDIR)$(PREFIX)/$(MANDIR)/sif.1)
 	@echo "✅ sif uninstalled successfully!"
 
 .PHONY: all check_go_version sif clean install uninstall
