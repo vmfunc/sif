@@ -47,9 +47,11 @@ func init() {
 	fw.Register(&codeigniterDetector{})
 }
 
-// sigmoidConfidence converts a weighted score to a 0-1 confidence value.
+// sigmoidConfidence maps the matched-weight fraction to a 0-1 confidence,
+// centered at 0.3 so a single weak signature match no longer clears the 0.5
+// detection threshold (it used to: sigmoid(0) was 0.5, so any match "detected").
 func sigmoidConfidence(score float32) float32 {
-	return float32(1.0 / (1.0 + math.Exp(-float64(score)*6.0)))
+	return float32(1.0 / (1.0 + math.Exp(-(float64(score)-0.3)*10.0)))
 }
 
 // laravelDetector detects Laravel framework.
