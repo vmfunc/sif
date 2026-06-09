@@ -25,8 +25,10 @@ import (
 	"github.com/dropalldatabases/sif/internal/output"
 )
 
+// dnsURL is a var so integration tests can repoint it at a fixture.
+var dnsURL = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/dnslist/"
+
 const (
-	dnsURL        = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/dnslist/"
 	dnsSmallFile  = "subdomains-100.txt"
 	dnsMediumFile = "subdomains-1000.txt"
 	dnsBigFile    = "subdomains-10000.txt"

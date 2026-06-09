@@ -27,7 +27,8 @@ import (
 	"github.com/dropalldatabases/sif/internal/output"
 )
 
-const commonPorts = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/ports/top-ports.txt"
+// commonPorts is a var so integration tests can repoint it at a fixture.
+var commonPorts = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/ports/top-ports.txt"
 
 func Ports(ctx context.Context, scope string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
 	log := output.Module("PORTS")

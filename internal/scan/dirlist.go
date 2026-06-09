@@ -26,11 +26,13 @@ import (
 	"github.com/dropalldatabases/sif/internal/output"
 )
 
+// directoryURL is a var so integration tests can repoint it at a fixture.
+var directoryURL = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/dirlist/"
+
 const (
-	directoryURL = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/dirlist/"
-	smallFile    = "directory-list-2.3-small.txt"
-	mediumFile   = "directory-list-2.3-medium.txt"
-	bigFile      = "directory-list-2.3-big.txt"
+	smallFile  = "directory-list-2.3-small.txt"
+	mediumFile = "directory-list-2.3-medium.txt"
+	bigFile    = "directory-list-2.3-big.txt"
 )
 
 type DirectoryResult struct {
