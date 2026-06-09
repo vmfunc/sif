@@ -70,8 +70,8 @@ type supabaseOpenAPIResponse struct {
 }
 
 // getSupabaseArrayResponse fetches a Supabase endpoint that returns an array.
-func getSupabaseArrayResponse(projectId, path, apikey string, auth *string) (*supabaseArrayResponse, error) {
-	body, resp, err := doSupabaseRequest(projectId, path, apikey, auth) //nolint:bodyclose // closed in doSupabaseRequest
+func getSupabaseArrayResponse(projectId, path, apikey string, auth *string, timeout time.Duration) (*supabaseArrayResponse, error) {
+	body, resp, err := doSupabaseRequest(projectId, path, apikey, auth, timeout) //nolint:bodyclose // closed in doSupabaseRequest
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +95,8 @@ func getSupabaseArrayResponse(projectId, path, apikey string, auth *string) (*su
 }
 
 // getSupabaseOpenAPI fetches the OpenAPI spec from Supabase.
-func getSupabaseOpenAPI(projectId, apikey string, auth *string) (*supabaseOpenAPIResponse, error) {
-	body, _, err := doSupabaseRequest(projectId, "/rest/v1/", apikey, auth) //nolint:bodyclose // closed in doSupabaseRequest
+func getSupabaseOpenAPI(projectId, apikey string, auth *string, timeout time.Duration) (*supabaseOpenAPIResponse, error) {
+	body, _, err := doSupabaseRequest(projectId, "/rest/v1/", apikey, auth, timeout) //nolint:bodyclose // closed in doSupabaseRequest
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +109,8 @@ func getSupabaseOpenAPI(projectId, apikey string, auth *string) (*supabaseOpenAP
 }
 
 // doSupabaseRequest performs a GET request to the Supabase API.
-func doSupabaseRequest(projectId, path, apikey string, auth *string) ([]byte, *http.Response, error) {
-	client := http.Client{}
+func doSupabaseRequest(projectId, path, apikey string, auth *string, timeout time.Duration) ([]byte, *http.Response, error) {
+	client := http.Client{Timeout: timeout}
 
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "https://"+projectId+".supabase.co"+path, http.NoBody)
 	if err != nil {
@@ -142,7 +142,7 @@ func doSupabaseRequest(projectId, path, apikey string, auth *string) ([]byte, *h
 	return body, resp, nil
 }
 
-func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) {
+func ScanSupabase(jsContent string, jsUrl string, timeout time.Duration) ([]supabaseScanResult, error) {
 	supabaselog := log.NewWithOptions(os.Stderr, log.Options{
 		Prefix: "JavaScript > Supabase",
 	}).With("url", jsUrl)
@@ -182,7 +182,7 @@ func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) 
 		}
 
 		supabaselog.Infof("Found valid supabase project %s with role %s", *supabaseJwt.ProjectId, *supabaseJwt.Role)
-		client := http.Client{}
+		client := http.Client{Timeout: timeout}
 
 		req, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, "https://"+*supabaseJwt.ProjectId+".supabase.co/auth/v1/signup", bytes.NewBufferString(`{"email":"automated`+strconv.Itoa(int(time.Now().Unix()))+`@sif.sh","password":"automatedacct"}`))
 		if err != nil {
@@ -219,7 +219,7 @@ func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) 
 
 		var collections = []supabaseCollection{}
 
-		openAPI, err := getSupabaseOpenAPI(*supabaseJwt.ProjectId, jwt, &auth)
+		openAPI, err := getSupabaseOpenAPI(*supabaseJwt.ProjectId, jwt, &auth, timeout)
 		if err != nil {
 			return nil, err
 		}
@@ -238,7 +238,7 @@ func ScanSupabase(jsContent string, jsUrl string) ([]supabaseScanResult, error) 
 				continue
 			}
 
-			sampleResp, err := getSupabaseArrayResponse(*supabaseJwt.ProjectId, "/rest/v1"+path, jwt, &auth)
+			sampleResp, err := getSupabaseArrayResponse(*supabaseJwt.ProjectId, "/rest/v1"+path, jwt, &auth, timeout)
 			if err != nil {
 				continue
 			}
