@@ -26,23 +26,26 @@ jobs:
           go-version: "1.25"
 
       - name: extract version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          # single source of truth so the cross-compile steps can't drift
+          echo "LDFLAGS=-s -w -X main.version=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
       - name: build for windows
         run: |
-          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-windows-amd64.exe ./cmd/sif
-          GOOS=windows GOARCH=386 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-windows-386.exe ./cmd/sif
+          GOOS=windows GOARCH=amd64 go build -ldflags="${{ env.LDFLAGS }}" -o sif-windows-amd64.exe ./cmd/sif
+          GOOS=windows GOARCH=386 go build -ldflags="${{ env.LDFLAGS }}" -o sif-windows-386.exe ./cmd/sif
 
       - name: build for macOS
         run: |
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-macos-amd64 ./cmd/sif
-          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-macos-arm64 ./cmd/sif
+          GOOS=darwin GOARCH=amd64 go build -ldflags="${{ env.LDFLAGS }}" -o sif-macos-amd64 ./cmd/sif
+          GOOS=darwin GOARCH=arm64 go build -ldflags="${{ env.LDFLAGS }}" -o sif-macos-arm64 ./cmd/sif
 
       - name: build for linux
         run: |
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-linux-amd64 ./cmd/sif
-          GOOS=linux GOARCH=386 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-linux-386 ./cmd/sif
-          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=${{ env.VERSION }}" -o sif-linux-arm64 ./cmd/sif
+          GOOS=linux GOARCH=amd64 go build -ldflags="${{ env.LDFLAGS }}" -o sif-linux-amd64 ./cmd/sif
+          GOOS=linux GOARCH=386 go build -ldflags="${{ env.LDFLAGS }}" -o sif-linux-386 ./cmd/sif
+          GOOS=linux GOARCH=arm64 go build -ldflags="${{ env.LDFLAGS }}" -o sif-linux-arm64 ./cmd/sif
 
       - name: package releases with modules
         run: |
