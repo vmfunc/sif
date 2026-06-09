@@ -4,7 +4,7 @@
 :   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :
 :   ▄█ █ █▀    ·   BSD 3-Clause License                                         :
 :                                                                               :
-:   (c) 2022-2025 vmfunc, xyzeva,                                               :
+:   (c) 2022-2026 vmfunc, xyzeva,                                               :
 :                 lunchcat alumni & contributors                                :
 :                                                                               :
 ·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
@@ -76,7 +76,7 @@ func New(settings *config.Settings) (*App, error) {
 
 	if !settings.ApiMode {
 		fmt.Println(output.Box.Render("   █▀ █ █▀▀\n  ▄█ █ █▀ "))
-		fmt.Println(output.Subheading.Render("\nblazing-fast pentesting suite\n\nbsd 3-clause · (c) 2022-2025 vmfunc, xyzeva & contributors\n"))
+		fmt.Println(output.Subheading.Render("\nblazing-fast pentesting suite\n\nbsd 3-clause · (c) 2022-2026 vmfunc, xyzeva & contributors\n"))
 	} else {
 		output.SetAPIMode(true)
 	}
