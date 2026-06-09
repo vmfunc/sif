@@ -137,6 +137,15 @@ the module system is in `internal/modules/`:
 go test ./internal/...
 ```
 
+### integration tests
+
+run the scanners against a local testbed that plants the artifacts each one
+should find (network-free, behind a build tag):
+
+```bash
+go test -tags=integration ./internal/scan/...
+```
+
 ### functional test
 
 ```bash

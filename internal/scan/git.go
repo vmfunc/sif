@@ -26,10 +26,10 @@ import (
 	"github.com/dropalldatabases/sif/internal/output"
 )
 
-const (
-	gitURL  = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/git/"
-	gitFile = "git.txt"
-)
+// gitURL is a var so integration tests can repoint it at a fixture.
+var gitURL = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/git/"
+
+const gitFile = "git.txt"
 
 func Git(url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
 	log := output.Module("GIT")
