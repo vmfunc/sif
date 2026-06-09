@@ -11,6 +11,11 @@ PREFIX ?= /usr/local
 BINDIR ?= bin
 MANDIR ?= share/man/man1
 
+# stamp local builds with the nearest v* tag (or short sha), matching the
+# release ci. --match keeps the automated-release-* tags out of the version.
+VERSION ?= $(shell git describe --tags --match 'v*' --always --dirty 2>/dev/null | sed 's/^v//')
+GO_LDFLAGS = -X main.version=$(VERSION)
+
 define COPYRIGHT_ASCII
 ╭────────────────────────────────────────────────────────────╮
 │                           _____________                    │
@@ -57,7 +62,7 @@ sif: check_go_version
 	@echo "📁 Current directory: $$(pwd)"
 	@echo "🔧 Go flags: $(GOFLAGS)"
 	@echo "📦 Building package: ./cmd/sif"
-	$(GO) build -v $(GOFLAGS) ./cmd/sif
+	$(GO) build -v $(GOFLAGS) -ldflags "$(GO_LDFLAGS)" ./cmd/sif
 	@echo "📊 Build info:"
 	@$(GO) version -m sif
 	@echo "✅ sif built successfully! 🚀"

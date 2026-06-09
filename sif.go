@@ -42,6 +42,9 @@ type App struct {
 	logFiles []string
 }
 
+// Version is set by main to the resolved build version and shown on the banner.
+var Version = "dev"
+
 type UrlResult struct {
 	Url     string `json:"url"`
 	Results []ModuleResult
@@ -76,7 +79,11 @@ func New(settings *config.Settings) (*App, error) {
 
 	if !settings.ApiMode {
 		fmt.Println(output.Box.Render("   █▀ █ █▀▀\n  ▄█ █ █▀ "))
-		fmt.Println(output.Subheading.Render("\nblazing-fast pentesting suite\n\nbsd 3-clause · (c) 2022-2026 vmfunc, xyzeva & contributors\n"))
+		tagline := "blazing-fast pentesting suite"
+		if Version != "dev" {
+			tagline += " · v" + Version
+		}
+		fmt.Println(output.Subheading.Render("\n" + tagline + "\n\nbsd 3-clause · (c) 2022-2026 vmfunc, xyzeva & contributors\n"))
 	} else {
 		output.SetAPIMode(true)
 	}
