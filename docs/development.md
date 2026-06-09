@@ -4,7 +4,7 @@ setting up a development environment for sif.
 
 ## prerequisites
 
-- go 1.23 or later
+- go 1.25 or later
 - git
 - make
 
@@ -28,8 +28,7 @@ sif/
 │   ├── logger/       # logging utilities
 │   ├── modules/      # module system
 │   ├── scan/         # built-in scans
-│   ├── styles/       # terminal styling
-│   └── worker/       # worker pool
+│   └── styles/       # terminal styling
 ├── modules/          # built-in yaml modules
 │   ├── http/         # http-based modules
 │   ├── info/         # information gathering

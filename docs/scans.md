@@ -98,16 +98,27 @@ analyzes javascript files for security issues.
 
 ## http headers (-headers)
 
-analyzes security headers.
+dumps the target's response headers.
+
+## security headers (-sh)
+
+flags missing or weak security headers and headers that leak server internals.
 
 ### checks
 
+- strict-transport-security (https only)
 - content-security-policy
 - x-frame-options
-- x-content-type-options
-- strict-transport-security
-- x-xss-protection
+- x-content-type-options (expects nosniff)
+- referrer-policy
 - permissions-policy
+- cross-origin-opener-policy
+
+### flagged as disclosure
+
+- server
+- x-powered-by
+- x-aspnet-version / x-aspnetmvc-version
 
 ## cms detection (-cms)
 

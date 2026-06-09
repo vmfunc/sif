@@ -24,7 +24,7 @@
 sif is a modular pentesting toolkit written in go. it's designed to be fast, concurrent, and extensible. run multiple scan types against targets with a single command.
 
 ```bash
-./sif -u https://example.com -all
+./sif -u https://example.com -headers -sh -cms -framework -git
 ```
 
 ## install
@@ -56,7 +56,7 @@ environment.systemPackages = [ pkgs.sif ];
 nix profile install nixpkgs#sif
 
 # or just run it without installing
-nix run nixpkgs#sif -- -u https://example.com -all
+nix run nixpkgs#sif -- -u https://example.com -headers -sh -framework
 ```
 
 the repo also ships a flake if you want to build from source:
@@ -125,8 +125,8 @@ makepkg -si
 # framework detection (with cve lookup)
 ./sif -u https://example.com -framework
 
-# everything
-./sif -u https://example.com -all
+# a broad sweep
+./sif -u https://example.com -dirlist small -dnslist small -ports common -headers -sh -cms -framework -git -whois
 ```
 
 run `./sif -h` for all options.
@@ -147,6 +147,7 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-js` | javascript analysis |
 | `-c3` | cloud storage misconfiguration |
 | `-headers` | http header analysis |
+| `-sh` | security header analysis (missing/weak headers) |
 | `-st` | subdomain takeover detection |
 | `-cms` | cms detection |
 | `-whois` | whois lookups |
