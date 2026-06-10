@@ -26,6 +26,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/dropalldatabases/sif/internal/pool"
 )
 
 // commonPorts is a var so integration tests can repoint it at a fixture.
@@ -75,39 +76,26 @@ func Ports(ctx context.Context, scope string, url string, timeout time.Duration,
 
 	var openPorts []string
 	var mu sync.Mutex
-	var wg sync.WaitGroup
-	wg.Add(threads)
 
-	for thread := 0; thread < threads; thread++ {
-		go func(thread int) {
-			defer wg.Done()
+	pool.Each(ports, threads, func(port int) {
+		progress.Increment(strconv.Itoa(port))
 
-			for i, port := range ports {
-				if i%threads != thread {
-					continue
-				}
+		charmlog.Debugf("Looking up: %d", port)
+		addr := fmt.Sprintf("%s:%d", sanitizedURL, port)
+		tcp, err := (&net.Dialer{Timeout: timeout}).DialContext(ctx, "tcp", addr)
+		if err != nil {
+			charmlog.Debugf("Error %d: %v", port, err)
+		} else {
+			progress.Pause()
+			log.Success("open: %s:%s [tcp]", sanitizedURL, output.Highlight.Render(strconv.Itoa(port)))
+			progress.Resume()
 
-				progress.Increment(strconv.Itoa(port))
-
-				charmlog.Debugf("Looking up: %d", port)
-				addr := fmt.Sprintf("%s:%d", sanitizedURL, port)
-				tcp, err := (&net.Dialer{Timeout: timeout}).DialContext(ctx, "tcp", addr)
-				if err != nil {
-					charmlog.Debugf("Error %d: %v", port, err)
-				} else {
-					progress.Pause()
-					log.Success("open: %s:%s [tcp]", sanitizedURL, output.Highlight.Render(strconv.Itoa(port)))
-					progress.Resume()
-
-					mu.Lock()
-					openPorts = append(openPorts, strconv.Itoa(port))
-					mu.Unlock()
-					_ = tcp.Close()
-				}
-			}
-		}(thread)
-	}
-	wg.Wait()
+			mu.Lock()
+			openPorts = append(openPorts, strconv.Itoa(port))
+			mu.Unlock()
+			_ = tcp.Close()
+		}
+	})
 	progress.Done()
 
 	log.Complete(len(openPorts), "open")

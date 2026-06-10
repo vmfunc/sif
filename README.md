@@ -220,6 +220,8 @@ write the run's findings out to a file for ci/cd or triage:
 | `-sarif` | write a sarif 2.1.0 report to this file |
 | `-markdown`, `-md` | write a markdown report to this file |
 | `-silent` | plain output: chrome to stderr, one finding per line to stdout (for pipelines) |
+| `-diff` | surface only findings added/removed since the last snapshot of each target |
+| `-store` | snapshot directory for `-diff` (default: log dir, else `<user-config>/sif/state`) |
 
 ```bash
 # scan and emit both a sarif and markdown report
@@ -227,6 +229,46 @@ write the run's findings out to a file for ci/cd or triage:
 ```
 
 sarif output is ingestable by github code scanning; markdown is a readable per-target summary.
+
+### diff mode
+
+`-diff` turns a re-scan into a monitor: sif snapshots each target's normalized findings to a json file, and on the next run reports only the delta (`+ new` / `- gone`) against that snapshot, then overwrites it. the first run for a target has no baseline, so everything is `+ new`. snapshots land in `-store` (one sanitized file per target); when unset they reuse the log dir, falling back to `<user-config>/sif/state`.
+
+```bash
+# baseline run, then re-scan later and see only what moved
+./sif -u https://example.com -sh -cors -diff
+./sif -u https://example.com -sh -cors -diff
+```
+
+the snapshot is always rewritten, so each run diffs against the previous one. the delta is chrome (it rides the normal output sink / stderr under `-silent`), not the findings stream.
+
+### notify
+
+ship findings to a chat/webhook sink so a continuous-recon run alerts on what it turns up. every provider is a single POST through the shared http client, so the global proxy/rate-limit/header config applies.
+
+| flag | description |
+|------|-------------|
+| `-notify` | ship findings to every configured provider after the scan |
+| `-notify-severity` | minimum severity to send (`info`/`low`/`medium`/`high`/`critical`, default `medium`) |
+| `-notify-config` | path to a notify-compatible yaml config (overrides env vars) |
+
+providers are configured env-first; a yaml file (`-notify-config`) overrides per-field. the yaml keys match [projectdiscovery/notify](https://github.com/projectdiscovery/notify) so an existing config ports over:
+
+| env var | yaml key | provider |
+|---------|----------|----------|
+| `SLACK_WEBHOOK_URL` | `slack_webhook_url` | slack incoming webhook |
+| `DISCORD_WEBHOOK_URL` | `discord_webhook_url` | discord webhook |
+| `TELEGRAM_BOT_TOKEN` | `telegram_api_key` | telegram bot api (needs chat id too) |
+| `TELEGRAM_CHAT_ID` | `telegram_chat_id` | telegram destination chat |
+| `NOTIFY_WEBHOOK_URL` | `webhook_url` | generic json webhook (structured findings) |
+
+```bash
+# alert slack on medium+ findings discovered during a scan
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+./sif -u https://example.com -cors -xss -notify -notify-severity medium
+```
+
+a provider with no destination is skipped; with nothing configured, `-notify` is a silent no-op. slack/discord/telegram receive a fixed-width finding block; the generic webhook receives structured json (`{count, findings[]}`).
 
 ### pipe mode
 

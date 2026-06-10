@@ -31,12 +31,14 @@ import (
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/modules"
+	"github.com/dropalldatabases/sif/internal/notify"
 	"github.com/dropalldatabases/sif/internal/output"
 	"github.com/dropalldatabases/sif/internal/report"
 	"github.com/dropalldatabases/sif/internal/scan"
 	"github.com/dropalldatabases/sif/internal/scan/builtin"
 	"github.com/dropalldatabases/sif/internal/scan/frameworks"
 	jsscan "github.com/dropalldatabases/sif/internal/scan/js"
+	"github.com/dropalldatabases/sif/internal/store"
 )
 
 // App represents the main application structure for sif.
@@ -303,9 +305,21 @@ func (app *App) Run() error {
 	reportResults := make([]report.Result, 0, 16)
 
 	// normalized findings for the whole run; the single Flatten-driven view that
-	// notify and diff (later) consume. collected alongside the report so both
-	// describe the same scanners from one pass.
+	// notify and diff consume. collected alongside the report so both describe the
+	// same scanners from one pass.
 	allFindings := make([]finding.Finding, 0, 16)
+
+	// resolve the snapshot dir once when diff mode is on; a bad default isn't
+	// fatal - diff just no-ops for the run rather than killing the scan.
+	storeDir := ""
+	if app.settings.Diff {
+		dir, err := app.resolveStoreDir()
+		if err != nil {
+			log.Warnf("diff disabled: %v", err)
+		} else {
+			storeDir = dir
+		}
+	}
 
 	for _, url := range app.targets {
 		output.Info("Starting scan on %s", output.Highlight.Render(url))
@@ -664,7 +678,17 @@ func (app *App) Run() error {
 			fmt.Println(string(marshalled))
 		}
 
-		allFindings = append(allFindings, collectFindings(url, moduleResults)...)
+		targetFindings := collectFindings(url, moduleResults)
+		allFindings = append(allFindings, targetFindings...)
+
+		// diff mode is per-target: load this target's last snapshot, surface only
+		// the delta, then overwrite the snapshot so the next run diffs against now.
+		// storeDir is "" when diff is off or the dir couldn't resolve, in which
+		// case this is a no-op and behavior is unchanged.
+		if storeDir != "" {
+			app.diffTarget(storeDir, url, targetFindings)
+		}
+
 		// the report carries raw blobs and is only built when an export flag is
 		// set, so the common path skips the marshalling entirely.
 		if wantReport {
@@ -675,6 +699,14 @@ func (app *App) Run() error {
 	// the normalized findings are the handoff point for notify/diff; surface the
 	// count now so the path is live and observable without changing output.
 	log.Debugf("normalized %d findings across %d targets", len(allFindings), len(app.targets))
+
+	// notify: ship the severity-filtered findings to any configured provider.
+	// kept as an isolated block so it merges cleanly with the diff-store bundle.
+	if app.settings.Notify {
+		if err := app.notifyFindings(context.Background(), allFindings); err != nil {
+			log.Errorf("notify: %v", err)
+		}
+	}
 
 	// -silent: stdout is the findings stream, one terse line each. all chrome
 	// already went to stderr via the rerouted sink, so this is the only thing a
@@ -709,15 +741,75 @@ func printFindings(findings []finding.Finding) {
 }
 
 // collectFindings normalizes one target's module results through finding.Flatten
-// - the single normalization path that notify and diff (later bundles) build on.
-// every scan result struct collapses to flat, severity-ranked findings here so a
-// scanner is described once, not once per consumer.
+// - the single normalization path that notify and diff build on. every scan
+// result struct collapses to flat, severity-ranked findings here so a scanner is
+// described once, not once per consumer.
 func collectFindings(target string, moduleResults []ModuleResult) []finding.Finding {
 	out := make([]finding.Finding, 0, len(moduleResults))
 	for _, mr := range moduleResults {
 		out = append(out, finding.Flatten(target, mr.Id, mr.Data)...)
 	}
 	return out
+}
+
+// resolveStoreDir picks the snapshot directory for diff mode. precedence: an
+// explicit -store wins; else the run's log dir is reused (snapshots live next to
+// logs); else the per-user default under <user-config>/sif/state. returns an
+// error only when no usable location exists, so the caller can disable diff
+// without failing the scan.
+func (app *App) resolveStoreDir() (string, error) {
+	if app.settings.Store != "" {
+		return app.settings.Store, nil
+	}
+	if app.settings.LogDir != "" {
+		return app.settings.LogDir, nil
+	}
+	dir, err := store.DefaultDir()
+	if err != nil {
+		return "", fmt.Errorf("resolving snapshot dir: %w", err)
+	}
+	return dir, nil
+}
+
+// diffTarget loads target's previous snapshot, prints the added/removed delta
+// against the current findings, then overwrites the snapshot so the next run
+// diffs against this one. a load failure surfaces but doesn't abort the run -
+// the new snapshot is still written so a corrupt baseline self-heals. always
+// saves, even when the delta is empty, to advance the baseline.
+func (app *App) diffTarget(dir, target string, current []finding.Finding) {
+	previous, err := store.Load(dir, target)
+	if err != nil {
+		log.Warnf("diff: reading snapshot for %s, treating as fresh: %v", target, err)
+		previous = nil
+	}
+
+	added, removed := store.Diff(previous, current)
+	printDiff(target, added, removed)
+
+	if err := store.Save(dir, target, current); err != nil {
+		log.Warnf("diff: saving snapshot for %s: %v", target, err)
+	}
+}
+
+// printDiff renders a target's diff: each added finding marked "+ new", each
+// removed one "- gone", with a one-line note when nothing changed. routed
+// through the shared output sink so -silent keeps it on stderr alongside the
+// other chrome. a single Builder keeps the block from interleaving.
+func printDiff(target string, added, removed []finding.Finding) {
+	if len(added) == 0 && len(removed) == 0 {
+		output.Info("diff %s: no changes since last snapshot", target)
+		return
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "diff %s: %d new, %d gone\n", target, len(added), len(removed))
+	for i := 0; i < len(added); i++ {
+		fmt.Fprintf(&b, "  + new  %s\n", added[i].Line())
+	}
+	for i := 0; i < len(removed); i++ {
+		fmt.Fprintf(&b, "  - gone %s\n", removed[i].Line())
+	}
+	fmt.Fprint(output.Writer(), b.String())
 }
 
 // collectReportResults flattens one target's module results into the report
@@ -760,6 +852,31 @@ func (app *App) writeReports(results []report.Result) error {
 	}
 
 	return nil
+}
+
+// notifyFindings filters the run's findings to the -notify-severity floor and
+// ships the survivors to every configured provider. an unrecognized severity
+// string parses to SeverityUnknown, which would let everything through; guard
+// against that by defaulting to medium so a typo can't flood a channel with
+// info noise. an empty filtered set makes notify.Send a no-op.
+func (app *App) notifyFindings(ctx context.Context, findings []finding.Finding) error {
+	floor := finding.ParseSeverity(app.settings.NotifySeverity)
+	if floor == finding.SeverityUnknown {
+		log.Warnf("notify: unknown severity %q, defaulting to medium", app.settings.NotifySeverity)
+		floor = finding.SeverityMedium
+	}
+
+	filtered := make([]finding.Finding, 0, len(findings))
+	for i := 0; i < len(findings); i++ {
+		if findings[i].Severity.AtLeast(floor) {
+			filtered = append(filtered, findings[i])
+		}
+	}
+
+	return notify.Send(ctx, filtered, notify.Options{
+		Timeout:    app.settings.Timeout,
+		ConfigPath: app.settings.NotifyConfig,
+	})
 }
 
 // expandTargets queries SecurityTrails for each original target and returns

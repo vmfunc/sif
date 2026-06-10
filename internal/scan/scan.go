@@ -23,13 +23,13 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/dropalldatabases/sif/internal/pool"
 )
 
 // stripScheme drops the scheme:// prefix from url, or returns it unchanged when
@@ -130,46 +130,32 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 			robotsData = append(robotsData, scanner.Text())
 		}
 
-		var wg sync.WaitGroup
-		wg.Add(threads)
-		for thread := 0; thread < threads; thread++ {
-			go func(thread int) {
-				defer wg.Done()
+		pool.Each(robotsData, threads, func(robot string) {
+			if robot == "" || strings.HasPrefix(robot, "#") || strings.HasPrefix(robot, "User-agent: ") || strings.HasPrefix(robot, "Sitemap: ") {
+				return
+			}
 
-				for i, robot := range robotsData {
-					if i%threads != thread {
-						continue
-					}
+			_, sanitizedRobot, _ := strings.Cut(robot, ": ")
+			log.Debugf("%s", robot)
+			robotReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url+"/"+sanitizedRobot, http.NoBody)
+			if err != nil {
+				log.Debugf("Error creating request for %s: %s", sanitizedRobot, err)
+				return
+			}
+			resp, err := client.Do(robotReq) //nolint:bodyclose // drained and closed via httpx.DrainClose
+			if err != nil {
+				log.Debugf("Error %s: %s", sanitizedRobot, err)
+				return
+			}
 
-					if robot == "" || strings.HasPrefix(robot, "#") || strings.HasPrefix(robot, "User-agent: ") || strings.HasPrefix(robot, "Sitemap: ") {
-						continue
-					}
-
-					_, sanitizedRobot, _ := strings.Cut(robot, ": ")
-					log.Debugf("%s", robot)
-					robotReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url+"/"+sanitizedRobot, http.NoBody)
-					if err != nil {
-						log.Debugf("Error creating request for %s: %s", sanitizedRobot, err)
-						continue
-					}
-					resp, err := client.Do(robotReq) //nolint:bodyclose // drained and closed via httpx.DrainClose
-					if err != nil {
-						log.Debugf("Error %s: %s", sanitizedRobot, err)
-						continue
-					}
-
-					if resp.StatusCode != 404 {
-						output.Success("%s from robots: %s", output.Status.Render(strconv.Itoa(resp.StatusCode)), output.Highlight.Render(sanitizedRobot))
-						if logdir != "" {
-							logger.Write(sanitizedURL, logdir, strconv.Itoa(resp.StatusCode)+" from robots: ["+sanitizedRobot+"]\n")
-						}
-					}
-					// status only; drain so the conn returns to the pool.
-					httpx.DrainClose(resp)
+			if resp.StatusCode != 404 {
+				output.Success("%s from robots: %s", output.Status.Render(strconv.Itoa(resp.StatusCode)), output.Highlight.Render(sanitizedRobot))
+				if logdir != "" {
+					logger.Write(sanitizedURL, logdir, strconv.Itoa(resp.StatusCode)+" from robots: ["+sanitizedRobot+"]\n")
 				}
-
-			}(thread)
-		}
-		wg.Wait()
+			}
+			// status only; drain so the conn returns to the pool.
+			httpx.DrainClose(resp)
+		})
 	}
 }

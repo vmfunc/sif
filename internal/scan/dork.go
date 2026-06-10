@@ -28,6 +28,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/dropalldatabases/sif/internal/pool"
 	googlesearch "github.com/rocketlaunchr/google-search"
 )
 
@@ -92,47 +93,33 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 	}
 
 	// util.InitProgressBar()
-	var wg sync.WaitGroup
 	var mu sync.Mutex
-	wg.Add(threads)
 
 	dorkResults := []DorkResult{}
-	for thread := 0; thread < threads; thread++ {
-		go func(thread int) {
-			defer wg.Done()
-
-			for i, dork := range dorks {
-
-				if i%threads != thread {
-					continue
-				}
-
-				results, err := googlesearch.Search(context.TODO(), fmt.Sprintf("%s %s", dork, sanitizedURL))
-				if err != nil {
-					log.Debugf("error searching for dork %s: %v", dork, err)
-					continue
-				}
-				if len(results) > 0 {
-					spin.Stop()
-					output.Success("%s dork results found for dork %s", output.Status.Render(strconv.Itoa(len(results))), output.Highlight.Render(dork))
-					spin.Start()
-					if logdir != "" {
-						_ = logger.Write(sanitizedURL, logdir, strconv.Itoa(len(results))+" dork results found for dork ["+dork+"]\n")
-					}
-
-					result := DorkResult{
-						Url:   dork,
-						Count: len(results),
-					}
-
-					mu.Lock()
-					dorkResults = append(dorkResults, result)
-					mu.Unlock()
-				}
+	pool.Each(dorks, threads, func(dork string) {
+		results, err := googlesearch.Search(context.TODO(), fmt.Sprintf("%s %s", dork, sanitizedURL))
+		if err != nil {
+			log.Debugf("error searching for dork %s: %v", dork, err)
+			return
+		}
+		if len(results) > 0 {
+			spin.Stop()
+			output.Success("%s dork results found for dork %s", output.Status.Render(strconv.Itoa(len(results))), output.Highlight.Render(dork))
+			spin.Start()
+			if logdir != "" {
+				_ = logger.Write(sanitizedURL, logdir, strconv.Itoa(len(results))+" dork results found for dork ["+dork+"]\n")
 			}
-		}(thread)
-	}
-	wg.Wait()
+
+			result := DorkResult{
+				Url:   dork,
+				Count: len(results),
+			}
+
+			mu.Lock()
+			dorkResults = append(dorkResults, result)
+			mu.Unlock()
+		}
+	})
 	spin.Stop()
 
 	output.ScanComplete("URL dorking", len(dorkResults), "found")

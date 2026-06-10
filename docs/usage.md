@@ -442,6 +442,78 @@ plain output for pipelines: all banner/spinner/log chrome goes to stderr and std
 subfinder -d example.com | sif -silent -probe -sh | notify
 ```
 
+### -diff
+
+turn a re-scan into a monitor. sif snapshots each target's normalized findings to a json file under the store dir; on the next run it loads that snapshot, diffs the current findings against it by finding key, and prints only the delta (`+ new` for findings that appeared, `- gone` for findings that vanished). it always rewrites the snapshot afterwards, so each run compares against the previous one.
+
+the first run for a target has no snapshot, so every finding shows as `+ new`. when nothing changed, sif notes that and writes a fresh snapshot anyway.
+
+```bash
+# baseline, then re-scan and see only what moved
+./sif -u https://example.com -sh -cors -diff
+./sif -u https://example.com -sh -cors -diff
+```
+
+the delta is chrome, not the findings stream: under `-silent` it rides stderr with the rest of the chrome, leaving stdout for the full findings.
+
+### -store
+
+snapshot directory for `-diff`. precedence when unset: the `-log` dir if one is given, else `<user-config>/sif/state` (`$XDG_CONFIG_HOME/sif/state` on linux, `~/Library/Application Support/sif/state` on macos). one sanitized file per target, created at `0750`, written `0600`.
+
+```bash
+./sif -u https://example.com -sh -diff -store ./snapshots
+```
+
+
+## notify options
+
+ship findings to a chat/webhook sink after the scan. every provider is a single POST through the shared http client, so the global proxy/rate-limit/header config applies. with nothing configured, `-notify` is a silent no-op.
+
+### -notify
+
+enable delivery to every configured provider:
+
+```bash
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+./sif -u https://example.com -cors -xss -notify
+```
+
+### -notify-severity
+
+minimum severity to send: `info`, `low`, `medium`, `high` or `critical` (default `medium`). findings below the floor are dropped, so info-level recon noise doesn't flood a channel. an unrecognized value falls back to `medium`:
+
+```bash
+./sif -u https://example.com -cors -notify -notify-severity high
+```
+
+### -notify-config
+
+path to a yaml config that overrides the env vars per-field. the keys match [projectdiscovery/notify](https://github.com/projectdiscovery/notify) so an existing config ports over:
+
+```yaml
+slack_webhook_url: https://hooks.slack.com/services/...
+discord_webhook_url: https://discord.com/api/webhooks/...
+telegram_api_key: 123456:abcdef
+telegram_chat_id: "987654"
+webhook_url: https://example.internal/sif-findings
+```
+
+```bash
+./sif -u https://example.com -cors -notify -notify-config notify.yaml
+```
+
+providers are resolved env-first, then overlaid by the yaml file:
+
+| env var | yaml key | provider |
+|---------|----------|----------|
+| `SLACK_WEBHOOK_URL` | `slack_webhook_url` | slack incoming webhook |
+| `DISCORD_WEBHOOK_URL` | `discord_webhook_url` | discord webhook |
+| `TELEGRAM_BOT_TOKEN` | `telegram_api_key` | telegram bot api (needs chat id too) |
+| `TELEGRAM_CHAT_ID` | `telegram_chat_id` | telegram destination chat |
+| `NOTIFY_WEBHOOK_URL` | `webhook_url` | generic json webhook (structured findings) |
+
+slack/discord/telegram receive a fixed-width finding block; the generic webhook receives structured json (`{count, findings[]}`) for downstream automation.
+
 ## api options
 
 ### -api

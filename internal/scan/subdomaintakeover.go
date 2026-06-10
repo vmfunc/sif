@@ -20,12 +20,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
+	"github.com/dropalldatabases/sif/internal/pool"
 	"github.com/dropalldatabases/sif/internal/styles"
 )
 
@@ -87,44 +87,29 @@ func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, t
 
 	client := httpx.Client(timeout)
 
-	var wg sync.WaitGroup
-	wg.Add(threads)
-
+	// buffered to the full candidate count so a send never blocks: Each only
+	// returns once every worker is done, and the channel is drained afterwards.
 	resultsChan := make(chan SubdomainTakeoverResult, len(dnsResults))
 
-	for thread := 0; thread < threads; thread++ {
-		go func(thread int) {
-			defer wg.Done()
+	pool.Each(dnsResults, threads, func(subdomain string) {
+		vulnerable, service := checkSubdomainTakeover(subdomain, client)
+		result := SubdomainTakeoverResult{
+			Subdomain:  subdomain,
+			Vulnerable: vulnerable,
+			Service:    service,
+		}
+		resultsChan <- result
 
-			for i, subdomain := range dnsResults {
-				if i%threads != thread {
-					continue
-				}
-
-				vulnerable, service := checkSubdomainTakeover(subdomain, client)
-				result := SubdomainTakeoverResult{
-					Subdomain:  subdomain,
-					Vulnerable: vulnerable,
-					Service:    service,
-				}
-				resultsChan <- result
-
-				if vulnerable {
-					subdomainlog.Warnf("Potential subdomain takeover: %s (%s)", styles.Highlight.Render(subdomain), service)
-					if logdir != "" {
-						logger.Write(sanitizedURL, logdir, fmt.Sprintf("Potential subdomain takeover: %s (%s)\n", subdomain, service))
-					}
-				} else {
-					subdomainlog.Infof("Subdomain not vulnerable: %s", subdomain)
-				}
+		if vulnerable {
+			subdomainlog.Warnf("Potential subdomain takeover: %s (%s)", styles.Highlight.Render(subdomain), service)
+			if logdir != "" {
+				logger.Write(sanitizedURL, logdir, fmt.Sprintf("Potential subdomain takeover: %s (%s)\n", subdomain, service))
 			}
-		}(thread)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultsChan)
-	}()
+		} else {
+			subdomainlog.Infof("Subdomain not vulnerable: %s", subdomain)
+		}
+	})
+	close(resultsChan)
 
 	var results []SubdomainTakeoverResult
 	for result := range resultsChan {

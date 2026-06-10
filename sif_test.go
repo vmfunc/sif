@@ -20,6 +20,7 @@ import (
 
 	"github.com/dropalldatabases/sif/internal/config"
 	"github.com/dropalldatabases/sif/internal/finding"
+	"github.com/dropalldatabases/sif/internal/store"
 )
 
 // TestMain neutralizes the stdin seam for the whole package so tests that build
@@ -371,5 +372,74 @@ func TestUrlResult_JSON(t *testing.T) {
 
 	if len(ur.Results) != 1 {
 		t.Errorf("UrlResult.Results = %d, want 1", len(ur.Results))
+	}
+}
+
+func TestResolveStoreDir(t *testing.T) {
+	// explicit -store wins over everything.
+	explicit := &App{settings: &config.Settings{Store: "/tmp/snaps", LogDir: "/tmp/logs"}}
+	if dir, err := explicit.resolveStoreDir(); err != nil || dir != "/tmp/snaps" {
+		t.Fatalf("explicit store: got (%q, %v), want (/tmp/snaps, nil)", dir, err)
+	}
+
+	// no -store: reuse the log dir.
+	logged := &App{settings: &config.Settings{LogDir: "/tmp/logs"}}
+	if dir, err := logged.resolveStoreDir(); err != nil || dir != "/tmp/logs" {
+		t.Fatalf("log dir fallback: got (%q, %v), want (/tmp/logs, nil)", dir, err)
+	}
+
+	// neither set: fall through to the per-user default (non-empty, no error).
+	bare := &App{settings: &config.Settings{}}
+	dir, err := bare.resolveStoreDir()
+	if err != nil {
+		t.Fatalf("default store dir: %v", err)
+	}
+	if dir == "" {
+		t.Fatal("default store dir resolved empty")
+	}
+}
+
+func TestDiffTargetSnapshotsAndDiffs(t *testing.T) {
+	dir := t.TempDir()
+	const target = "https://diff.example.com"
+	app := &App{settings: &config.Settings{Diff: true, Store: dir}}
+
+	first := []finding.Finding{
+		{Target: target, Module: "headers", Severity: finding.SeverityInfo, Key: "headers:Server", Title: "Server", Raw: "nginx"},
+	}
+
+	// first run: no prior snapshot, everything is new; the snapshot must persist.
+	app.diffTarget(dir, target, first)
+
+	saved, err := store.Load(dir, target)
+	if err != nil {
+		t.Fatalf("load after first run: %v", err)
+	}
+	if len(saved) != 1 || saved[0].Key != "headers:Server" {
+		t.Fatalf("snapshot after first run = %#v, want the headers finding", saved)
+	}
+
+	// second run with a different set: the snapshot must advance to the new set so
+	// a third run would diff against it.
+	second := []finding.Finding{
+		{Target: target, Module: "cors", Severity: finding.SeverityMedium, Key: "cors:x", Title: "null origin", Raw: "null"},
+	}
+	app.diffTarget(dir, target, second)
+
+	saved, err = store.Load(dir, target)
+	if err != nil {
+		t.Fatalf("load after second run: %v", err)
+	}
+	if len(saved) != 1 || saved[0].Key != "cors:x" {
+		t.Fatalf("snapshot after second run = %#v, want the cors finding", saved)
+	}
+
+	// the delta between the two snapshots is exactly: headers gone, cors new.
+	added, removed := store.Diff(first, second)
+	if len(added) != 1 || added[0].Key != "cors:x" {
+		t.Fatalf("added = %#v, want cors:x", added)
+	}
+	if len(removed) != 1 || removed[0].Key != "headers:Server" {
+		t.Fatalf("removed = %#v, want headers:Server", removed)
 	}
 }
