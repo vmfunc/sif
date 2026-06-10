@@ -188,11 +188,13 @@ func queryShodanHost(ip string, apiKey string, timeout time.Duration) (*ShodanRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Shodan request: %w", err)
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 	if err != nil {
 		return nil, fmt.Errorf("failed to query Shodan: %w", err)
 	}
-	defer resp.Body.Close()
+	// the unauthorized/not-found branches return before reading the body, so
+	// drain on close to keep the conn reusable instead of leaking it.
+	defer httpx.DrainClose(resp)
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("invalid Shodan API key")

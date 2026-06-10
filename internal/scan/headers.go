@@ -46,11 +46,12 @@ func Headers(url string, timeout time.Duration, logdir string) ([]HeaderResult, 
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	// header-only scan: drain on close so the conn is returned to the pool.
+	defer httpx.DrainClose(resp)
 
 	var results []HeaderResult
 

@@ -74,7 +74,8 @@ func fetchRobotsTXT(url string, client *http.Client) *http.Response {
 		}
 
 		redirectURL := resp.Header.Get("Location")
-		resp.Body.Close()
+		// only the Location header is used here; drain so the conn is reusable.
+		httpx.DrainClose(resp)
 		if redirectURL == "" {
 			log.Debugf("Redirect location is empty for %s", url)
 			return nil
@@ -111,11 +112,13 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 		return http.ErrUseLastResponse
 	}
 
-	resp := fetchRobotsTXT(url+"/robots.txt", client)
+	resp := fetchRobotsTXT(url+"/robots.txt", client) //nolint:bodyclose // drained and closed via httpx.DrainClose
 	if resp == nil {
 		return
 	}
-	defer resp.Body.Close()
+	// drain on close: the non-success branch never reads the body, so a bare
+	// close would leak the conn instead of returning it to the pool.
+	defer httpx.DrainClose(resp)
 
 	if resp.StatusCode != 404 && resp.StatusCode != 301 && resp.StatusCode != 302 && resp.StatusCode != 307 {
 		output.Success("File %s found", output.Status.Render("robots.txt"))
@@ -149,7 +152,7 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 						log.Debugf("Error creating request for %s: %s", sanitizedRobot, err)
 						continue
 					}
-					resp, err := client.Do(robotReq)
+					resp, err := client.Do(robotReq) //nolint:bodyclose // drained and closed via httpx.DrainClose
 					if err != nil {
 						log.Debugf("Error %s: %s", sanitizedRobot, err)
 						continue
@@ -161,7 +164,8 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 							logger.Write(sanitizedURL, logdir, strconv.Itoa(resp.StatusCode)+" from robots: ["+sanitizedRobot+"]\n")
 						}
 					}
-					resp.Body.Close()
+					// status only; drain so the conn returns to the pool.
+					httpx.DrainClose(resp)
 				}
 
 			}(thread)

@@ -129,7 +129,9 @@ func doSupabaseRequest(projectId, path, apikey string, auth *string, timeout tim
 	if err != nil {
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
+	// the non-200 branch returns before reading the body, so drain on close to
+	// keep the conn reusable instead of leaking it.
+	defer httpx.DrainClose(resp)
 
 	if resp.StatusCode != 200 {
 		return nil, nil, errors.New("request to " + resp.Request.URL.String() + " failed with status code " + strconv.Itoa(resp.StatusCode))
@@ -215,7 +217,8 @@ func ScanSupabase(jsContent string, jsUrl string, timeout time.Duration) ([]supa
 			auth = authResp.AccessToken
 			supabaselog.Infof("Created account with JWT %s", auth)
 		} else {
-			resp.Body.Close()
+			// non-200 signup: body never read, so drain to reuse the conn.
+			httpx.DrainClose(resp)
 		}
 
 		var collections = []supabaseCollection{}

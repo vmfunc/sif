@@ -104,11 +104,12 @@ func checkS3Bucket(ctx context.Context, bucket string, client *http.Client) (boo
 	if err != nil {
 		return false, err
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	// status only; drain on close so the conn returns to the pool.
+	defer httpx.DrainClose(resp)
 
 	// If we can access the bucket listing, it's public
 	return resp.StatusCode == http.StatusOK, nil

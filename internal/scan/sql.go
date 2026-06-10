@@ -208,7 +208,8 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 						}
 					}
 				} else {
-					resp.Body.Close()
+					// uninteresting status; body never read, so drain to reuse the conn.
+					httpx.DrainClose(resp)
 				}
 			}
 		}()

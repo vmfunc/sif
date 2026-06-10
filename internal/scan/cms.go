@@ -128,10 +128,11 @@ func detectWordPress(url string, client *http.Client, bodyString string) bool {
 		if err != nil {
 			continue
 		}
-		resp, err := client.Do(req)
+		resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 		if err == nil {
 			found := resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound
-			resp.Body.Close()
+			// status only; drain so the conn returns to the pool.
+			httpx.DrainClose(resp)
 			if found {
 				return true
 			}
