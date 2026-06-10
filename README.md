@@ -122,6 +122,9 @@ makepkg -si
 # sql recon + lfi scanning
 ./sif -u https://example.com -sql -lfi
 
+# web vuln probes (cors, open redirect, reflected xss)
+./sif -u https://example.com -cors -redirect -xss
+
 # framework detection (with cve lookup)
 ./sif -u https://example.com -framework
 
@@ -170,6 +173,9 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-securitytrails` | domain discovery + target expansion (requires SECURITYTRAILS_API_KEY) |
 | `-sql` | sql recon |
 | `-lfi` | local file inclusion |
+| `-cors` | cors misconfiguration probe |
+| `-redirect` | open redirect probe |
+| `-xss` | reflected xss probe |
 | `-framework` | framework detection with cve lookup |
 
 ### http options

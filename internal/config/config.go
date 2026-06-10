@@ -46,6 +46,9 @@ type Settings struct {
 	SecurityTrails    bool
 	SQL               bool
 	LFI               bool
+	CORS              bool
+	Redirect          bool
+	XSS               bool
 	Framework         bool
 	Modules           string // Comma-separated list of module IDs to run
 	ModuleTags        string // Run modules matching these tags
@@ -107,6 +110,9 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.SecurityTrails, "securitytrails", false, "Enable SecurityTrails domain discovery (requires SECURITYTRAILS_API_KEY env var)"),
 		flagSet.BoolVar(&settings.SQL, "sql", false, "Enable SQL reconnaissance (admin panels, error disclosure)"),
 		flagSet.BoolVar(&settings.LFI, "lfi", false, "Enable LFI (Local File Inclusion) reconnaissance"),
+		flagSet.BoolVar(&settings.CORS, "cors", false, "Enable CORS misconfiguration probe"),
+		flagSet.BoolVar(&settings.Redirect, "redirect", false, "Enable open redirect probe"),
+		flagSet.BoolVar(&settings.XSS, "xss", false, "Enable reflected XSS probe"),
 		flagSet.BoolVar(&settings.Framework, "framework", false, "Enable framework detection"),
 	)
 

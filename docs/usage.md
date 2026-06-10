@@ -154,6 +154,30 @@ export SHODAN_API_KEY=your-api-key
 ./sif -u https://example.com -lfi
 ```
 
+### cors probe
+
+`-cors` - probe for cors misconfigurations (reflected/permissive origins)
+
+```bash
+./sif -u https://example.com -cors
+```
+
+### open redirect probe
+
+`-redirect` - probe redirect-prone params for open redirects
+
+```bash
+./sif -u https://example.com/login?next=home -redirect
+```
+
+### reflected xss probe
+
+`-xss` - inject a canary into params and report unescaped reflections
+
+```bash
+./sif -u https://example.com/search?q=test -xss
+```
+
 ### framework detection
 
 `-framework` - detect web frameworks with version and cve lookup
@@ -339,6 +363,9 @@ the first time you run a new release sif also prints that release's notes once. 
   -git \
   -sql \
   -lfi \
+  -cors \
+  -redirect \
+  -xss \
   -am
 ```
 

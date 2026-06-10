@@ -65,6 +65,32 @@ func newVulnApp() *httptest.Server {
 		w.Write([]byte("<title>phpMyAdmin</title>"))
 	})
 
+	// reflecting-origin endpoint for the cors probe
+	mux.HandleFunc("/cors", func(w http.ResponseWriter, r *http.Request) {
+		if origin := r.Header.Get("Origin"); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// open-redirect endpoint: echoes the next param into Location
+	mux.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
+		if next := r.URL.Query().Get("next"); next != "" {
+			w.Header().Set("Location", next)
+			w.WriteHeader(http.StatusFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// reflecting endpoint for the xss probe: echoes q raw into html text
+	mux.HandleFunc("/xss", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		//nolint:gosec // deliberate reflected-xss fixture for the probe under test
+		w.Write([]byte("<html><body><div>" + r.URL.Query().Get("q") + "</div></body></html>"))
+	})
+
 	// homepage doubles as the cms fingerprint and the lfi sink
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -177,6 +203,45 @@ func TestIntegrationLFI(t *testing.T) {
 	}
 	if result == nil || len(result.Vulnerabilities) == 0 {
 		t.Errorf("expected an lfi finding from the passwd sink, got %+v", result)
+	}
+}
+
+func TestIntegrationCORS(t *testing.T) {
+	srv := newVulnApp()
+	defer srv.Close()
+
+	result, err := CORS(srv.URL+"/cors", 5*time.Second, 3, "")
+	if err != nil {
+		t.Fatalf("CORS: %v", err)
+	}
+	if result == nil || len(result.Findings) == 0 {
+		t.Fatalf("expected a cors finding from the reflecting endpoint, got %+v", result)
+	}
+}
+
+func TestIntegrationRedirect(t *testing.T) {
+	srv := newVulnApp()
+	defer srv.Close()
+
+	result, err := Redirect(srv.URL+"/redirect", 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("Redirect: %v", err)
+	}
+	if result == nil || len(result.Findings) == 0 {
+		t.Fatalf("expected an open-redirect finding from the next sink, got %+v", result)
+	}
+}
+
+func TestIntegrationXSS(t *testing.T) {
+	srv := newVulnApp()
+	defer srv.Close()
+
+	result, err := XSS(srv.URL+"/xss", 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("XSS: %v", err)
+	}
+	if result == nil || len(result.Findings) == 0 {
+		t.Fatalf("expected a reflected-xss finding from the q sink, got %+v", result)
 	}
 }
 
