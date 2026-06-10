@@ -14,8 +14,12 @@ package httpx
 
 import (
 	"context"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -214,4 +218,274 @@ func TestRateLimitUnlimited(t *testing.T) {
 	if rt.limiter != nil {
 		t.Error("expected no limiter when RateLimit is 0")
 	}
+}
+
+func TestIdlePerHost(t *testing.T) {
+	tests := []struct {
+		name    string
+		threads int
+		want    int
+	}{
+		{name: "below floor clamps up", threads: 1, want: minIdleConnsPerHost},
+		{name: "zero clamps up", threads: 0, want: minIdleConnsPerHost},
+		{name: "at floor", threads: minIdleConnsPerHost, want: minIdleConnsPerHost},
+		{name: "above floor passes through", threads: 64, want: 64},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := idlePerHost(tt.threads); got != tt.want {
+				t.Errorf("idlePerHost(%d) = %d, want %d", tt.threads, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildTransportTuning(t *testing.T) {
+	const threads = 32
+	tr, err := buildTransport("", threads)
+	if err != nil {
+		t.Fatalf("buildTransport: %v", err)
+	}
+
+	if tr.MaxIdleConns != maxIdleConns {
+		t.Errorf("MaxIdleConns = %d, want %d", tr.MaxIdleConns, maxIdleConns)
+	}
+	if tr.MaxIdleConnsPerHost != threads {
+		t.Errorf("MaxIdleConnsPerHost = %d, want %d", tr.MaxIdleConnsPerHost, threads)
+	}
+	if tr.MaxConnsPerHost != 0 {
+		t.Errorf("MaxConnsPerHost = %d, want 0 (unbounded)", tr.MaxConnsPerHost)
+	}
+	if tr.IdleConnTimeout != idleConnTimeout {
+		t.Errorf("IdleConnTimeout = %v, want %v", tr.IdleConnTimeout, idleConnTimeout)
+	}
+	if !tr.ForceAttemptHTTP2 {
+		t.Error("ForceAttemptHTTP2 = false, want true")
+	}
+}
+
+func TestDrainClose(t *testing.T) {
+	resetConfig(t)
+
+	// serve a body the caller never reads; DrainClose must drain it so the conn
+	// is eligible for reuse rather than abandoned mid-stream.
+	const body = "sif response body that the caller never reads"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, body)
+	}))
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, http.NoBody)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := Client(5 * time.Second).Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+
+	DrainClose(resp)
+
+	// after DrainClose the body is closed; a further read must fail.
+	if _, err := resp.Body.Read(make([]byte, 1)); err == nil {
+		t.Error("expected read after DrainClose to fail on a closed body")
+	}
+}
+
+func TestDrainCloseNil(t *testing.T) {
+	// a nil response (e.g. an errored request) must not panic.
+	DrainClose(nil)
+	DrainClose(&http.Response{})
+}
+
+// countConns wraps a test server with a ConnState hook that tallies how many
+// distinct tcp conns the server saw. distinct conns == failed reuse.
+func countConns(t *testing.T) (*httptest.Server, func() int) {
+	t.Helper()
+
+	var (
+		mu    sync.Mutex
+		conns = make(map[net.Conn]struct{})
+	)
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// always write a body so reuse depends on the caller draining it.
+		io.WriteString(w, "ok")
+	}))
+	srv.Config.ConnState = func(c net.Conn, state http.ConnState) {
+		if state != http.StateNew {
+			return
+		}
+		mu.Lock()
+		conns[c] = struct{}{}
+		mu.Unlock()
+	}
+	srv.Start()
+	t.Cleanup(srv.Close)
+
+	return srv, func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(conns)
+	}
+}
+
+func TestTransportReusesConnections(t *testing.T) {
+	resetConfig(t)
+
+	const (
+		threads  = 8
+		requests = 30
+	)
+	if err := Configure(Options{Threads: threads}); err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+
+	srv, distinct := countConns(t)
+
+	// fire N sequential requests through the tuned client, draining each body so
+	// the conn returns to the pool. a working pool serves all of them on one conn.
+	client := Client(5 * time.Second)
+	for i := 0; i < requests; i++ {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, http.NoBody)
+		if err != nil {
+			t.Fatalf("new request %d: %v", i, err)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("do request %d: %v", i, err)
+		}
+		DrainClose(resp)
+	}
+
+	// sequential reuse should land on exactly one conn; allow a tiny margin for
+	// the rare race where a conn is reaped between requests.
+	const maxReuseConns = 2
+	if got := distinct(); got > maxReuseConns {
+		t.Errorf("tuned client opened %d conns for %d requests, want <= %d (pool not reusing)",
+			got, requests, maxReuseConns)
+	}
+}
+
+func TestBareClientDoesNotReuse(t *testing.T) {
+	srv, distinct := countConns(t)
+
+	// the control: a bare DefaultTransport client whose caller closes but never
+	// drains the body. go can't reuse a half-read conn, so each request dials
+	// fresh - this is exactly the pre-tuning behavior we're fixing.
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: http.DefaultTransport.(*http.Transport).Clone(),
+	}
+
+	const requests = 30
+	for i := 0; i < requests; i++ {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, http.NoBody)
+		if err != nil {
+			t.Fatalf("new request %d: %v", i, err)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("do request %d: %v", i, err)
+		}
+		// close without draining - the leak that kills reuse.
+		resp.Body.Close()
+	}
+
+	// most requests should have dialed a fresh conn. don't demand exactly N (the
+	// scheduler occasionally reuses one), just that it's clearly not pooling.
+	const minDistinct = requests / 2
+	if got := distinct(); got < minDistinct {
+		t.Errorf("bare client opened only %d conns for %d requests, want >= %d "+
+			"(expected near-zero reuse without draining)", got, requests, minDistinct)
+	}
+}
+
+// BenchmarkConnReuse contrasts the tuned, draining client against a bare client
+// that closes without draining. the reported conns/op metric is the distinct
+// tcp conns one pass of `requests` opened - tuned≈1, bare≈requests - so the
+// README can quote real before/after reuse numbers. the conn map is reset per
+// iteration so the metric stays a per-pass count and the bare path doesn't
+// accumulate b.N*requests live sockets and exhaust the ephemeral port range.
+//
+// run the bare sub-bench with a bounded -benchtime (e.g. -benchtime 5x): its
+// whole point is that it can't reuse, so a large b.N floods the local port
+// space with TIME_WAIT sockets. the tuned sub-bench reuses and runs unbounded.
+func BenchmarkConnReuse(b *testing.B) {
+	const requests = 50
+
+	run := func(b *testing.B, drain bool, client *http.Client) {
+		b.Helper()
+		var (
+			mu    sync.Mutex
+			conns = make(map[net.Conn]struct{})
+		)
+		srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			io.WriteString(w, strings.Repeat("x", 256))
+		}))
+		srv.Config.ConnState = func(c net.Conn, state http.ConnState) {
+			if state != http.StateNew {
+				return
+			}
+			mu.Lock()
+			conns[c] = struct{}{}
+			mu.Unlock()
+		}
+		srv.Start()
+		defer srv.Close()
+
+		var lastPass int
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			mu.Lock()
+			conns = make(map[net.Conn]struct{})
+			mu.Unlock()
+			for i := 0; i < requests; i++ {
+				req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, http.NoBody)
+				resp, err := client.Do(req)
+				if err != nil {
+					b.Fatalf("do: %v", err)
+				}
+				if drain {
+					DrainClose(resp)
+				} else {
+					resp.Body.Close()
+				}
+			}
+			// close idle conns between passes so the bare client's per-pass
+			// sockets land in TIME_WAIT and free up before the next pass.
+			client.CloseIdleConnections()
+			mu.Lock()
+			lastPass = len(conns)
+			mu.Unlock()
+		}
+		b.StopTimer()
+
+		// distinct conns for a single pass of `requests`.
+		b.ReportMetric(float64(lastPass), "conns/op")
+	}
+
+	b.Run("tuned-drain", func(b *testing.B) {
+		resetBench()
+		tr, err := buildTransport("", 8)
+		if err != nil {
+			b.Fatalf("buildTransport: %v", err)
+		}
+		run(b, true, &http.Client{Timeout: 5 * time.Second, Transport: tr})
+	})
+
+	b.Run("bare-noDrain", func(b *testing.B) {
+		run(b, false, &http.Client{
+			Timeout:   5 * time.Second,
+			Transport: http.DefaultTransport.(*http.Transport).Clone(),
+		})
+	})
+}
+
+// resetBench clears the package transport without a *testing.T for benchmarks.
+func resetBench() {
+	mu.Lock()
+	configured = nil
+	mu.Unlock()
 }

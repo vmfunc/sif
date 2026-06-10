@@ -424,7 +424,15 @@ func TestIntegrationDnslist(t *testing.T) {
 	}
 	defer func() { dnsTransport = origTr }()
 
-	found, err := Dnslist("small", "http://example.com", 5*time.Second, 2, "")
+	// inject a fake resolver so the run never touches real dns: every candidate
+	// resolves, nothing is wildcard, so all wordlist names reach the probe step.
+	origResolver := newDNSResolver
+	newDNSResolver = func(_ string, _ []string) (hostResolver, error) {
+		return resolveAllStub{}, nil
+	}
+	defer func() { newDNSResolver = origResolver }()
+
+	found, err := Dnslist("small", "http://example.com", 5*time.Second, 2, "", nil)
 	if err != nil {
 		t.Fatalf("Dnslist: %v", err)
 	}
@@ -434,6 +442,12 @@ func TestIntegrationDnslist(t *testing.T) {
 		t.Errorf("expected dev.example.com among findings, got %v", found)
 	}
 }
+
+// resolveAllStub answers every host as a real, non-wildcard hit so the dns gate
+// is a pass-through and the probe step gets the full wordlist.
+type resolveAllStub struct{}
+
+func (resolveAllStub) Resolve(string) (bool, error) { return true, nil }
 
 func contains(s []string, v string) bool {
 	for i := 0; i < len(s); i++ {

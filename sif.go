@@ -25,6 +25,8 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/config"
+	"github.com/dropalldatabases/sif/internal/dnsx"
+	"github.com/dropalldatabases/sif/internal/finding"
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/modules"
@@ -194,6 +196,7 @@ func (app *App) Run() error {
 		Headers:   app.settings.Header,
 		Cookie:    app.settings.Cookie,
 		RateLimit: app.settings.RateLimit,
+		Threads:   app.settings.Threads,
 	}); err != nil {
 		log.Warnf("http client config failed, continuing with defaults: %v", err)
 	}
@@ -214,6 +217,11 @@ func (app *App) Run() error {
 	// is set, so the common path pays nothing.
 	wantReport := app.settings.SARIF != "" || app.settings.Markdown != ""
 	reportResults := make([]report.Result, 0, 16)
+
+	// normalized findings for the whole run; the single Flatten-driven view that
+	// notify and diff (later) consume. collected alongside the report so both
+	// describe the same scanners from one pass.
+	allFindings := make([]finding.Finding, 0, 16)
 
 	for _, url := range app.targets {
 		output.Info("Starting scan on %s", output.Highlight.Render(url))
@@ -263,7 +271,7 @@ func (app *App) Run() error {
 		var dnsResults []string
 
 		if app.settings.Dnslist != "none" {
-			result, err := scan.Dnslist(app.settings.Dnslist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.Dnslist(app.settings.Dnslist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, dnsx.ParseResolvers(app.settings.Resolvers))
 			if err != nil {
 				log.Errorf("Error while running dns scan: %s", err)
 			} else {
@@ -542,10 +550,17 @@ func (app *App) Run() error {
 			fmt.Println(string(marshalled))
 		}
 
+		allFindings = append(allFindings, collectFindings(url, moduleResults)...)
+		// the report carries raw blobs and is only built when an export flag is
+		// set, so the common path skips the marshalling entirely.
 		if wantReport {
 			reportResults = append(reportResults, collectReportResults(url, moduleResults)...)
 		}
 	}
+
+	// the normalized findings are the handoff point for notify/diff; surface the
+	// count now so the path is live and observable without changing output.
+	log.Debugf("normalized %d findings across %d targets", len(allFindings), len(app.targets))
 
 	if wantReport {
 		if err := app.writeReports(reportResults); err != nil {
@@ -558,6 +573,18 @@ func (app *App) Run() error {
 	}
 
 	return nil
+}
+
+// collectFindings normalizes one target's module results through finding.Flatten
+// - the single normalization path that notify and diff (later bundles) build on.
+// every scan result struct collapses to flat, severity-ranked findings here so a
+// scanner is described once, not once per consumer.
+func collectFindings(target string, moduleResults []ModuleResult) []finding.Finding {
+	out := make([]finding.Finding, 0, len(moduleResults))
+	for _, mr := range moduleResults {
+		out = append(out, finding.Flatten(target, mr.Id, mr.Data)...)
+	}
+	return out
 }
 
 // collectReportResults flattens one target's module results into the report
