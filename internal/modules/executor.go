@@ -14,6 +14,7 @@ package modules
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,6 +26,11 @@ import (
 
 // MaxBodySize limits response body to prevent memory exhaustion.
 const MaxBodySize = 5 * 1024 * 1024
+
+// ErrUnsupportedModuleType signals an executor for a module type that is not
+// yet implemented. Returning it (rather than an empty result) keeps callers
+// from mistaking "not implemented" for "scanned, found nothing".
+var ErrUnsupportedModuleType = errors.New("unsupported module type")
 
 // httpRequest represents a generated HTTP request.
 type httpRequest struct {
@@ -379,22 +385,16 @@ func truncateEvidence(s string) string {
 	return s
 }
 
-// ExecuteDNSModule runs a DNS-based module (stub for now).
-func ExecuteDNSModule(ctx context.Context, target string, def *YAMLModule, opts Options) (*Result, error) {
-	// TODO: Implement DNS module execution
-	return &Result{
-		ModuleID: def.ID,
-		Target:   target,
-		Findings: []Finding{},
-	}, nil
+// ExecuteDNSModule runs a DNS-based module (not yet implemented).
+// returns ErrUnsupportedModuleType so the caller logs a clear failure rather
+// than reporting an empty (but successful-looking) result.
+func ExecuteDNSModule(_ context.Context, _ string, def *YAMLModule, _ Options) (*Result, error) {
+	return nil, fmt.Errorf("dns module %q: %w", def.ID, ErrUnsupportedModuleType)
 }
 
-// ExecuteTCPModule runs a TCP-based module (stub for now).
-func ExecuteTCPModule(ctx context.Context, target string, def *YAMLModule, opts Options) (*Result, error) {
-	// TODO: Implement TCP module execution
-	return &Result{
-		ModuleID: def.ID,
-		Target:   target,
-		Findings: []Finding{},
-	}, nil
+// ExecuteTCPModule runs a TCP-based module (not yet implemented).
+// returns ErrUnsupportedModuleType so the caller logs a clear failure rather
+// than reporting an empty (but successful-looking) result.
+func ExecuteTCPModule(_ context.Context, _ string, def *YAMLModule, _ Options) (*Result, error) {
+	return nil, fmt.Errorf("tcp module %q: %w", def.ID, ErrUnsupportedModuleType)
 }
