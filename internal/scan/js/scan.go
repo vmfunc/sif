@@ -39,6 +39,31 @@ type JavascriptScanResult struct {
 // ResultType implements the ScanResult interface.
 func (r *JavascriptScanResult) ResultType() string { return "js" }
 
+// SupabaseFinding is the exported view of one discovered supabase project. the
+// raw supabaseScanResult stays package-private (it carries scan internals), so
+// downstream normalizers consume this projection instead.
+type SupabaseFinding struct {
+	ProjectId   string
+	Role        string
+	Collections int
+}
+
+// SupabaseFindings projects the package-private supabase results into a stable
+// exported shape for the finding normalizer; role is what makes one interesting
+// (a non-anon key is the real bug).
+func (r *JavascriptScanResult) SupabaseFindings() []SupabaseFinding {
+	out := make([]SupabaseFinding, 0, len(r.SupabaseResults))
+	for i := 0; i < len(r.SupabaseResults); i++ {
+		s := r.SupabaseResults[i]
+		out = append(out, SupabaseFinding{
+			ProjectId:   s.ProjectId,
+			Role:        s.Role,
+			Collections: len(s.Collections),
+		})
+	}
+	return out
+}
+
 func JavascriptScan(url string, timeout time.Duration, threads int, logdir string) (*JavascriptScanResult, error) {
 	log := output.Module("JS")
 	log.Start()
