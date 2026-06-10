@@ -21,6 +21,7 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
 )
@@ -58,7 +59,7 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 		log.Error("Error creating request: %s", err)
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpx.Client(timeout).Do(req)
 	if err != nil {
 		log.Error("Error downloading DNS list: %s", err)
 		return nil, err
@@ -81,9 +82,11 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 		}
 	}
 
-	client := &http.Client{
-		Timeout:   timeout,
-		Transport: dnsTransport,
+	// per-host probe client. dnsTransport pins every dial at a fixture in
+	// integration tests; nil keeps the shared transport for real runs.
+	client := httpx.Client(timeout)
+	if dnsTransport != nil {
+		client.Transport = dnsTransport
 	}
 
 	progress := output.NewProgress(len(dns), "enumerating")

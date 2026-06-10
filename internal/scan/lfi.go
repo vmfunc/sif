@@ -23,6 +23,7 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
 )
@@ -136,14 +137,12 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	client := &http.Client{
-		Timeout: timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 3 {
-				return http.ErrUseLastResponse
-			}
-			return nil
-		},
+	client := httpx.Client(timeout)
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 3 {
+			return http.ErrUseLastResponse
+		}
+		return nil
 	}
 
 	// parse the target URL to check for existing parameters

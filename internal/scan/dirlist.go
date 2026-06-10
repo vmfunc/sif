@@ -22,6 +22,7 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
 )
@@ -64,12 +65,14 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 		list = directoryURL + bigFile
 	}
 
+	client := httpx.Client(timeout)
+
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, list, http.NoBody)
 	if err != nil {
 		log.Error("Error creating directory list request: %s", err)
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Error("Error downloading directory list: %s", err)
 		return nil, err
@@ -81,10 +84,6 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		directories = append(directories, scanner.Text())
-	}
-
-	client := &http.Client{
-		Timeout: timeout,
 	}
 
 	progress := output.NewProgress(len(directories), "fuzzing")

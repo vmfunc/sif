@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
 	googlesearch "github.com/rocketlaunchr/google-search"
@@ -76,7 +77,7 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 		output.Error("Error creating dork list request: %s", err)
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpx.Client(timeout).Do(req)
 	if err != nil {
 		spin.Stop()
 		output.Error("Error downloading dork list: %s", err)

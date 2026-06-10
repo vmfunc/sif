@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 )
 
 // jwtRegex matches JWT tokens in JavaScript content.
@@ -110,7 +111,7 @@ func getSupabaseOpenAPI(projectId, apikey string, auth *string, timeout time.Dur
 
 // doSupabaseRequest performs a GET request to the Supabase API.
 func doSupabaseRequest(projectId, path, apikey string, auth *string, timeout time.Duration) ([]byte, *http.Response, error) {
-	client := http.Client{Timeout: timeout}
+	client := httpx.Client(timeout)
 
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "https://"+projectId+".supabase.co"+path, http.NoBody)
 	if err != nil {
@@ -182,7 +183,7 @@ func ScanSupabase(jsContent string, jsUrl string, timeout time.Duration) ([]supa
 		}
 
 		supabaselog.Infof("Found valid supabase project %s with role %s", *supabaseJwt.ProjectId, *supabaseJwt.Role)
-		client := http.Client{Timeout: timeout}
+		client := httpx.Client(timeout)
 
 		req, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, "https://"+*supabaseJwt.ProjectId+".supabase.co/auth/v1/signup", bytes.NewBufferString(`{"email":"automated`+strconv.Itoa(int(time.Now().Unix()))+`@sif.sh","password":"automatedacct"}`))
 		if err != nil {

@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
 )
@@ -180,7 +181,7 @@ func resolveHostname(hostname string) (string, error) {
 }
 
 func queryShodanHost(ip string, apiKey string, timeout time.Duration) (*ShodanResult, error) {
-	client := &http.Client{Timeout: timeout}
+	client := httpx.Client(timeout)
 
 	reqURL := fmt.Sprintf("%s/shodan/host/%s?key=%s", shodanBaseURL, ip, apiKey)
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, reqURL, http.NoBody)

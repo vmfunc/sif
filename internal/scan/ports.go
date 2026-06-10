@@ -23,6 +23,7 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
 )
@@ -50,7 +51,7 @@ func Ports(ctx context.Context, scope string, url string, timeout time.Duration,
 			log.Error("Error creating request: %s", err)
 			return nil, err
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := httpx.Client(timeout).Do(req)
 		if err != nil {
 			log.Error("Error downloading ports list: %s", err)
 			return nil, err

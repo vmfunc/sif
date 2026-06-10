@@ -172,6 +172,24 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-lfi` | local file inclusion |
 | `-framework` | framework detection with cve lookup |
 
+### http options
+
+these apply to every outbound request across all scanners:
+
+| flag | description |
+|------|-------------|
+| `-proxy` | route all traffic through a proxy (http/https/socks5 url) |
+| `-H`, `--header` | custom header to send (repeatable or comma-separated, `"Key: Value"`) |
+| `-cookie` | cookie header to send with every request |
+| `-rate-limit` | max requests per second (0 = unlimited, default 0) |
+
+```bash
+# scan through a socks5 proxy with a custom header, cookie and 20 req/s cap
+./sif -u https://example.com -headers -proxy socks5://127.0.0.1:1080 -H "Authorization: Bearer tok" -cookie "session=abc" -rate-limit 20
+```
+
+a scanner that sets a header explicitly (e.g. an api key) always wins over the global default.
+
 ### yaml modules
 
 list available modules:

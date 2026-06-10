@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
 )
@@ -73,7 +74,7 @@ func SecurityTrails(targetURL string, timeout time.Duration, logdir string) (*Se
 	}
 	hostname := parsedURL.Hostname()
 
-	client := &http.Client{Timeout: timeout}
+	client := httpx.Client(timeout)
 
 	result := &SecurityTrailsResult{
 		Domain: hostname,

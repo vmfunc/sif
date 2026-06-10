@@ -23,6 +23,7 @@ import (
 
 	"github.com/antchfx/htmlquery"
 	charmlog "github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/output"
 	"github.com/dropalldatabases/sif/internal/scan/js/frameworks"
 	urlutil "github.com/projectdiscovery/utils/url"
@@ -43,6 +44,8 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 	spin := output.NewSpinner("Scanning JavaScript files")
 	spin.Start()
 
+	client := httpx.Client(timeout)
+
 	baseUrl, err := urlutil.Parse(url)
 	if err != nil {
 		spin.Stop()
@@ -53,7 +56,7 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 		spin.Stop()
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		spin.Stop()
 		return nil, err
@@ -120,7 +123,7 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 			charmlog.Warnf("Failed to create request: %s", err)
 			continue
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			charmlog.Warnf("Failed to fetch script: %s", err)
 			continue
