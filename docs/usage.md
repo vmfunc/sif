@@ -464,6 +464,56 @@ snapshot directory for `-diff`. precedence when unset: the `-log` dir if one is 
 ./sif -u https://example.com -sh -diff -store ./snapshots
 ```
 
+
+## notify options
+
+ship findings to a chat/webhook sink after the scan. every provider is a single POST through the shared http client, so the global proxy/rate-limit/header config applies. with nothing configured, `-notify` is a silent no-op.
+
+### -notify
+
+enable delivery to every configured provider:
+
+```bash
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+./sif -u https://example.com -cors -xss -notify
+```
+
+### -notify-severity
+
+minimum severity to send: `info`, `low`, `medium`, `high` or `critical` (default `medium`). findings below the floor are dropped, so info-level recon noise doesn't flood a channel. an unrecognized value falls back to `medium`:
+
+```bash
+./sif -u https://example.com -cors -notify -notify-severity high
+```
+
+### -notify-config
+
+path to a yaml config that overrides the env vars per-field. the keys match [projectdiscovery/notify](https://github.com/projectdiscovery/notify) so an existing config ports over:
+
+```yaml
+slack_webhook_url: https://hooks.slack.com/services/...
+discord_webhook_url: https://discord.com/api/webhooks/...
+telegram_api_key: 123456:abcdef
+telegram_chat_id: "987654"
+webhook_url: https://example.internal/sif-findings
+```
+
+```bash
+./sif -u https://example.com -cors -notify -notify-config notify.yaml
+```
+
+providers are resolved env-first, then overlaid by the yaml file:
+
+| env var | yaml key | provider |
+|---------|----------|----------|
+| `SLACK_WEBHOOK_URL` | `slack_webhook_url` | slack incoming webhook |
+| `DISCORD_WEBHOOK_URL` | `discord_webhook_url` | discord webhook |
+| `TELEGRAM_BOT_TOKEN` | `telegram_api_key` | telegram bot api (needs chat id too) |
+| `TELEGRAM_CHAT_ID` | `telegram_chat_id` | telegram destination chat |
+| `NOTIFY_WEBHOOK_URL` | `webhook_url` | generic json webhook (structured findings) |
+
+slack/discord/telegram receive a fixed-width finding block; the generic webhook receives structured json (`{count, findings[]}`) for downstream automation.
+
 ## api options
 
 ### -api

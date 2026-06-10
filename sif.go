@@ -31,6 +31,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/modules"
+	"github.com/dropalldatabases/sif/internal/notify"
 	"github.com/dropalldatabases/sif/internal/output"
 	"github.com/dropalldatabases/sif/internal/report"
 	"github.com/dropalldatabases/sif/internal/scan"
@@ -699,6 +700,14 @@ func (app *App) Run() error {
 	// count now so the path is live and observable without changing output.
 	log.Debugf("normalized %d findings across %d targets", len(allFindings), len(app.targets))
 
+	// notify: ship the severity-filtered findings to any configured provider.
+	// kept as an isolated block so it merges cleanly with the diff-store bundle.
+	if app.settings.Notify {
+		if err := app.notifyFindings(context.Background(), allFindings); err != nil {
+			log.Errorf("notify: %v", err)
+		}
+	}
+
 	// -silent: stdout is the findings stream, one terse line each. all chrome
 	// already went to stderr via the rerouted sink, so this is the only thing a
 	// downstream pipe sees.
@@ -843,6 +852,31 @@ func (app *App) writeReports(results []report.Result) error {
 	}
 
 	return nil
+}
+
+// notifyFindings filters the run's findings to the -notify-severity floor and
+// ships the survivors to every configured provider. an unrecognized severity
+// string parses to SeverityUnknown, which would let everything through; guard
+// against that by defaulting to medium so a typo can't flood a channel with
+// info noise. an empty filtered set makes notify.Send a no-op.
+func (app *App) notifyFindings(ctx context.Context, findings []finding.Finding) error {
+	floor := finding.ParseSeverity(app.settings.NotifySeverity)
+	if floor == finding.SeverityUnknown {
+		log.Warnf("notify: unknown severity %q, defaulting to medium", app.settings.NotifySeverity)
+		floor = finding.SeverityMedium
+	}
+
+	filtered := make([]finding.Finding, 0, len(findings))
+	for i := 0; i < len(findings); i++ {
+		if findings[i].Severity.AtLeast(floor) {
+			filtered = append(filtered, findings[i])
+		}
+	}
+
+	return notify.Send(ctx, filtered, notify.Options{
+		Timeout:    app.settings.Timeout,
+		ConfigPath: app.settings.NotifyConfig,
+	})
 }
 
 // expandTargets queries SecurityTrails for each original target and returns

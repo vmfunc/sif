@@ -209,6 +209,17 @@ the first run for a target reports everything as new.
 .BR \-store " \fIdir\fR"
 snapshot directory for \fB\-diff\fR. defaults to the \fB\-log\fR dir if set,
 otherwise \fI<user\-config>/sif/state\fR. one sanitized file per target.
+.B \-notify
+ship findings to every configured provider (slack, discord, telegram, generic
+webhook) after the scan. providers are configured env\-first and overridable by a
+yaml file; with nothing configured this is a silent no\-op.
+.TP
+.BR \-notify\-severity " \fIlevel\fR"
+minimum severity to send: \fBinfo\fR, \fBlow\fR, \fBmedium\fR, \fBhigh\fR or
+\fBcritical\fR (default \fBmedium\fR). findings below the floor are dropped.
+.TP
+.BR \-notify\-config " \fIfile\fR"
+path to a notify\-compatible yaml config whose values override the env vars.
 .TP
 .B \-api
 emit json results and suppress the interactive output.
@@ -240,6 +251,22 @@ api key used by \fB\-shodan\fR.
 .TP
 .B SECURITYTRAILS_API_KEY
 api key used by \fB\-securitytrails\fR.
+.TP
+.B SLACK_WEBHOOK_URL
+slack incoming webhook used by \fB\-notify\fR (yaml key \fBslack_webhook_url\fR).
+.TP
+.B DISCORD_WEBHOOK_URL
+discord webhook used by \fB\-notify\fR (yaml key \fBdiscord_webhook_url\fR).
+.TP
+.B TELEGRAM_BOT_TOKEN
+telegram bot token used by \fB\-notify\fR (yaml key \fBtelegram_api_key\fR);
+requires \fBTELEGRAM_CHAT_ID\fR too.
+.TP
+.B TELEGRAM_CHAT_ID
+telegram destination chat used by \fB\-notify\fR (yaml key \fBtelegram_chat_id\fR).
+.TP
+.B NOTIFY_WEBHOOK_URL
+generic json webhook used by \fB\-notify\fR (yaml key \fBwebhook_url\fR).
 .TP
 .B SIF_NO_PATCHNOTES
 set to any value to suppress the once\-per\-version patch note shown at startup.

@@ -79,6 +79,9 @@ type Settings struct {
 	Header            goflags.StringSlice // custom request headers ("Key: Value")
 	Cookie            string
 	RateLimit         int
+	Notify            bool   // -notify: ship findings to configured providers
+	NotifySeverity    string // -notify-severity: minimum severity to send (info..critical)
+	NotifyConfig      string // -notify-config: path to a notify-compatible yaml file
 }
 
 // minThreads is the floor for the worker count. Threads feeds wg.Add across the
@@ -89,6 +92,10 @@ const minThreads = 1
 // defaultCrawlDepth bounds how far the spider recurses by default; deep enough
 // to find linked pages without crawling an entire site.
 const defaultCrawlDepth = 2
+
+// defaultNotifySeverity is the floor notify sends at when -notify-severity is
+// unset: medium drops pure recon/info noise so alerts stay actionable.
+const defaultNotifySeverity = "medium"
 
 const (
 	Nil goflags.EnumVariable = iota
@@ -178,6 +185,12 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.Silent, "silent", false, "Plain output: chrome to stderr, one finding per line to stdout (for pipelines)"),
 		flagSet.BoolVar(&settings.Diff, "diff", false, "Diff mode: surface only findings added/removed since the last snapshot of each target"),
 		flagSet.StringVar(&settings.Store, "store", "", "Snapshot directory for -diff (default: log dir, else <user-config>/sif/state)"),
+	)
+
+	flagSet.CreateGroup("notify", "Notify",
+		flagSet.BoolVar(&settings.Notify, "notify", false, "Ship findings to configured providers (slack/discord/telegram/webhook)"),
+		flagSet.StringVar(&settings.NotifySeverity, "notify-severity", defaultNotifySeverity, "Minimum severity to notify on (info/low/medium/high/critical)"),
+		flagSet.StringVar(&settings.NotifyConfig, "notify-config", "", "Path to a notify-compatible yaml config (overrides env vars)"),
 	)
 
 	flagSet.CreateGroup("api", "API",
