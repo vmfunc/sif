@@ -41,29 +41,49 @@ func stripScheme(url string) string {
 	return url
 }
 
-func fetchRobotsTXT(url string, client *http.Client) *http.Response {
-	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
-	if err != nil {
-		log.Debugf("Error creating request for robots.txt: %s", err)
-		return nil
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Debugf("Error fetching robots.txt: %s", err)
-		return nil
-	}
+// maxRobotsRedirects caps how many 301 hops fetchRobotsTXT will chase. without
+// a bound an A->B->A redirect loop recursed forever and blew the stack.
+const maxRobotsRedirects = 10
 
-	if resp.StatusCode == http.StatusMovedPermanently {
+// fetchRobotsTXT follows 301s to robots.txt iteratively, bounded by both a hop
+// cap and a visited set so a redirect cycle terminates instead of recursing
+// without end.
+func fetchRobotsTXT(url string, client *http.Client) *http.Response {
+	visited := make(map[string]bool, maxRobotsRedirects)
+
+	for hop := 0; hop < maxRobotsRedirects; hop++ {
+		if visited[url] {
+			log.Debugf("redirect loop hit at %s, stopping", url)
+			return nil
+		}
+		visited[url] = true
+
+		req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
+		if err != nil {
+			log.Debugf("Error creating request for robots.txt: %s", err)
+			return nil
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Debugf("Error fetching robots.txt: %s", err)
+			return nil
+		}
+
+		if resp.StatusCode != http.StatusMovedPermanently {
+			return resp
+		}
+
 		redirectURL := resp.Header.Get("Location")
+		resp.Body.Close()
 		if redirectURL == "" {
 			log.Debugf("Redirect location is empty for %s", url)
 			return nil
 		}
-		resp.Body.Close()
-		return fetchRobotsTXT(redirectURL, client)
+		url = redirectURL
 	}
 
-	return resp
+	log.Debugf("robots.txt redirect depth exceeded (%d hops)", maxRobotsRedirects)
+	return nil
 }
 
 // Scan performs a basic URL scan, including checks for robots.txt and other common endpoints.
