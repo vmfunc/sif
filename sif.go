@@ -194,6 +194,7 @@ func (app *App) Run() error {
 		Headers:   app.settings.Header,
 		Cookie:    app.settings.Cookie,
 		RateLimit: app.settings.RateLimit,
+		Threads:   app.settings.Threads,
 	}); err != nil {
 		log.Warnf("http client config failed, continuing with defaults: %v", err)
 	}

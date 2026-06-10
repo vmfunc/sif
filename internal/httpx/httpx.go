@@ -17,6 +17,8 @@ package httpx
 
 import (
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -41,6 +43,29 @@ const headerSep = ": "
 // equal to the per-second rate keeps the cap honest over any one-second window.
 const limiterBurstPerRate = 1
 
+// transport pool tuning. go's default transport caps idle conns per host at 2
+// and reuse only kicks in once a response body is fully drained, so without
+// these a high thread count just thrashes the dialer instead of pooling.
+const (
+	// total idle conns kept warm across every host we hit in a run.
+	maxIdleConns = 512
+	// floor for per-host idle conns so a single-target run still pools even
+	// when the thread count is tiny.
+	minIdleConnsPerHost = 8
+	// how long an idle conn lingers before the pool reaps it.
+	idleConnTimeout = 90 * time.Second
+	// keepalive probe interval for live conns; mirrors go's default dialer so
+	// the socks5 branch doesn't silently lose os-level keepalive.
+	dialKeepAlive = 30 * time.Second
+	// dial timeout for the socks5 branch; matches go's default dialer.
+	dialTimeout = 30 * time.Second
+)
+
+// drainCap bounds how much of an unread body DrainClose will copy before
+// closing; a body larger than this isn't worth slurping just to reuse the
+// conn, so we cap the read and let the conn be discarded instead.
+const drainCap = 16 << 10
+
 // Options carries the runtime knobs that apply to every outbound request.
 // RateLimit is requests/sec (0 = unlimited); Headers are "Key: Value" strings.
 type Options struct {
@@ -49,6 +74,9 @@ type Options struct {
 	Cookie    string
 	UserAgent string
 	RateLimit int
+	// Threads is the scan worker count; it sizes the per-host idle pool so
+	// concurrent workers hitting one target reuse conns instead of dialing fresh.
+	Threads int
 }
 
 // configured holds the package-level transport built once by Configure. nil
@@ -63,7 +91,7 @@ var (
 //
 //nolint:gocritic // signature is the package's stable startup api; called once.
 func Configure(opts Options) error {
-	base, err := buildTransport(opts.Proxy)
+	base, err := buildTransport(opts.Proxy, opts.Threads)
 	if err != nil {
 		return err
 	}
@@ -104,15 +132,25 @@ func Client(timeout time.Duration) *http.Client {
 	return &http.Client{Timeout: timeout, Transport: rt}
 }
 
-// buildTransport clones the default transport and applies the proxy. An empty
-// proxy leaves the default behavior (respects HTTP_PROXY env) intact.
-func buildTransport(proxyURL string) (*http.Transport, error) {
+// buildTransport clones the default transport, tunes its pool for the worker
+// count and applies the proxy. An empty proxy leaves the default behavior
+// (respects HTTP_PROXY env) intact.
+func buildTransport(proxyURL string, threads int) (*http.Transport, error) {
 	tr, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		// unreachable in practice, but never trust an assertion silently.
 		return nil, fmt.Errorf("default transport is not *http.Transport")
 	}
 	transport := tr.Clone()
+
+	// size the idle pool so every worker can keep its conn warm. per-host idle
+	// must clear the thread count or workers past the cap re-dial each request;
+	// MaxConnsPerHost stays 0 (unbounded) so the limiter, not the pool, paces us.
+	transport.MaxIdleConns = maxIdleConns
+	transport.MaxIdleConnsPerHost = idlePerHost(threads)
+	transport.MaxConnsPerHost = 0
+	transport.IdleConnTimeout = idleConnTimeout
+	transport.ForceAttemptHTTP2 = true
 
 	if proxyURL == "" {
 		return transport, nil
@@ -127,9 +165,11 @@ func buildTransport(proxyURL string) (*http.Transport, error) {
 	case schemeHTTP, schemeHTTPS:
 		transport.Proxy = http.ProxyURL(parsed)
 	case schemeSOCKS5:
-		// socks5 needs a custom dialer; the returned dialer implements
-		// ContextDialer so cancellation/timeouts propagate.
-		dialer, err := proxy.SOCKS5("tcp", parsed.Host, nil, proxy.Direct)
+		// socks5 needs a custom dialer. proxy.SOCKS5 takes a forward dialer, so
+		// hand it our own net.Dialer with keepalive set - the default
+		// proxy.Direct has none, which would kill os-level conn pooling.
+		fwd := &net.Dialer{Timeout: dialTimeout, KeepAlive: dialKeepAlive}
+		dialer, err := proxy.SOCKS5("tcp", parsed.Host, nil, fwd)
 		if err != nil {
 			return nil, fmt.Errorf("socks5 proxy %q: %w", proxyURL, err)
 		}
@@ -143,6 +183,29 @@ func buildTransport(proxyURL string) (*http.Transport, error) {
 	}
 
 	return transport, nil
+}
+
+// idlePerHost picks the per-host idle pool size: at least the worker count so
+// no worker re-dials, never below the floor so a small thread count still pools.
+func idlePerHost(threads int) int {
+	if threads < minIdleConnsPerHost {
+		return minIdleConnsPerHost
+	}
+	return threads
+}
+
+// DrainClose fully reads (up to drainCap) and closes resp.Body. go only returns
+// a conn to the idle pool when the body is read to EOF, so a caller that only
+// closes leaks the conn and forces a fresh dial next time. Call this instead of
+// a bare resp.Body.Close() to keep the pool warm. Safe on a nil response.
+func DrainClose(resp *http.Response) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
+	// the read result is intentionally ignored: we're discarding the body and
+	// about to close it, so a copy error changes nothing we can act on.
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, drainCap))
+	resp.Body.Close()
 }
 
 // parseHeaders splits each "Key: Value" entry on the first ": ". Entries
