@@ -200,6 +200,16 @@ plain output for pipelines: route all chrome to stderr and print one
 normalized finding per line to stdout as \fB[severity] target module title\fR.
 implies non\-interactive (no spinners).
 .TP
+.B \-diff
+diff mode: snapshot each target's findings to a json file and, on a re\-scan,
+print only the delta against the last snapshot (\fB+ new\fR for findings that
+appeared, \fB- gone\fR for ones that vanished), then overwrite the snapshot.
+the first run for a target reports everything as new.
+.TP
+.BR \-store " \fIdir\fR"
+snapshot directory for \fB\-diff\fR. defaults to the \fB\-log\fR dir if set,
+otherwise \fI<user\-config>/sif/state\fR. one sanitized file per target.
+.TP
 .B \-api
 emit json results and suppress the interactive output.
 .SH MODULES

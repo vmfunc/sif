@@ -69,6 +69,8 @@ type Settings struct {
 	SARIF             string // path to write a sarif 2.1.0 report to ("" = off)
 	Markdown          string // path to write a markdown report to ("" = off)
 	Silent            bool   // route chrome to stderr, print one finding per line to stdout
+	Diff              bool   // surface only findings added/removed vs the last snapshot
+	Store             string // snapshot dir for diff mode ("" = default state dir)
 	Modules           string // Comma-separated list of module IDs to run
 	ModuleTags        string // Run modules matching these tags
 	AllModules        bool   // Run all loaded modules
@@ -174,6 +176,8 @@ func Parse() *Settings {
 		flagSet.StringVar(&settings.SARIF, "sarif", "", "Write a SARIF 2.1.0 report to this file"),
 		flagSet.StringVarP(&settings.Markdown, "markdown", "md", "", "Write a markdown report to this file"),
 		flagSet.BoolVar(&settings.Silent, "silent", false, "Plain output: chrome to stderr, one finding per line to stdout (for pipelines)"),
+		flagSet.BoolVar(&settings.Diff, "diff", false, "Diff mode: surface only findings added/removed since the last snapshot of each target"),
+		flagSet.StringVar(&settings.Store, "store", "", "Snapshot directory for -diff (default: log dir, else <user-config>/sif/state)"),
 	)
 
 	flagSet.CreateGroup("api", "API",

@@ -220,6 +220,8 @@ write the run's findings out to a file for ci/cd or triage:
 | `-sarif` | write a sarif 2.1.0 report to this file |
 | `-markdown`, `-md` | write a markdown report to this file |
 | `-silent` | plain output: chrome to stderr, one finding per line to stdout (for pipelines) |
+| `-diff` | surface only findings added/removed since the last snapshot of each target |
+| `-store` | snapshot directory for `-diff` (default: log dir, else `<user-config>/sif/state`) |
 
 ```bash
 # scan and emit both a sarif and markdown report
@@ -227,6 +229,18 @@ write the run's findings out to a file for ci/cd or triage:
 ```
 
 sarif output is ingestable by github code scanning; markdown is a readable per-target summary.
+
+### diff mode
+
+`-diff` turns a re-scan into a monitor: sif snapshots each target's normalized findings to a json file, and on the next run reports only the delta (`+ new` / `- gone`) against that snapshot, then overwrites it. the first run for a target has no baseline, so everything is `+ new`. snapshots land in `-store` (one sanitized file per target); when unset they reuse the log dir, falling back to `<user-config>/sif/state`.
+
+```bash
+# baseline run, then re-scan later and see only what moved
+./sif -u https://example.com -sh -cors -diff
+./sif -u https://example.com -sh -cors -diff
+```
+
+the snapshot is always rewritten, so each run diffs against the previous one. the delta is chrome (it rides the normal output sink / stderr under `-silent`), not the findings stream.
 
 ### pipe mode
 

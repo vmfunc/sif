@@ -61,6 +61,14 @@ func TestSettingsDefaults(t *testing.T) {
 	if settings.Ports != "" {
 		t.Errorf("expected Ports default to be empty, got %v", settings.Ports)
 	}
+
+	// diff mode is opt-in and its store dir defaults empty (resolved at runtime).
+	if settings.Diff != false {
+		t.Errorf("expected Diff default to be false, got %v", settings.Diff)
+	}
+	if settings.Store != "" {
+		t.Errorf("expected Store default to be empty, got %v", settings.Store)
+	}
 }
 
 func TestSettingsNoScanBehavior(t *testing.T) {

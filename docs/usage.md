@@ -442,6 +442,28 @@ plain output for pipelines: all banner/spinner/log chrome goes to stderr and std
 subfinder -d example.com | sif -silent -probe -sh | notify
 ```
 
+### -diff
+
+turn a re-scan into a monitor. sif snapshots each target's normalized findings to a json file under the store dir; on the next run it loads that snapshot, diffs the current findings against it by finding key, and prints only the delta (`+ new` for findings that appeared, `- gone` for findings that vanished). it always rewrites the snapshot afterwards, so each run compares against the previous one.
+
+the first run for a target has no snapshot, so every finding shows as `+ new`. when nothing changed, sif notes that and writes a fresh snapshot anyway.
+
+```bash
+# baseline, then re-scan and see only what moved
+./sif -u https://example.com -sh -cors -diff
+./sif -u https://example.com -sh -cors -diff
+```
+
+the delta is chrome, not the findings stream: under `-silent` it rides stderr with the rest of the chrome, leaving stdout for the full findings.
+
+### -store
+
+snapshot directory for `-diff`. precedence when unset: the `-log` dir if one is given, else `<user-config>/sif/state` (`$XDG_CONFIG_HOME/sif/state` on linux, `~/Library/Application Support/sif/state` on macos). one sanitized file per target, created at `0750`, written `0600`.
+
+```bash
+./sif -u https://example.com -sh -diff -store ./snapshots
+```
+
 ## api options
 
 ### -api
