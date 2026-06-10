@@ -61,6 +61,9 @@ type Settings struct {
 	Crawl             bool
 	CrawlDepth        int
 	Passive           bool
+	Probe             bool
+	SARIF             string // path to write a sarif 2.1.0 report to ("" = off)
+	Markdown          string // path to write a markdown report to ("" = off)
 	Modules           string // Comma-separated list of module IDs to run
 	ModuleTags        string // Run modules matching these tags
 	AllModules        bool   // Run all loaded modules
@@ -140,6 +143,7 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.Crawl, "crawl", false, "Enable web crawling (spider same-host links/scripts/forms)"),
 		flagSet.IntVar(&settings.CrawlDepth, "crawl-depth", defaultCrawlDepth, "Max crawl recursion depth"),
 		flagSet.BoolVar(&settings.Passive, "passive", false, "Enable passive subdomain/url discovery (zero traffic to target)"),
+		flagSet.BoolVar(&settings.Probe, "probe", false, "Probe the target for liveness (status, title, server, redirect chain)"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",
@@ -155,6 +159,11 @@ func Parse() *Settings {
 		flagSet.StringSliceVarP(&settings.Header, "header", "H", nil, "Custom header to send (repeatable or comma-separated, \"Key: Value\")", goflags.CommaSeparatedStringSliceOptions),
 		flagSet.StringVar(&settings.Cookie, "cookie", "", "Cookie header to send with every request"),
 		flagSet.IntVar(&settings.RateLimit, "rate-limit", 0, "Max requests per second (0 = unlimited)"),
+	)
+
+	flagSet.CreateGroup("output", "Output",
+		flagSet.StringVar(&settings.SARIF, "sarif", "", "Write a SARIF 2.1.0 report to this file"),
+		flagSet.StringVarP(&settings.Markdown, "markdown", "md", "", "Write a markdown report to this file"),
 	)
 
 	flagSet.CreateGroup("api", "API",

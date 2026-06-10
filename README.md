@@ -188,6 +188,7 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-crawl` | web crawler (spider same-host links/scripts/forms) |
 | `-crawl-depth` | max crawl recursion depth (default 2) |
 | `-passive` | passive subdomain/url discovery (zero traffic to target) |
+| `-probe` | live-host probe (status, title, server, redirect chain) |
 
 ### http options
 
@@ -206,6 +207,22 @@ these apply to every outbound request across all scanners:
 ```
 
 a scanner that sets a header explicitly (e.g. an api key) always wins over the global default.
+
+### report export
+
+write the run's findings out to a file for ci/cd or triage:
+
+| flag | description |
+|------|-------------|
+| `-sarif` | write a sarif 2.1.0 report to this file |
+| `-markdown`, `-md` | write a markdown report to this file |
+
+```bash
+# scan and emit both a sarif and markdown report
+./sif -u https://example.com -headers -cors -sarif out.sarif -md out.md
+```
+
+sarif output is ingestable by github code scanning; markdown is a readable per-target summary.
 
 ### yaml modules
 

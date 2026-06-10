@@ -245,6 +245,22 @@ func TestIntegrationXSS(t *testing.T) {
 	}
 }
 
+func TestIntegrationProbe(t *testing.T) {
+	srv := newVulnApp()
+	defer srv.Close()
+
+	result, err := Probe(srv.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("Probe: %v", err)
+	}
+	if result == nil || !result.Alive {
+		t.Fatalf("expected the vuln app to be alive, got %+v", result)
+	}
+	if result.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 from the homepage, got %d", result.StatusCode)
+	}
+}
+
 func TestIntegrationPorts(t *testing.T) {
 	// a real listener stands in for an open port; a tiny server hands its number
 	// to Ports via the commonPorts wordlist.

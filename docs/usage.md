@@ -242,6 +242,14 @@ keyless and zero traffic to the target itself - all lookups hit third-party feed
 ./sif -u https://example.com -passive
 ```
 
+### live-host probe
+
+`-probe` - check whether the target is alive and report its final status, page title, server header, content-length and the redirect chain it walked
+
+```bash
+./sif -u https://example.com -probe
+```
+
 ### whois lookup
 
 `-whois` - perform whois lookups
@@ -361,6 +369,26 @@ cap outbound requests per second (0 = unlimited, default 0):
 
 ```bash
 ./sif -u https://example.com -rate-limit 20
+```
+
+## output options
+
+write the collected findings out to a file after the scan. both formats can be requested in the same run.
+
+### -sarif
+
+write a sarif 2.1.0 report (one run, tool `sif`, one result per finding). ingestable by github code scanning and other sarif consumers:
+
+```bash
+./sif -u https://example.com -headers -cors -sarif out.sarif
+```
+
+### -md, --markdown
+
+write a readable markdown report grouped by target, then by module:
+
+```bash
+./sif -u https://example.com -headers -cors -md report.md
 ```
 
 ## api options
