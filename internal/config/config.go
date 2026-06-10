@@ -30,6 +30,7 @@ type Settings struct {
 	DirWordlist       string // -w  dirlist: custom wordlist (file path or url)
 	DirExtensions     string // -e  dirlist: extensions appended to each word
 	Dnslist           string
+	Resolvers         string // -resolvers dnslist: comma list overriding the bundled pool
 	Debug             bool
 	LogDir            string
 	NoScan            bool
@@ -120,6 +121,7 @@ func Parse() *Settings {
 		flagSet.StringVar(&settings.DirWordlist, "w", "", "Dirlist: custom wordlist (local file path or url; overrides -dirlist size)"),
 		flagSet.StringVar(&settings.DirExtensions, "e", "", "Dirlist: extensions appended to each word (comma list, e.g. php,bak,env)"),
 		flagSet.EnumVar(&settings.Dnslist, "dnslist", Nil, "DNS fuzzing scan size (small/medium/large)", listSizes),
+		flagSet.StringVar(&settings.Resolvers, "resolvers", "", "Dnslist: DNS resolvers to use (comma list, e.g. 1.1.1.1,8.8.8.8; overrides the bundled pool)"),
 		flagSet.EnumVar(&settings.Ports, "ports", Nil, "Port scanning scope (common/full)", portScopes),
 		flagSet.BoolVar(&settings.Dorking, "dork", false, "Enable Google dorking"),
 		flagSet.BoolVar(&settings.Git, "git", false, "Enable git repository scanning"),

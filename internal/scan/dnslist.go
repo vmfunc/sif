@@ -21,6 +21,7 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/dnsx"
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
@@ -32,6 +33,27 @@ var dnsURL = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/mai
 // dnsTransport is a var so integration tests can route the per-host probes at a
 // local server instead of resolving real DNS. nil keeps http.DefaultTransport.
 var dnsTransport http.RoundTripper
+
+// hostResolver is the small slice of dnsx the dnslist worker needs: resolve a
+// candidate and report whether it's a real, non-wildcard hit.
+type hostResolver interface {
+	Resolve(host string) (bool, error)
+}
+
+// newDNSResolver builds the resolver for one run; it's a var so integration
+// tests inject a fake that answers without touching real dns. the apex is
+// fingerprinted for wildcards before any candidate is checked.
+var newDNSResolver = func(apex string, resolvers []string) (hostResolver, error) {
+	r, err := dnsx.NewResolver(resolvers)
+	if err != nil {
+		return nil, fmt.Errorf("dns resolver: %w", err)
+	}
+	if err := r.FingerprintWildcard(apex); err != nil {
+		return nil, fmt.Errorf("wildcard fingerprint: %w", err)
+	}
+
+	return r, nil
+}
 
 const (
 	dnsSmallFile  = "subdomains-100.txt"
@@ -56,8 +78,11 @@ func meaningfulStatus(code int) bool {
 	return code >= http.StatusOK && code < http.StatusMultipleChoices
 }
 
-// Dnslist performs DNS subdomain enumeration on the target domain.
-func Dnslist(size string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
+// Dnslist performs DNS subdomain enumeration on the target domain. each
+// candidate is resolved first; only names that actually resolve (and aren't a
+// wildcard catch-all) are http-probed, so a big wordlist no longer means a
+// http request per dead name.
+func Dnslist(size string, url string, timeout time.Duration, threads int, logdir string, resolvers []string) ([]string, error) {
 	log := output.Module("DNS")
 	log.Start()
 
@@ -91,6 +116,15 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 	}
 
 	sanitizedURL := stripScheme(url)
+
+	// resolve against dns first, fingerprinting the apex for wildcards so a
+	// catch-all zone can't flood the probe step. build it once and share across
+	// the workers - the underlying client is concurrency-safe.
+	resolver, err := newDNSResolver(sanitizedURL, resolvers)
+	if err != nil {
+		log.Error("Error building DNS resolver: %s", err)
+		return nil, err
+	}
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, size+" subdomain fuzzing"); err != nil {
@@ -132,10 +166,23 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 
 				charmlog.Debugf("Looking up: %s", domain)
 
+				host := domain + "." + sanitizedURL
+
+				// dns gate: skip the http probe entirely for names that don't
+				// resolve or that a wildcard zone answers. this is the whole point -
+				// no request per dead candidate.
+				ok, err := resolver.Resolve(host)
+				if err != nil {
+					charmlog.Debugf("resolve %s: %s", host, err)
+					continue
+				}
+				if !ok {
+					continue
+				}
+
 				// probe http first, then https - but a subdomain is recorded at
 				// most once. firing both schemes and appending on each is what
 				// double-counted every host on the old path.
-				host := domain + "." + sanitizedURL
 				foundURL, scheme := probeSubdomain(client, host)
 				if foundURL == "" {
 					continue

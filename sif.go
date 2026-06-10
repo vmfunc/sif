@@ -25,6 +25,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/config"
+	"github.com/dropalldatabases/sif/internal/dnsx"
 	"github.com/dropalldatabases/sif/internal/finding"
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
@@ -270,7 +271,7 @@ func (app *App) Run() error {
 		var dnsResults []string
 
 		if app.settings.Dnslist != "none" {
-			result, err := scan.Dnslist(app.settings.Dnslist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.Dnslist(app.settings.Dnslist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, dnsx.ParseResolvers(app.settings.Resolvers))
 			if err != nil {
 				log.Errorf("Error while running dns scan: %s", err)
 			} else {
