@@ -41,6 +41,15 @@ type Finding struct {
 	Raw      string   // short evidence string, not the full body
 }
 
+// Line renders a finding as one stable, terse, machine-friendly line for the
+// -silent plain sink: "[severity] target module title". no styling, no color -
+// a downstream pipe (notify, grep, awk) keys off the bracketed severity and the
+// fixed field order, so the shape stays frozen. pointer receiver: Finding is
+// wide enough that copying it per line is wasteful.
+func (f *Finding) Line() string {
+	return fmt.Sprintf("[%s] %s %s %s", f.Severity, f.Target, f.Module, f.Title)
+}
+
 // static per-module severities for results that carry no severity field of
 // their own. these are the editorial baseline; a scanner that emits its own
 // severity (cors, xss, nuclei, ...) overrides this on a per-item basis.

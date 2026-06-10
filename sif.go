@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -85,13 +86,19 @@ func NewModuleResult[T ScanResult](data T) ModuleResult {
 func New(settings *config.Settings) (*App, error) {
 	app := &App{settings: settings}
 
+	// -silent reroutes all chrome to stderr (and suppresses spinners) before the
+	// banner prints, so stdout carries nothing but findings even on the banner.
+	if settings.Silent {
+		output.SetSilent(true)
+	}
+
 	if !settings.ApiMode {
-		fmt.Println(output.Box.Render("   █▀ █ █▀▀\n  ▄█ █ █▀ "))
+		fmt.Fprintln(output.Writer(), output.Box.Render("   █▀ █ █▀▀\n  ▄█ █ █▀ "))
 		tagline := "blazing-fast pentesting suite"
 		if Version != "dev" {
 			tagline += " · v" + Version
 		}
-		fmt.Println(output.Subheading.Render("\n" + tagline + "\n\nbsd 3-clause · (c) 2022-2026 vmfunc, xyzeva & contributors\n"))
+		fmt.Fprintln(output.Writer(), output.Subheading.Render("\n"+tagline+"\n\nbsd 3-clause · (c) 2022-2026 vmfunc, xyzeva & contributors\n"))
 	} else {
 		output.SetAPIMode(true)
 	}
@@ -101,10 +108,11 @@ func New(settings *config.Settings) (*App, error) {
 		return app, nil
 	}
 
-	switch {
-	case len(settings.URLs) > 0:
-		app.targets = settings.URLs
-	case settings.File != "":
+	// -u and -f are explicit; stdin is additive so `subfinder | sif -u extra`
+	// still works. order: flags first, then piped lines appended.
+	app.targets = append(app.targets, settings.URLs...)
+
+	if settings.File != "" {
 		if _, err := os.Stat(settings.File); err != nil {
 			return nil, err
 		}
@@ -120,29 +128,105 @@ func New(settings *config.Settings) (*App, error) {
 		for scanner.Scan() {
 			app.targets = append(app.targets, scanner.Text())
 		}
-	default:
-		return nil, fmt.Errorf("target(s) must be supplied with -u or -f\n\nSee 'sif -h' for more information")
 	}
 
-	// Validate all URLs early
-	for _, url := range app.targets {
-		if err := validateURL(url); err != nil {
+	// when stdin is a pipe (not a terminal), drain it for targets so sif slots
+	// into a unix pipeline: `subfinder -d x | sif -silent | notify`. keyed off
+	// stdin's mode, never stdout - a redirected stdout (>file) is not a pipe in.
+	piped, err := stdinPipedFn()
+	if err != nil {
+		return nil, err
+	}
+	if piped {
+		stdinTargets, err := readTargets(stdinReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading targets from stdin: %w", err)
+		}
+		app.targets = append(app.targets, stdinTargets...)
+	}
+
+	if len(app.targets) == 0 {
+		return nil, fmt.Errorf("target(s) must be supplied with -u, -f, or stdin\n\nSee 'sif -h' for more information")
+	}
+
+	// normalize every target in place: a naked host gains a default scheme, an
+	// explicit scheme is kept, genuinely invalid input is rejected early.
+	for i := 0; i < len(app.targets); i++ {
+		normalized, err := normalizeTarget(app.targets[i])
+		if err != nil {
 			return nil, err
 		}
+		app.targets[i] = normalized
 	}
 
 	return app, nil
 }
 
-// validateURL checks that a URL has a valid HTTP/HTTPS protocol.
-func validateURL(url string) error {
-	if url == "" {
-		return fmt.Errorf("empty URL provided")
+// defaultScheme is prepended to scheme-less targets. https is the safer default
+// for recon: it's what modern hosts serve and avoids a cleartext first hop.
+const defaultScheme = "https://"
+
+// stdin ingestion is wired through two seams so it's hermetically testable: the
+// pipe check and the reader can be swapped in tests without touching real fds.
+var (
+	stdinPipedFn           = stdinPiped
+	stdinReader  io.Reader = os.Stdin
+)
+
+// stdinPiped reports whether stdin is a pipe/redirect rather than a terminal.
+// a char device (the tty) means interactive with no piped input; anything else
+// (pipe, file redirect) is treated as a target stream.
+func stdinPiped() (bool, error) {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false, fmt.Errorf("stat stdin: %w", err)
 	}
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		return fmt.Errorf("URL %s must include http:// or https:// protocol", url)
+	return info.Mode()&os.ModeCharDevice == 0, nil
+}
+
+// readTargets scans one target per line from r, dropping blank lines and
+// trimming surrounding whitespace. shared by the stdin path; the file path keeps
+// its own scanner since it preserves lines verbatim for back-compat.
+func readTargets(r io.Reader) ([]string, error) {
+	var out []string
+	scanner := bufio.NewScanner(r)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		out = append(out, line)
 	}
-	return nil
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanning targets: %w", err)
+	}
+	return out, nil
+}
+
+// normalizeTarget canonicalizes a single target. a scheme-less host gets the
+// default scheme; an http:// or https:// target is kept as-is. an empty string
+// or a non-http(s) scheme (ftp://, file://, ...) is rejected so junk can't slip
+// into the scan loop.
+func normalizeTarget(target string) (string, error) {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return "", fmt.Errorf("empty target provided")
+	}
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		return target, nil
+	}
+	// reject anything that carries some other scheme; "://" present but not
+	// http(s) is a deliberate non-web target, not a naked host.
+	if strings.Contains(target, "://") {
+		return "", fmt.Errorf("target %s must use http:// or https:// scheme", target)
+	}
+	// a bare "host:port" or path-only token would also be ambiguous; require at
+	// least a host-looking first segment (no spaces) before defaulting a scheme.
+	if strings.ContainsAny(target, " \t") {
+		return "", fmt.Errorf("invalid target %q", target)
+	}
+	return defaultScheme + target, nil
 }
 
 // Run runs the pentesting suite, with the targets specified, according to the
@@ -562,6 +646,13 @@ func (app *App) Run() error {
 	// count now so the path is live and observable without changing output.
 	log.Debugf("normalized %d findings across %d targets", len(allFindings), len(app.targets))
 
+	// -silent: stdout is the findings stream, one terse line each. all chrome
+	// already went to stderr via the rerouted sink, so this is the only thing a
+	// downstream pipe sees.
+	if app.settings.Silent {
+		printFindings(allFindings)
+	}
+
 	if wantReport {
 		if err := app.writeReports(reportResults); err != nil {
 			return err
@@ -573,6 +664,18 @@ func (app *App) Run() error {
 	}
 
 	return nil
+}
+
+// printFindings writes one normalized finding per line to stdout for the
+// -silent plain sink. a single Builder over the run avoids interleaving with
+// any stray stderr chrome and keeps the write to one syscall.
+func printFindings(findings []finding.Finding) {
+	var b strings.Builder
+	for i := 0; i < len(findings); i++ {
+		b.WriteString(findings[i].Line())
+		b.WriteByte('\n')
+	}
+	fmt.Print(b.String())
 }
 
 // collectFindings normalizes one target's module results through finding.Flatten

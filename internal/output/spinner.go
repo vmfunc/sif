@@ -14,7 +14,6 @@ package output
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"time"
 )
@@ -42,7 +41,7 @@ func NewSpinner(message string) *Spinner {
 
 // Start begins the spinner animation
 func (s *Spinner) Start() {
-	if apiMode {
+	if apiMode || silent {
 		return
 	}
 
@@ -57,7 +56,7 @@ func (s *Spinner) Start() {
 
 	// In non-TTY mode, just print the message once
 	if !IsTTY {
-		fmt.Printf("    %s...\n", s.message)
+		fmt.Fprintf(sink, "    %s...\n", s.message)
 		return
 	}
 
@@ -66,7 +65,7 @@ func (s *Spinner) Start() {
 
 // Stop halts the spinner and clears the line
 func (s *Spinner) Stop() {
-	if apiMode {
+	if apiMode || silent {
 		return
 	}
 
@@ -112,8 +111,8 @@ func (s *Spinner) animate() {
 			spinnerChar := prefixInfo.Render(spinnerFrames[frame])
 			line := fmt.Sprintf("\r    %s %s", spinnerChar, msg)
 
-			fmt.Fprint(os.Stdout, "\033[2K") // Clear line
-			fmt.Fprint(os.Stdout, line)
+			fmt.Fprint(sink, "\033[2K") // Clear line
+			fmt.Fprint(sink, line)
 
 			frame = (frame + 1) % len(spinnerFrames)
 		}

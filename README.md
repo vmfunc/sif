@@ -216,6 +216,7 @@ write the run's findings out to a file for ci/cd or triage:
 |------|-------------|
 | `-sarif` | write a sarif 2.1.0 report to this file |
 | `-markdown`, `-md` | write a markdown report to this file |
+| `-silent` | plain output: chrome to stderr, one finding per line to stdout (for pipelines) |
 
 ```bash
 # scan and emit both a sarif and markdown report
@@ -223,6 +224,21 @@ write the run's findings out to a file for ci/cd or triage:
 ```
 
 sarif output is ingestable by github code scanning; markdown is a readable per-target summary.
+
+### pipe mode
+
+sif reads targets from stdin and accepts naked hosts, so it drops into a unix pipeline. `-silent` routes all banner/spinner/log chrome to stderr and prints one normalized finding per line (`[severity] target module title`) to stdout:
+
+```bash
+# subfinder feeds hosts, sif probes them, notify ships the findings
+subfinder -d example.com | sif -silent -probe | notify
+```
+
+| flag | description |
+|------|-------------|
+| stdin | a piped target stream (one host/url per line) is read alongside `-u`/`-f` |
+
+scheme-less hosts default to `https://`; an explicit `http://`/`https://` is kept; any other scheme (`ftp://`, ...) is rejected.
 
 ### yaml modules
 

@@ -65,6 +65,7 @@ type Settings struct {
 	Probe             bool
 	SARIF             string // path to write a sarif 2.1.0 report to ("" = off)
 	Markdown          string // path to write a markdown report to ("" = off)
+	Silent            bool   // route chrome to stderr, print one finding per line to stdout
 	Modules           string // Comma-separated list of module IDs to run
 	ModuleTags        string // Run modules matching these tags
 	AllModules        bool   // Run all loaded modules
@@ -166,6 +167,7 @@ func Parse() *Settings {
 	flagSet.CreateGroup("output", "Output",
 		flagSet.StringVar(&settings.SARIF, "sarif", "", "Write a SARIF 2.1.0 report to this file"),
 		flagSet.StringVarP(&settings.Markdown, "markdown", "md", "", "Write a markdown report to this file"),
+		flagSet.BoolVar(&settings.Silent, "silent", false, "Plain output: chrome to stderr, one finding per line to stdout (for pipelines)"),
 	)
 
 	flagSet.CreateGroup("api", "API",

@@ -52,7 +52,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if !settings.ApiMode {
+	// patchnotes print to stdout; skip them in api/silent mode so the only thing
+	// on stdout is the machine-readable result stream.
+	if !settings.ApiMode && !settings.Silent {
 		patchnotes.ShowOnce(version)
 	}
 

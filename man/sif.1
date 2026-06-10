@@ -1,5 +1,5 @@
 .\" man page for sif - the blazing-fast pentesting suite
-.TH sif 1 "2026-06-08" "sif" "sif manual"
+.TH sif 1 "2026-06-10" "sif" "sif manual"
 .SH NAME
 sif \- blazing-fast pentesting suite
 .SH SYNOPSIS
@@ -15,17 +15,25 @@ sif \- blazing-fast pentesting suite
 .RI [ scans ]
 .RI [ options ]
 .br
+.I "targets"
+|
+.B sif
+.RI [ scans ]
+.RI [ options ]
+.br
 .B sif
 .RB { patchnote | version }
 .SH DESCRIPTION
 .B sif
 is a modular recon and exploitation suite. it runs multiple scan types
 concurrently against one or more targets, and can be extended with yaml
-modules. targets must include a
+modules. a scheme\-less target defaults to
+.B https://
+\&; an explicit
 .B http://
 or
 .B https://
-scheme.
+is kept; any other scheme is rejected.
 .SH TARGETS
 .TP
 .BR \-u ", " \-\-urls " \fIlist\fR"
@@ -33,6 +41,13 @@ comma\-separated list of urls to scan.
 .TP
 .BR \-f ", " \-\-file " \fIpath\fR"
 file with one url per line.
+.TP
+.B stdin
+when stdin is a pipe, one target per line is read from it, alongside any
+.B \-u
+/
+.B \-f
+targets. lets sif slot into a unix pipeline (e.g. \fBsubfinder | sif \-silent | notify\fR).
 .SH SCANS
 .TP
 .BR \-dirlist " \fIsize\fR"
@@ -170,6 +185,11 @@ write a sarif 2.1.0 report of the run to \fIfile\fR.
 .TP
 .BR \-md ", " \-\-markdown " \fIfile\fR"
 write a markdown report of the run to \fIfile\fR.
+.TP
+.B \-silent
+plain output for pipelines: route all chrome to stderr and print one
+normalized finding per line to stdout as \fB[severity] target module title\fR.
+implies non\-interactive (no spinners).
 .TP
 .B \-api
 emit json results and suppress the interactive output.

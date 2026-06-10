@@ -21,6 +21,23 @@ read targets from a file (one url per line):
 ./sif -f targets.txt
 ```
 
+### stdin (pipe mode)
+
+when stdin is a pipe, sif reads one target per line from it, alongside any `-u`/`-f` targets. this lets sif slot into a unix pipeline:
+
+```bash
+subfinder -d example.com | sif -silent -probe | notify
+```
+
+### naked hosts
+
+targets without a scheme default to `https://`; an explicit `http://`/`https://` is kept as given. any other scheme (`ftp://`, `file://`, ...) is rejected:
+
+```bash
+./sif -u example.com          # scanned as https://example.com
+echo example.com | sif -probe # same, over stdin
+```
+
 ## scan options
 
 ### directory fuzzing
@@ -389,6 +406,14 @@ write a readable markdown report grouped by target, then by module:
 
 ```bash
 ./sif -u https://example.com -headers -cors -md report.md
+```
+
+### -silent
+
+plain output for pipelines: all banner/spinner/log chrome goes to stderr and stdout carries one normalized finding per line, formatted `[severity] target module title`. implies non-interactive (no spinners), so a downstream consumer sees nothing but findings:
+
+```bash
+subfinder -d example.com | sif -silent -probe -sh | notify
 ```
 
 ## api options
