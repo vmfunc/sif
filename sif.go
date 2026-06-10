@@ -421,6 +421,26 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.Crawl {
+			result, err := scan.Crawl(url, app.settings.CrawlDepth, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running web crawl: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "Crawl")
+			}
+		}
+
+		if app.settings.Passive {
+			result, err := scan.Passive(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running passive discovery: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "Passive")
+			}
+		}
+
 		// Load and run modules
 		if app.settings.AllModules || app.settings.Modules != "" || app.settings.ModuleTags != "" {
 			loader, err := modules.NewLoader()

@@ -98,6 +98,15 @@ reflected xss probe.
 .B \-framework
 framework detection with cve lookup.
 .TP
+.B \-crawl
+web crawler; spiders same\-host links, scripts and forms, respecting robots.txt.
+.TP
+.BR \-crawl\-depth " \fIn\fR"
+max crawl recursion depth (default 2).
+.TP
+.B \-passive
+passive subdomain and historical url discovery from third\-party feeds (zero traffic to the target).
+.TP
 .B \-noscan
 skip the base url scan (robots.txt, etc).
 .SH OPTIONS

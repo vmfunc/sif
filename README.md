@@ -177,6 +177,9 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-redirect` | open redirect probe |
 | `-xss` | reflected xss probe |
 | `-framework` | framework detection with cve lookup |
+| `-crawl` | web crawler (spider same-host links/scripts/forms) |
+| `-crawl-depth` | max crawl recursion depth (default 2) |
+| `-passive` | passive subdomain/url discovery (zero traffic to target) |
 
 ### http options
 

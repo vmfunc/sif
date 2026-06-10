@@ -186,6 +186,26 @@ export SHODAN_API_KEY=your-api-key
 ./sif -u https://example.com -framework
 ```
 
+### web crawler
+
+`-crawl` - spider the target, following same-host links, scripts and forms
+
+`-crawl-depth` - max recursion depth (default 2). respects robots.txt and stays on the target host.
+
+```bash
+./sif -u https://example.com -crawl -crawl-depth 3
+```
+
+### passive discovery
+
+`-passive` - gather subdomains from certificate transparency (crt.sh, certspotter) and historical urls from the wayback machine
+
+keyless and zero traffic to the target itself - all lookups hit third-party feeds.
+
+```bash
+./sif -u https://example.com -passive
+```
+
 ### whois lookup
 
 `-whois` - perform whois lookups
