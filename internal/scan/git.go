@@ -91,7 +91,7 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 					charmlog.Debugf("Error creating request for %s: %s", repourl, err)
 					continue
 				}
-				resp, err := client.Do(gitReq)
+				resp, err := client.Do(gitReq) //nolint:bodyclose // drained and closed via httpx.DrainClose
 				if err != nil {
 					charmlog.Debugf("Error %s: %s", repourl, err)
 					continue
@@ -109,7 +109,8 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 					foundUrls = append(foundUrls, resp.Request.URL.String())
 					mu.Unlock()
 				}
-				resp.Body.Close()
+				// status/headers only; drain so the conn returns to the pool.
+				httpx.DrainClose(resp)
 			}
 		}(thread)
 	}

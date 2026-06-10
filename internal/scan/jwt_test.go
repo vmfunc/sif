@@ -1,0 +1,172 @@
+/*
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+:                                                                               :
+:   █▀ █ █▀▀   ·   Blazing-fast pentesting suite                                :
+:   ▄█ █ █▀    ·   BSD 3-Clause License                                         :
+:                                                                               :
+:   (c) 2022-2026 vmfunc, xyzeva,                                               :
+:                 lunchcat alumni & contributors                                :
+:                                                                               :
+·━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━·
+*/
+
+package scan
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+)
+
+// fixed jwt fixtures, generated offline. each exercises a distinct weakness.
+const (
+	// header {alg:none}, payload {sub:admin}, empty signature - forgeable.
+	jwtNone = "eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0." +
+		"eyJzdWIiOiAiYWRtaW4iLCAicm9sZSI6ICJ1c2VyIn0."
+
+	// HS256, no exp claim, signed with the bundled weak secret "secret".
+	jwtWeakHS256 = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9." +
+		"eyJzdWIiOiAiMTIzNDU2Nzg5MCIsICJuYW1lIjogInRlc3RlciJ9." +
+		"JOjVfLa8gp3cvFkNVgOnmdrI1MCHZRA_ChBmCPF-Z8w"
+
+	// HS256, exp in 2001 (long past), signed with a secret not in the wordlist.
+	jwtExpired = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9." +
+		"eyJzdWIiOiAieCIsICJleHAiOiAxMDAwMDAwMDAwfQ." +
+		"gr28Ffm4wJkonHGSKmMD5Rj7e1pTt2o_EwG6lMWQeSc"
+
+	// HS256 carrying a plaintext password claim (jwt bodies are not encrypted).
+	jwtSensitive = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9." +
+		"eyJzdWIiOiAieCIsICJwYXNzd29yZCI6ICJodW50ZXIyIiwgImV4cCI6IDk5OTk5OTk5OTl9." +
+		"rjEf0CUa7_qppuINi6zL9vupJIX0rzSBhul7kKM9uSA"
+)
+
+// hasIssue reports whether the analyzed token carries an issue of the given kind.
+func hasIssue(token *JWTToken, kind string) bool {
+	for i := 0; i < len(token.Issues); i++ {
+		if token.Issues[i].Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func TestJWT_AlgNoneAndMissingExpFlagged(t *testing.T) {
+	// serve the alg:none token in the Authorization header echo.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Authorization", "Bearer "+jwtNone)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	result, err := JWT(srv.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("JWT: %v", err)
+	}
+	if result == nil || len(result.Tokens) != 1 {
+		t.Fatalf("expected exactly one analyzed token, got %+v", result)
+	}
+
+	token := &result.Tokens[0]
+	if !hasIssue(token, "alg:none") {
+		t.Errorf("expected alg:none to be flagged, got issues %+v", token.Issues)
+	}
+	if !hasIssue(token, "missing exp") {
+		t.Errorf("expected missing exp to be flagged, got issues %+v", token.Issues)
+	}
+	// the preview must never carry the whole token.
+	if len(token.Preview) >= len(jwtNone) {
+		t.Errorf("preview should be trimmed, got full token %q", token.Preview)
+	}
+}
+
+func TestJWT_WeakSecretCracked(t *testing.T) {
+	// token rides in a Set-Cookie this time.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.SetCookie(w, &http.Cookie{Name: "session", Value: jwtWeakHS256})
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	result, err := JWT(srv.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("JWT: %v", err)
+	}
+	if result == nil || len(result.Tokens) != 1 {
+		t.Fatalf("expected one token, got %+v", result)
+	}
+
+	token := &result.Tokens[0]
+	if token.WeakKey != "secret" {
+		t.Errorf("expected weak secret 'secret' to be cracked, got %q", token.WeakKey)
+	}
+	if !hasIssue(token, "weak hmac secret") {
+		t.Errorf("expected weak hmac secret issue, got %+v", token.Issues)
+	}
+	if !hasIssue(token, "rs256->hs256 confusion surface") {
+		t.Errorf("expected hmac confusion surface to be flagged, got %+v", token.Issues)
+	}
+}
+
+func TestJWT_ExpiredFlagged(t *testing.T) {
+	// token in the response body.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"token":"` + jwtExpired + `"}`))
+	}))
+	defer srv.Close()
+
+	result, err := JWT(srv.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("JWT: %v", err)
+	}
+	if result == nil || len(result.Tokens) != 1 {
+		t.Fatalf("expected one token, got %+v", result)
+	}
+	if !hasIssue(&result.Tokens[0], "expired token") {
+		t.Errorf("expected expired token to be flagged, got %+v", result.Tokens[0].Issues)
+	}
+	// a strong, unguessed secret must not be cracked.
+	if result.Tokens[0].WeakKey != "" {
+		t.Errorf("did not expect a cracked key on the strong-secret token, got %q", result.Tokens[0].WeakKey)
+	}
+}
+
+func TestJWT_SensitiveClaimFlagged(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(jwtSensitive))
+	}))
+	defer srv.Close()
+
+	result, err := JWT(srv.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("JWT: %v", err)
+	}
+	if result == nil || len(result.Tokens) != 1 {
+		t.Fatalf("expected one token, got %+v", result)
+	}
+	if !hasIssue(&result.Tokens[0], "sensitive plaintext claim") {
+		t.Errorf("expected sensitive claim to be flagged, got %+v", result.Tokens[0].Issues)
+	}
+}
+
+func TestJWT_NoTokens(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("nothing to see here"))
+	}))
+	defer srv.Close()
+
+	result, err := JWT(srv.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("JWT: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected nil result when no tokens present, got %+v", result)
+	}
+}
+
+func TestJWTResult_ResultType(t *testing.T) {
+	r := &JWTResult{}
+	if r.ResultType() != "jwt" {
+		t.Errorf("expected result type 'jwt', got %q", r.ResultType())
+	}
+}

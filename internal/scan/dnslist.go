@@ -229,14 +229,15 @@ func probeSubdomain(client *http.Client, host string) (string, dnsScheme) {
 			charmlog.Debugf("Error %s: %s", host, err)
 			continue
 		}
-		resp, err := client.Do(req)
+		resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 		if err != nil {
 			charmlog.Debugf("Error %s: %s", host, err)
 			continue
 		}
 		code := resp.StatusCode
 		resolved := resp.Request.URL.String()
-		resp.Body.Close()
+		// status/url only; drain so the conn returns to the pool.
+		httpx.DrainClose(resp)
 
 		if meaningfulStatus(code) {
 			return resolved, schemes[i].label

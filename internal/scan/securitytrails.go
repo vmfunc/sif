@@ -187,11 +187,13 @@ func doSTRequest(client *http.Client, reqURL, apiKey string) ([]byte, error) {
 	req.Header.Set("APIKEY", apiKey)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 	if err != nil {
 		return nil, fmt.Errorf("SecurityTrails request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	// the auth/rate-limit branches return before reading the body, so drain on
+	// close to keep the conn reusable instead of leaking it.
+	defer httpx.DrainClose(resp)
 
 	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("invalid SecurityTrails API key (status %d)", resp.StatusCode)

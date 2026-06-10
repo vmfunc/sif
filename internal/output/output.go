@@ -14,6 +14,7 @@ package output
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -126,13 +127,47 @@ func SetAPIMode(enabled bool) {
 	apiMode = enabled
 }
 
+// sink is where all banner/spinner/log chrome is written. it defaults to stdout
+// so normal runs are unchanged; -silent repoints it at stderr so stdout carries
+// nothing but the machine-readable findings a downstream pipe consumes.
+var sink io.Writer = os.Stdout
+
+// silent is the plain-sink mode: chrome goes to stderr and interactive widgets
+// (spinners, live progress) are suppressed so a piped consumer never sees them.
+var silent bool
+
+// SetSilent routes all chrome to stderr and marks the run non-interactive.
+// findings are printed to stdout by the caller via Finding/PrintFinding; the
+// output package itself never touches stdout once silent is on.
+func SetSilent(enabled bool) {
+	silent = enabled
+	if enabled {
+		sink = os.Stderr
+		return
+	}
+	sink = os.Stdout
+}
+
+// Silent reports whether plain-sink mode is active. callers gate interactive
+// behaviour (spinners, prompts) on this.
+func Silent() bool {
+	return silent
+}
+
+// Writer is the current chrome sink (stdout normally, stderr under -silent).
+// callers that render their own chrome (the startup banner) write here so it
+// follows the same routing as everything else.
+func Writer() io.Writer {
+	return sink
+}
+
 // Info prints an informational message with [*] prefix
 func Info(format string, args ...interface{}) {
 	if apiMode {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Printf("%s %s\n", prefixInfo.Render("[*]"), msg)
+	fmt.Fprintf(sink, "%s %s\n", prefixInfo.Render("[*]"), msg)
 }
 
 // Success prints a success message with [+] prefix
@@ -141,7 +176,7 @@ func Success(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Printf("%s %s\n", prefixSuccess.Render("[+]"), msg)
+	fmt.Fprintf(sink, "%s %s\n", prefixSuccess.Render("[+]"), msg)
 }
 
 // Warn prints a warning message with [!] prefix
@@ -150,7 +185,7 @@ func Warn(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Printf("%s %s\n", prefixWarning.Render("[!]"), msg)
+	fmt.Fprintf(sink, "%s %s\n", prefixWarning.Render("[!]"), msg)
 }
 
 // Error prints an error message with [-] prefix
@@ -159,7 +194,7 @@ func Error(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Printf("%s %s\n", prefixError.Render("[-]"), msg)
+	fmt.Fprintf(sink, "%s %s\n", prefixError.Render("[-]"), msg)
 }
 
 // ScanStart prints a styled scan start message
@@ -167,7 +202,7 @@ func ScanStart(scanName string) {
 	if apiMode {
 		return
 	}
-	fmt.Printf("%s starting %s\n", prefixInfo.Render("[*]"), scanName)
+	fmt.Fprintf(sink, "%s starting %s\n", prefixInfo.Render("[*]"), scanName)
 }
 
 // ScanComplete prints a styled scan completion message
@@ -175,7 +210,7 @@ func ScanComplete(scanName string, resultCount int, resultType string) {
 	if apiMode {
 		return
 	}
-	fmt.Printf("%s %s complete (%d %s)\n", prefixInfo.Render("[*]"), scanName, resultCount, resultType)
+	fmt.Fprintf(sink, "%s %s complete (%d %s)\n", prefixInfo.Render("[*]"), scanName, resultCount, resultType)
 }
 
 // Module creates a prefixed logger for a specific module/tool
@@ -202,7 +237,7 @@ func (m *ModuleLogger) Info(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Printf("%s %s\n", m.prefix(), msg)
+	fmt.Fprintf(sink, "%s %s\n", m.prefix(), msg)
 }
 
 // Success prints a success message with module prefix
@@ -211,7 +246,7 @@ func (m *ModuleLogger) Success(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Printf("%s %s %s\n", m.prefix(), prefixSuccess.Render("✓"), msg)
+	fmt.Fprintf(sink, "%s %s %s\n", m.prefix(), prefixSuccess.Render("✓"), msg)
 }
 
 // Warn prints a warning message with module prefix
@@ -220,7 +255,7 @@ func (m *ModuleLogger) Warn(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Printf("%s %s %s\n", m.prefix(), prefixWarning.Render("!"), msg)
+	fmt.Fprintf(sink, "%s %s %s\n", m.prefix(), prefixWarning.Render("!"), msg)
 }
 
 // Error prints an error message with module prefix
@@ -229,7 +264,7 @@ func (m *ModuleLogger) Error(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Printf("%s %s %s\n", m.prefix(), prefixError.Render("✗"), msg)
+	fmt.Fprintf(sink, "%s %s %s\n", m.prefix(), prefixError.Render("✗"), msg)
 }
 
 // Start prints a scan start message with module prefix (adds newline before for separation)
@@ -237,7 +272,7 @@ func (m *ModuleLogger) Start() {
 	if apiMode {
 		return
 	}
-	fmt.Printf("\n%s starting scan\n", m.prefix())
+	fmt.Fprintf(sink, "\n%s starting scan\n", m.prefix())
 }
 
 // Complete prints a scan complete message with module prefix
@@ -245,15 +280,16 @@ func (m *ModuleLogger) Complete(resultCount int, resultType string) {
 	if apiMode {
 		return
 	}
-	fmt.Printf("%s complete (%d %s)\n", m.prefix(), resultCount, resultType)
+	fmt.Fprintf(sink, "%s complete (%d %s)\n", m.prefix(), resultCount, resultType)
 }
 
-// ClearLine clears the current line (for progress bar updates)
+// ClearLine clears the current line (for progress bar updates). silent mode is
+// non-interactive, so there's no live line to clear and stdout stays untouched.
 func ClearLine() {
-	if !IsTTY {
+	if !IsTTY || silent {
 		return
 	}
-	fmt.Print("\033[2K\r")
+	fmt.Fprint(sink, "\033[2K\r")
 }
 
 // Summary styles
@@ -274,22 +310,22 @@ func PrintSummary(scans []string, logFiles []string) {
 		return
 	}
 
-	fmt.Println()
-	fmt.Println(summaryLine.Render("────────────────────────────────────────────────────────────"))
-	fmt.Println()
-	fmt.Printf("  %s\n", summaryHeader.Render("SCAN COMPLETE"))
-	fmt.Println()
+	fmt.Fprintln(sink)
+	fmt.Fprintln(sink, summaryLine.Render("────────────────────────────────────────────────────────────"))
+	fmt.Fprintln(sink)
+	fmt.Fprintf(sink, "  %s\n", summaryHeader.Render("SCAN COMPLETE"))
+	fmt.Fprintln(sink)
 
 	// Print scans
 	scanList := strings.Join(scans, ", ")
-	fmt.Printf("  %s %s\n", Muted.Render("Scans:"), scanList)
+	fmt.Fprintf(sink, "  %s %s\n", Muted.Render("Scans:"), scanList)
 
 	// Print log files if any
 	if len(logFiles) > 0 {
-		fmt.Printf("  %s %s\n", Muted.Render("Output:"), strings.Join(logFiles, ", "))
+		fmt.Fprintf(sink, "  %s %s\n", Muted.Render("Output:"), strings.Join(logFiles, ", "))
 	}
 
-	fmt.Println()
-	fmt.Println(summaryLine.Render("────────────────────────────────────────────────────────────"))
-	fmt.Println()
+	fmt.Fprintln(sink)
+	fmt.Fprintln(sink, summaryLine.Render("────────────────────────────────────────────────────────────"))
+	fmt.Fprintln(sink)
 }

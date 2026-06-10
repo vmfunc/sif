@@ -21,6 +21,23 @@ read targets from a file (one url per line):
 ./sif -f targets.txt
 ```
 
+### stdin (pipe mode)
+
+when stdin is a pipe, sif reads one target per line from it, alongside any `-u`/`-f` targets. this lets sif slot into a unix pipeline:
+
+```bash
+subfinder -d example.com | sif -silent -probe | notify
+```
+
+### naked hosts
+
+targets without a scheme default to `https://`; an explicit `http://`/`https://` is kept as given. any other scheme (`ftp://`, `file://`, ...) is rejected:
+
+```bash
+./sif -u example.com          # scanned as https://example.com
+echo example.com | sif -probe # same, over stdin
+```
+
 ## scan options
 
 ### directory fuzzing
@@ -214,6 +231,32 @@ export SHODAN_API_KEY=your-api-key
 ./sif -u https://example.com/search?q=test -xss
 ```
 
+### jwt analysis
+
+`-jwt` - fetch the target once, harvest jwts from response headers, cookies and body, then analyze each one entirely offline
+
+flags alg:none, the rs256->hs256 confusion surface, missing/expired exp, plaintext sensitive claims, and cracks a small bundled weak-hmac wordlist. no token is ever sent off-box.
+
+```bash
+./sif -u https://example.com -jwt
+```
+
+### openapi/swagger exposure
+
+`-openapi` - probe the conventional spec paths (`/swagger.json`, `/openapi.json`, `/v3/api-docs`, ...), parse the first hit (json or yaml) and enumerate every path+method, flagging operations with no security requirement
+
+```bash
+./sif -u https://example.com -openapi
+```
+
+### favicon fingerprint
+
+`-favicon` - fetch `/favicon.ico` (or the declared `<link rel=icon>`), compute the shodan-style mmh3 hash, match it against a bundled tech map and print the `http.favicon.hash:<n>` pivot query
+
+```bash
+./sif -u https://example.com -favicon
+```
+
 ### framework detection
 
 `-framework` - detect web frameworks with version and cve lookup
@@ -389,6 +432,14 @@ write a readable markdown report grouped by target, then by module:
 
 ```bash
 ./sif -u https://example.com -headers -cors -md report.md
+```
+
+### -silent
+
+plain output for pipelines: all banner/spinner/log chrome goes to stderr and stdout carries one normalized finding per line, formatted `[severity] target module title`. implies non-interactive (no spinners), so a downstream consumer sees nothing but findings:
+
+```bash
+subfinder -d example.com | sif -silent -probe -sh | notify
 ```
 
 ## api options

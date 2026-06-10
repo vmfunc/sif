@@ -13,10 +13,23 @@
 package sif
 
 import (
+	"io"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/dropalldatabases/sif/internal/config"
+	"github.com/dropalldatabases/sif/internal/finding"
 )
+
+// TestMain neutralizes the stdin seam for the whole package so tests that build
+// an App via New() never block on the test runner's real stdin (a pipe under
+// `go test`). tests that exercise ingestion set the seams explicitly.
+func TestMain(m *testing.M) {
+	stdinPipedFn = func() (bool, error) { return false, nil }
+	stdinReader = strings.NewReader("")
+	os.Exit(m.Run())
+}
 
 // mockResult is a test implementation of ScanResult
 type mockResult struct {
@@ -117,18 +130,14 @@ func TestNew_URLValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			// naked host is now accepted and normalized, not rejected
 			name:    "missing protocol",
 			url:     "example.com",
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name:    "invalid protocol",
 			url:     "ftp://example.com",
-			wantErr: true,
-		},
-		{
-			name:    "empty url",
-			url:     "",
 			wantErr: true,
 		},
 	}
@@ -146,6 +155,194 @@ func TestNew_URLValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNormalizeTarget(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{name: "naked host defaults https", in: "example.com", want: "https://example.com"},
+		{name: "naked host with port", in: "example.com:8443", want: "https://example.com:8443"},
+		{name: "naked host with path", in: "example.com/admin", want: "https://example.com/admin"},
+		{name: "https kept", in: "https://example.com", want: "https://example.com"},
+		{name: "http kept", in: "http://example.com", want: "http://example.com"},
+		{name: "surrounding whitespace trimmed", in: "  example.com\t", want: "https://example.com"},
+		{name: "empty rejected", in: "", wantErr: true},
+		{name: "blank rejected", in: "   ", wantErr: true},
+		{name: "ftp scheme rejected", in: "ftp://example.com", wantErr: true},
+		{name: "file scheme rejected", in: "file:///etc/passwd", wantErr: true},
+		{name: "embedded space rejected", in: "foo bar", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizeTarget(tt.in)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("normalizeTarget(%q) err = %v, wantErr %v", tt.in, err, tt.wantErr)
+			}
+			if err != nil {
+				return
+			}
+			if got != tt.want {
+				t.Errorf("normalizeTarget(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNew_StdinIngestion(t *testing.T) {
+	// feed a pipe of targets and assert they're parsed and normalized alongside
+	// the explicit -u target. the seams stand in for a real stdin pipe.
+	origPiped, origReader := stdinPipedFn, stdinReader
+	t.Cleanup(func() { stdinPipedFn, stdinReader = origPiped, origReader })
+
+	stdinPipedFn = func() (bool, error) { return true, nil }
+	stdinReader = strings.NewReader("sub1.example.com\nhttps://sub2.example.com\n\n  sub3.example.com  \n")
+
+	settings := &config.Settings{
+		URLs:    []string{"https://flag.example.com"},
+		ApiMode: true,
+	}
+
+	app, err := New(settings)
+	if err != nil {
+		t.Fatalf("New() unexpected error: %v", err)
+	}
+
+	want := []string{
+		"https://flag.example.com",
+		"https://sub1.example.com",
+		"https://sub2.example.com",
+		"https://sub3.example.com",
+	}
+	if len(app.targets) != len(want) {
+		t.Fatalf("targets = %v (%d), want %d", app.targets, len(app.targets), len(want))
+	}
+	for i := range want {
+		if app.targets[i] != want[i] {
+			t.Errorf("target[%d] = %q, want %q", i, app.targets[i], want[i])
+		}
+	}
+}
+
+func TestNew_StdinOnly(t *testing.T) {
+	// no -u/-f: a piped stream alone must satisfy the target requirement.
+	origPiped, origReader := stdinPipedFn, stdinReader
+	t.Cleanup(func() { stdinPipedFn, stdinReader = origPiped, origReader })
+
+	stdinPipedFn = func() (bool, error) { return true, nil }
+	stdinReader = strings.NewReader("only.example.com\n")
+
+	app, err := New(&config.Settings{ApiMode: true})
+	if err != nil {
+		t.Fatalf("New() unexpected error: %v", err)
+	}
+	if len(app.targets) != 1 || app.targets[0] != "https://only.example.com" {
+		t.Errorf("targets = %v, want [https://only.example.com]", app.targets)
+	}
+}
+
+func TestNew_NoTargets_StdinEmpty(t *testing.T) {
+	// an empty pipe with no flags is still "no targets" and must error.
+	origPiped, origReader := stdinPipedFn, stdinReader
+	t.Cleanup(func() { stdinPipedFn, stdinReader = origPiped, origReader })
+
+	stdinPipedFn = func() (bool, error) { return true, nil }
+	stdinReader = strings.NewReader("\n  \n")
+
+	if _, err := New(&config.Settings{ApiMode: true}); err == nil {
+		t.Error("New() should error when stdin yields no targets and no flags set")
+	}
+}
+
+func TestReadTargets(t *testing.T) {
+	got, err := readTargets(strings.NewReader("a.com\n\n  b.com \nc.com\n"))
+	if err != nil {
+		t.Fatalf("readTargets() error: %v", err)
+	}
+	want := []string{"a.com", "b.com", "c.com"}
+	if len(got) != len(want) {
+		t.Fatalf("readTargets() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("readTargets()[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+// errReader fails on first read; used to assert stdin scan errors propagate.
+type errReader struct{}
+
+func (errReader) Read([]byte) (int, error) { return 0, io.ErrClosedPipe }
+
+func TestReadTargets_Error(t *testing.T) {
+	if _, err := readTargets(errReader{}); err == nil {
+		t.Error("readTargets() should propagate a reader error")
+	}
+}
+
+func TestPrintFindings(t *testing.T) {
+	findings := []finding.Finding{
+		{Target: "https://a.com", Module: "sql", Severity: finding.SeverityHigh, Title: "admin panel"},
+		{Target: "https://b.com", Module: "headers", Severity: finding.SeverityInfo, Title: "Server"},
+	}
+
+	out := captureStdout(t, func() { printFindings(findings) })
+
+	wantLines := []string{
+		"[high] https://a.com sql admin panel",
+		"[info] https://b.com headers Server",
+	}
+	got := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(got) != len(wantLines) {
+		t.Fatalf("printFindings wrote %d lines, want %d:\n%s", len(got), len(wantLines), out)
+	}
+	for i := range wantLines {
+		if got[i] != wantLines[i] {
+			t.Errorf("line %d = %q, want %q", i, got[i], wantLines[i])
+		}
+	}
+}
+
+func TestPrintFindings_Empty(t *testing.T) {
+	out := captureStdout(t, func() { printFindings(nil) })
+	if out != "" {
+		t.Errorf("printFindings(nil) wrote %q, want empty", out)
+	}
+}
+
+// captureStdout swaps os.Stdout for a pipe, runs fn, and returns what it wrote.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	saved := os.Stdout
+	os.Stdout = w
+
+	done := make(chan string, 1)
+	go func() {
+		buf := make([]byte, 0, 4096)
+		tmp := make([]byte, 1024)
+		for {
+			n, rerr := r.Read(tmp)
+			buf = append(buf, tmp[:n]...)
+			if rerr != nil {
+				break
+			}
+		}
+		done <- string(buf)
+	}()
+
+	fn()
+	os.Stdout = saved
+	w.Close()
+	return <-done
 }
 
 func TestModuleResult_JSON(t *testing.T) {

@@ -175,13 +175,13 @@ func probeCORS(client *http.Client, targetURL, origin, note string) (CORSFinding
 	}
 	req.Header.Set("Origin", origin)
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 	if err != nil {
 		charmlog.Debugf("cors: request %s with origin %s: %v", targetURL, origin, err)
 		return CORSFinding{}, false
 	}
-	// headers are all we need; drain nothing, just close.
-	resp.Body.Close()
+	// headers are all we need; drain the body so the conn returns to the pool.
+	httpx.DrainClose(resp)
 
 	allowOrigin := resp.Header.Get("Access-Control-Allow-Origin")
 	if allowOrigin == "" {

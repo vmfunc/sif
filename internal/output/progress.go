@@ -98,7 +98,7 @@ func (p *Progress) Done() {
 }
 
 func (p *Progress) render() {
-	if apiMode {
+	if apiMode || silent {
 		return
 	}
 
@@ -135,7 +135,7 @@ func (p *Progress) render() {
 		p.mu.Unlock()
 
 		if advanced {
-			fmt.Printf("    [%d%%] %d/%d\n", percent, current, total)
+			fmt.Fprintf(sink, "    [%d%%] %d/%d\n", percent, current, total)
 		}
 		return
 	}
@@ -190,5 +190,5 @@ func (p *Progress) render() {
 	)
 
 	ClearLine()
-	fmt.Print(line)
+	fmt.Fprint(sink, line)
 }

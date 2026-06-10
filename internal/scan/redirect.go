@@ -229,12 +229,14 @@ func probeRedirect(client *http.Client, testURL string) (location, via string, o
 		charmlog.Debugf("redirect: build request for %s: %v", testURL, err)
 		return "", "", false
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 	if err != nil {
 		charmlog.Debugf("redirect: request %s: %v", testURL, err)
 		return "", "", false
 	}
-	defer resp.Body.Close()
+	// the header-redirect branch returns before reading the body, so drain on
+	// close to keep that conn reusable instead of leaking it.
+	defer httpx.DrainClose(resp)
 
 	// header redirect: a 30x whose Location resolves to the sentinel host
 	if resp.StatusCode >= http.StatusMultipleChoices && resp.StatusCode < http.StatusBadRequest {

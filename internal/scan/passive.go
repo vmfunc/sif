@@ -205,11 +205,13 @@ func passiveGET(ctx context.Context, client *http.Client, reqURL string) ([]byte
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	// the non-200 branch returns before reading the body, so drain on close to
+	// keep the conn reusable instead of leaking it.
+	defer httpx.DrainClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
