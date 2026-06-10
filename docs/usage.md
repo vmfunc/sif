@@ -225,7 +225,7 @@ http request timeout (default: 10s):
 
 ### --threads
 
-number of concurrent threads (default: 10):
+number of concurrent threads (default: 10). values below 1 are clamped to 1:
 
 ```bash
 ./sif -u https://example.com --threads 20
@@ -245,6 +245,42 @@ enable debug logging:
 
 ```bash
 ./sif -u https://example.com -d
+```
+
+## http options
+
+these apply to every outbound request across all scanners (proxy, custom headers, cookie and rate limiting share one client). a scanner that sets a header explicitly still wins over the global default.
+
+### -proxy
+
+route all traffic through a proxy. supports http, https and socks5 urls:
+
+```bash
+./sif -u https://example.com -proxy socks5://127.0.0.1:1080
+```
+
+### -H, --header
+
+add a custom header to every request. repeatable or comma-separated, `"Key: Value"`:
+
+```bash
+./sif -u https://example.com -H "Authorization: Bearer tok" -H "X-Env: staging"
+```
+
+### -cookie
+
+cookie header to send with every request:
+
+```bash
+./sif -u https://example.com -cookie "session=abc; theme=dark"
+```
+
+### -rate-limit
+
+cap outbound requests per second (0 = unlimited, default 0):
+
+```bash
+./sif -u https://example.com -rate-limit 20
 ```
 
 ## api options

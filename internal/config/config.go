@@ -51,7 +51,16 @@ type Settings struct {
 	ModuleTags        string // Run modules matching these tags
 	AllModules        bool   // Run all loaded modules
 	ListModules       bool   // List available modules and exit
+	Proxy             string
+	Header            goflags.StringSlice // custom request headers ("Key: Value")
+	Cookie            string
+	RateLimit         int
 }
+
+// minThreads is the floor for the worker count. Threads feeds wg.Add across the
+// scanners, so 0 silently runs nothing and a negative value panics with
+// "negative WaitGroup counter"; clamp the parsed value up to this.
+const minThreads = 1
 
 const (
 	Nil goflags.EnumVariable = iota
@@ -109,6 +118,13 @@ func Parse() *Settings {
 		flagSet.StringVar(&settings.Template, "template", "", "Sif runtime template to use"),
 	)
 
+	flagSet.CreateGroup("http", "HTTP",
+		flagSet.StringVar(&settings.Proxy, "proxy", "", "Proxy for all requests (http/https/socks5 url)"),
+		flagSet.StringSliceVarP(&settings.Header, "header", "H", nil, "Custom header to send (repeatable or comma-separated, \"Key: Value\")", goflags.CommaSeparatedStringSliceOptions),
+		flagSet.StringVar(&settings.Cookie, "cookie", "", "Cookie header to send with every request"),
+		flagSet.IntVar(&settings.RateLimit, "rate-limit", 0, "Max requests per second (0 = unlimited)"),
+	)
+
 	flagSet.CreateGroup("api", "API",
 		flagSet.BoolVar(&settings.ApiMode, "api", false, "Enable API mode. Only useful for internal lunchcat usage"),
 	)
@@ -122,6 +138,12 @@ func Parse() *Settings {
 
 	if err := flagSet.Parse(); err != nil {
 		log.Fatalf("Could not parse flags: %s", err)
+	}
+
+	// threads feeds wg.Add directly; floor it so 0 isn't a silent no-op and a
+	// negative value can't panic the waitgroup.
+	if settings.Threads < minThreads {
+		settings.Threads = minThreads
 	}
 
 	return settings

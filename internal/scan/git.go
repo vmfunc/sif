@@ -22,6 +22,7 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
 )
@@ -48,13 +49,15 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 		}
 	}
 
+	client := httpx.Client(timeout)
+
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, gitURL+gitFile, http.NoBody)
 	if err != nil {
 		spin.Stop()
 		log.Error("Error creating git list request: %s", err)
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		spin.Stop()
 		log.Error("Error downloading git list: %s", err)
@@ -66,11 +69,6 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		gitUrls = append(gitUrls, scanner.Text())
-	}
-
-	// util.InitProgressBar()
-	client := &http.Client{
-		Timeout: timeout,
 	}
 
 	var wg sync.WaitGroup

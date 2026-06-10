@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
 )
@@ -85,11 +86,9 @@ func Scan(url string, timeout time.Duration, threads int, logdir string) {
 		}
 	}
 
-	client := &http.Client{
-		Timeout: timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+	client := httpx.Client(timeout)
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
 	}
 
 	resp := fetchRobotsTXT(url+"/robots.txt", client)

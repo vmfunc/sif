@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/styles"
 )
@@ -50,9 +51,7 @@ func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStor
 		Prefix: "C3",
 	}).With("url", url)
 
-	client := &http.Client{
-		Timeout: timeout,
-	}
+	client := httpx.Client(timeout)
 
 	potentialBuckets := extractPotentialBuckets(sanitizedURL)
 

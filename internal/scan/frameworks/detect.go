@@ -22,6 +22,7 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
 )
@@ -47,7 +48,7 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	spin := output.NewSpinner("Detecting frameworks")
 	spin.Start()
 
-	client := &http.Client{Timeout: timeout}
+	client := httpx.Client(timeout)
 
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 	if err != nil {

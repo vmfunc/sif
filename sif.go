@@ -25,6 +25,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/dropalldatabases/sif/internal/config"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/modules"
 	"github.com/dropalldatabases/sif/internal/output"
@@ -178,6 +179,18 @@ func (app *App) Run() error {
 				log.Errorf("closing logger: %v", err)
 			}
 		}()
+	}
+
+	// wire proxy/headers/cookie/rate-limit into the shared http client once,
+	// before any scanner runs. a bad proxy/header shouldn't kill the run -
+	// scanners fall back to a plain client if this fails.
+	if err := httpx.Configure(httpx.Options{
+		Proxy:     app.settings.Proxy,
+		Headers:   app.settings.Header,
+		Cookie:    app.settings.Cookie,
+		RateLimit: app.settings.RateLimit,
+	}); err != nil {
+		log.Warnf("http client config failed, continuing with defaults: %v", err)
 	}
 
 	// target expansion - securitytrails discovers new domains before scanning

@@ -30,6 +30,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/dropalldatabases/sif/internal/httpx"
 	urlutil "github.com/projectdiscovery/utils/url"
 )
 
@@ -48,7 +49,9 @@ func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
 		return nil, err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	// no timeout in scope here; 0 matches the previous DefaultClient behavior
+	// while still routing through the shared transport (proxy/headers/rate-limit).
+	resp, err := httpx.Client(0).Do(req)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/styles"
 )
@@ -54,9 +55,7 @@ func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, t
 		Prefix: "Subdomain Takeover",
 	})
 
-	client := &http.Client{
-		Timeout: timeout,
-	}
+	client := httpx.Client(timeout)
 
 	var wg sync.WaitGroup
 	wg.Add(threads)
