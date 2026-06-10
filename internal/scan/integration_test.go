@@ -134,7 +134,7 @@ func TestIntegrationDirlist(t *testing.T) {
 	directoryURL = srv.URL + "/"
 	defer func() { directoryURL = orig }()
 
-	results, err := Dirlist("small", srv.URL, 5*time.Second, 3, "")
+	results, err := Dirlist("small", srv.URL, 5*time.Second, 3, "", DirlistOptions{})
 	if err != nil {
 		t.Fatalf("Dirlist: %v", err)
 	}

@@ -38,6 +38,30 @@ file with one url per line.
 .BR \-dirlist " \fIsize\fR"
 directory and file fuzzing (small/medium/large).
 .TP
+.BR \-mc " \fIcodes\fR"
+dirlist: match only these status codes (comma list, e.g. 200,301).
+.TP
+.BR \-fc " \fIcodes\fR"
+dirlist: filter out these status codes (comma list).
+.TP
+.BR \-fs " \fIsizes\fR"
+dirlist: filter out responses of these body sizes (comma list).
+.TP
+.BR \-fw " \fIcounts\fR"
+dirlist: filter out responses with these word counts (comma list).
+.TP
+.BR \-fr " \fIregex\fR"
+dirlist: filter out responses whose body matches this regex.
+.TP
+.B \-ac
+dirlist: auto\-calibrate the soft\-404 wildcard baseline so catch\-all 200s are dropped.
+.TP
+.BR \-w " \fIpath|url\fR"
+dirlist: custom wordlist (local file or url); overrides the \fB\-dirlist\fR size.
+.TP
+.BR \-e " \fIexts\fR"
+dirlist: extensions appended to each word (comma list, e.g. php,bak,env).
+.TP
 .BR \-dnslist " \fIsize\fR"
 subdomain enumeration (small/medium/large).
 .TP

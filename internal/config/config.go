@@ -21,6 +21,14 @@ import (
 
 type Settings struct {
 	Dirlist           string
+	DirMatchCodes     string // -mc dirlist: status codes to keep
+	DirFilterCodes    string // -fc dirlist: status codes to drop
+	DirFilterSizes    string // -fs dirlist: body sizes to drop
+	DirFilterWords    string // -fw dirlist: word counts to drop
+	DirFilterRegex    string // -fr dirlist: regex; body match drops response
+	DirCalibrate      bool   // -ac dirlist: auto-calibrate soft-404 baseline
+	DirWordlist       string // -w  dirlist: custom wordlist (file path or url)
+	DirExtensions     string // -e  dirlist: extensions appended to each word
 	Dnslist           string
 	Debug             bool
 	LogDir            string
@@ -100,6 +108,14 @@ func Parse() *Settings {
 	portScopes := goflags.AllowdTypes{"common": Common, "full": Full, "none": Nil}
 	flagSet.CreateGroup("scans", "Scans",
 		flagSet.EnumVar(&settings.Dirlist, "dirlist", Nil, "Directory fuzzing scan size (small/medium/large)", listSizes),
+		flagSet.StringVar(&settings.DirMatchCodes, "mc", "", "Dirlist: match these status codes (comma list, e.g. 200,301)"),
+		flagSet.StringVar(&settings.DirFilterCodes, "fc", "", "Dirlist: filter out these status codes (comma list)"),
+		flagSet.StringVar(&settings.DirFilterSizes, "fs", "", "Dirlist: filter out responses of these body sizes (comma list)"),
+		flagSet.StringVar(&settings.DirFilterWords, "fw", "", "Dirlist: filter out responses with these word counts (comma list)"),
+		flagSet.StringVar(&settings.DirFilterRegex, "fr", "", "Dirlist: filter out responses whose body matches this regex"),
+		flagSet.BoolVar(&settings.DirCalibrate, "ac", false, "Dirlist: auto-calibrate the soft-404 wildcard baseline"),
+		flagSet.StringVar(&settings.DirWordlist, "w", "", "Dirlist: custom wordlist (local file path or url; overrides -dirlist size)"),
+		flagSet.StringVar(&settings.DirExtensions, "e", "", "Dirlist: extensions appended to each word (comma list, e.g. php,bak,env)"),
 		flagSet.EnumVar(&settings.Dnslist, "dnslist", Nil, "DNS fuzzing scan size (small/medium/large)", listSizes),
 		flagSet.EnumVar(&settings.Ports, "ports", Nil, "Port scanning scope (common/full)", portScopes),
 		flagSet.BoolVar(&settings.Dorking, "dork", false, "Enable Google dorking"),

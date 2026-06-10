@@ -33,6 +33,42 @@ sizes: `small`, `medium`, `large`
 ./sif -u https://example.com -dirlist medium
 ```
 
+#### response filters
+
+modern apps serve a catch-all 200 for unknown routes, so a naive scan reports
+every path. these ffuf-style filters cut the noise (a filter always wins over a
+match):
+
+- `-mc <codes>` - match only these status codes (comma list, e.g. `200,301`)
+- `-fc <codes>` - filter out these status codes
+- `-fs <sizes>` - filter out responses of these body sizes
+- `-fw <counts>` - filter out responses with these word counts
+- `-fr <regex>` - filter out responses whose body matches this regex
+
+```bash
+./sif -u https://example.com -dirlist medium -mc 200,301 -fs 1234
+```
+
+#### wildcard calibration
+
+`-ac` probes a few paths that cannot exist, learns the soft-404 baseline
+(status + size + words), and auto-drops any response matching it - so SPA
+catch-all 200s stop flooding the output:
+
+```bash
+./sif -u https://example.com -dirlist medium -ac
+```
+
+#### custom wordlists and extensions
+
+`-w <path|url>` overrides the size switch with your own list (local file or
+remote url); `-e <exts>` appends each extension to every word, keeping the bare
+word too:
+
+```bash
+./sif -u https://example.com -w /path/to/words.txt -e php,bak,env
+```
+
 ### subdomain enumeration
 
 `-dnslist <size>` - enumerate subdomains

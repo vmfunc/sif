@@ -231,11 +231,20 @@ func (app *App) Run() error {
 		}
 
 		if app.settings.Dirlist != "none" {
-			result, err := scan.Dirlist(app.settings.Dirlist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.Dirlist(app.settings.Dirlist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, scan.DirlistOptions{
+				MatchCodes:  app.settings.DirMatchCodes,
+				FilterCodes: app.settings.DirFilterCodes,
+				FilterSizes: app.settings.DirFilterSizes,
+				FilterWords: app.settings.DirFilterWords,
+				FilterRegex: app.settings.DirFilterRegex,
+				Calibrate:   app.settings.DirCalibrate,
+				Wordlist:    app.settings.DirWordlist,
+				Extensions:  app.settings.DirExtensions,
+			})
 			if err != nil {
 				log.Errorf("Error while running directory scan: %s", err)
 			} else {
-				moduleResults = append(moduleResults, ModuleResult{"dirlist", result})
+				moduleResults = append(moduleResults, NewModuleResult(result))
 				scansRun = append(scansRun, "Directory Listing")
 			}
 		}

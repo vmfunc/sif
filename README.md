@@ -157,6 +157,14 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | flag | description |
 |------|-------------|
 | `-dirlist` | directory and file fuzzing (small/medium/large) |
+| `-mc` | dirlist: match these status codes (comma list, e.g. 200,301) |
+| `-fc` | dirlist: filter out these status codes (comma list) |
+| `-fs` | dirlist: filter out responses of these body sizes (comma list) |
+| `-fw` | dirlist: filter out responses with these word counts (comma list) |
+| `-fr` | dirlist: filter out responses whose body matches this regex |
+| `-ac` | dirlist: auto-calibrate the soft-404 wildcard baseline |
+| `-w` | dirlist: custom wordlist (local file or url; overrides `-dirlist` size) |
+| `-e` | dirlist: extensions appended to each word (comma list, e.g. php,bak,env) |
 | `-dnslist` | subdomain enumeration (small/medium/large) |
 | `-ports` | port scanning (common/full) |
 | `-nuclei` | vulnerability scanning with nuclei templates |
