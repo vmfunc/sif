@@ -231,6 +231,32 @@ export SHODAN_API_KEY=your-api-key
 ./sif -u https://example.com/search?q=test -xss
 ```
 
+### jwt analysis
+
+`-jwt` - fetch the target once, harvest jwts from response headers, cookies and body, then analyze each one entirely offline
+
+flags alg:none, the rs256->hs256 confusion surface, missing/expired exp, plaintext sensitive claims, and cracks a small bundled weak-hmac wordlist. no token is ever sent off-box.
+
+```bash
+./sif -u https://example.com -jwt
+```
+
+### openapi/swagger exposure
+
+`-openapi` - probe the conventional spec paths (`/swagger.json`, `/openapi.json`, `/v3/api-docs`, ...), parse the first hit (json or yaml) and enumerate every path+method, flagging operations with no security requirement
+
+```bash
+./sif -u https://example.com -openapi
+```
+
+### favicon fingerprint
+
+`-favicon` - fetch `/favicon.ico` (or the declared `<link rel=icon>`), compute the shodan-style mmh3 hash, match it against a bundled tech map and print the `http.favicon.hash:<n>` pivot query
+
+```bash
+./sif -u https://example.com -favicon
+```
+
 ### framework detection
 
 `-framework` - detect web frameworks with version and cve lookup

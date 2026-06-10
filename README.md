@@ -181,6 +181,9 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-securitytrails` | domain discovery + target expansion (requires SECURITYTRAILS_API_KEY) |
 | `-sql` | sql recon |
 | `-lfi` | local file inclusion |
+| `-jwt` | jwt discovery + offline weakness analysis (alg:none, weak hmac, exp, sensitive claims) |
+| `-openapi` | openapi/swagger spec exposure probe (enumerates paths + unauth endpoints) |
+| `-favicon` | favicon hash fingerprinting (shodan-style mmh3, tech match + pivot query) |
 | `-cors` | cors misconfiguration probe |
 | `-redirect` | open redirect probe |
 | `-xss` | reflected xss probe |

@@ -89,6 +89,12 @@ func Flatten(target, module string, result any) []Finding {
 		return flattenSQL(target, r)
 	case *scan.LFIResult:
 		return flattenLFI(target, r)
+	case *scan.JWTResult:
+		return flattenJWT(target, r)
+	case *scan.OpenAPIResult:
+		return flattenOpenAPI(target, r)
+	case *scan.FaviconResult:
+		return flattenFavicon(target, r)
 	case *scan.CMSResult:
 		return flattenCMS(target, r)
 	case *scan.SecurityTrailsResult:
@@ -240,6 +246,66 @@ func flattenLFI(target string, r *scan.LFIResult) []Finding {
 		})
 	}
 	return out
+}
+
+func flattenJWT(target string, r *scan.JWTResult) []Finding {
+	if r == nil {
+		return nil
+	}
+	out := make([]Finding, 0, len(r.Tokens))
+	for i := 0; i < len(r.Tokens); i++ {
+		t := r.Tokens[i]
+		// one finding per weakness, not per token: a token with alg:none and a
+		// weak key is two distinct issues a consumer wants to diff separately.
+		for j := 0; j < len(t.Issues); j++ {
+			iss := t.Issues[j]
+			out = append(out, Finding{
+				Target:   target,
+				Module:   "jwt",
+				Severity: ParseSeverity(iss.Severity),
+				Key:      key("jwt", t.Source+":"+iss.Kind),
+				Title:    "jwt " + iss.Kind,
+				Raw:      iss.Detail,
+			})
+		}
+	}
+	return out
+}
+
+func flattenOpenAPI(target string, r *scan.OpenAPIResult) []Finding {
+	if r == nil {
+		return nil
+	}
+	return []Finding{{
+		Target:   target,
+		Module:   "openapi",
+		Severity: ParseSeverity(r.Severity),
+		Key:      key("openapi", r.SpecURL),
+		Title:    "openapi spec exposed",
+		Raw:      fmt.Sprintf("%s (%d endpoints)", r.SpecURL, len(r.Endpoints)),
+	}}
+}
+
+func flattenFavicon(target string, r *scan.FaviconResult) []Finding {
+	if r == nil {
+		return nil
+	}
+	// a matched fingerprint is a real signal; an unmatched hash is just inventory
+	// (still useful as a shodan pivot, so we keep it at recon).
+	sev := sevRecon
+	title := fmt.Sprintf("favicon hash %d", r.Hash)
+	if r.Tech != "" {
+		sev = SeverityLow
+		title = r.Tech + " (favicon)"
+	}
+	return []Finding{{
+		Target:   target,
+		Module:   "favicon",
+		Severity: sev,
+		Key:      key("favicon", fmt.Sprintf("%d", r.Hash)),
+		Title:    title,
+		Raw:      r.ShodanQ,
+	}}
 }
 
 func flattenCMS(target string, r *scan.CMSResult) []Finding {

@@ -55,6 +55,9 @@ type Settings struct {
 	SecurityTrails    bool
 	SQL               bool
 	LFI               bool
+	JWT               bool
+	OpenAPI           bool
+	Favicon           bool
 	CORS              bool
 	Redirect          bool
 	XSS               bool
@@ -139,6 +142,9 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.SecurityTrails, "securitytrails", false, "Enable SecurityTrails domain discovery (requires SECURITYTRAILS_API_KEY env var)"),
 		flagSet.BoolVar(&settings.SQL, "sql", false, "Enable SQL reconnaissance (admin panels, error disclosure)"),
 		flagSet.BoolVar(&settings.LFI, "lfi", false, "Enable LFI (Local File Inclusion) reconnaissance"),
+		flagSet.BoolVar(&settings.JWT, "jwt", false, "Enable JWT discovery + offline weakness analysis"),
+		flagSet.BoolVar(&settings.OpenAPI, "openapi", false, "Enable OpenAPI/Swagger spec exposure probe"),
+		flagSet.BoolVar(&settings.Favicon, "favicon", false, "Enable favicon hash fingerprinting (shodan-style)"),
 		flagSet.BoolVar(&settings.CORS, "cors", false, "Enable CORS misconfiguration probe"),
 		flagSet.BoolVar(&settings.Redirect, "redirect", false, "Enable open redirect probe"),
 		flagSet.BoolVar(&settings.XSS, "xss", false, "Enable reflected XSS probe"),

@@ -125,6 +125,15 @@ sql reconnaissance (admin panels, error disclosure).
 .B \-lfi
 local file inclusion reconnaissance.
 .TP
+.B \-jwt
+jwt discovery plus offline weakness analysis (alg:none, weak hmac secret, missing/expired exp, sensitive plaintext claims).
+.TP
+.B \-openapi
+openapi/swagger spec exposure probe; enumerates paths, methods and unauthenticated operations.
+.TP
+.B \-favicon
+favicon hash fingerprinting (shodan\-style mmh3); matches bundled tech and prints the http.favicon.hash pivot query.
+.TP
 .B \-cors
 cors misconfiguration probe (reflected/permissive origins).
 .TP

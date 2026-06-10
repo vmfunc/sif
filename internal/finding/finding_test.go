@@ -73,6 +73,35 @@ func coverageCases() []coverageCase {
 			wantItems: 1,
 		},
 		{
+			value: &scan.JWTResult{Tokens: []scan.JWTToken{{
+				Source: "header:Authorization",
+				Alg:    "none",
+				Issues: []scan.JWTIssue{
+					{Kind: "alg:none", Severity: "critical", Detail: "no signature"},
+					{Kind: "missing exp", Severity: "medium", Detail: "no expiry"},
+				},
+			}}},
+			typed:     &scan.JWTResult{},
+			module:    "jwt",
+			wantItems: 2,
+		},
+		{
+			value: &scan.OpenAPIResult{
+				SpecURL:   "http://x/openapi.json",
+				Severity:  "high",
+				Endpoints: []scan.OpenAPIEndpoint{{Path: "/users", Method: "GET", Unauth: true}},
+			},
+			typed:     &scan.OpenAPIResult{},
+			module:    "openapi",
+			wantItems: 1,
+		},
+		{
+			value:     &scan.FaviconResult{Hash: 116323821, Tech: "Apache Tomcat", ShodanQ: "http.favicon.hash:116323821"},
+			typed:     &scan.FaviconResult{},
+			module:    "favicon",
+			wantItems: 1,
+		},
+		{
 			value:     &scan.CMSResult{Name: "WordPress", Version: "6.1"},
 			typed:     &scan.CMSResult{},
 			module:    "cms",
@@ -245,7 +274,7 @@ func TestEveryResultTypeIsInCoverageTable(t *testing.T) {
 	// lockstep with the ScanResult implementers; a missing entry means the table
 	// (and very likely Flatten) skipped a scanner.
 	want := []string{
-		"shodan", "sql", "lfi", "cms", "securitytrails",
+		"shodan", "sql", "lfi", "jwt", "openapi", "favicon", "cms", "securitytrails",
 		"cors", "redirect", "xss", "crawl", "passive", "probe",
 		"headers", "security_headers", "dirlist", "cloudstorage",
 		"dork", "subdomain_takeover", "framework", "js", "custom-mod",

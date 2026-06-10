@@ -503,6 +503,36 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.JWT {
+			result, err := scan.JWT(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running JWT analysis: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "JWT")
+			}
+		}
+
+		if app.settings.OpenAPI {
+			result, err := scan.OpenAPI(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running OpenAPI probe: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "OpenAPI")
+			}
+		}
+
+		if app.settings.Favicon {
+			result, err := scan.Favicon(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running favicon fingerprint: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "Favicon")
+			}
+		}
+
 		if app.settings.CORS {
 			result, err := scan.CORS(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 			if err != nil {
