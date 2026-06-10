@@ -32,6 +32,8 @@ import (
 type JavascriptScanResult struct {
 	SupabaseResults      []supabaseScanResult `json:"supabase_results"`
 	FoundEnvironmentVars map[string]string    `json:"environment_variables"`
+	SecretMatches        []SecretMatch        `json:"secret_matches"`
+	Endpoints            []string             `json:"endpoints"`
 }
 
 // ResultType implements the ScanResult interface.
@@ -116,6 +118,11 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 	log.Info("Got %d scripts, now running scans on them", len(scripts))
 
 	supabaseResults := make([]supabaseScanResult, 0, len(scripts))
+	secretMatches := make([]SecretMatch, 0)
+	endpoints := make([]string, 0)
+	// dedupe secrets and endpoints across every script, not just within one.
+	seenSecrets := make(map[string]struct{})
+	seenEndpoints := make(map[string]struct{})
 	for _, script := range scripts {
 		charmlog.Debugf("Scanning %s", script)
 		req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, script, http.NoBody)
@@ -147,16 +154,41 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 		if scriptSupabaseResults != nil {
 			supabaseResults = append(supabaseResults, scriptSupabaseResults...)
 		}
+
+		// reuse the same script buffer for credential and endpoint extraction.
+		for _, match := range ScanSecrets(content, script) {
+			key := match.Rule + "\x00" + match.Match
+			if _, ok := seenSecrets[key]; ok {
+				continue
+			}
+			seenSecrets[key] = struct{}{}
+			secretMatches = append(secretMatches, match)
+			log.Warn("found %s in %s", match.Rule, script)
+		}
+
+		for _, endpoint := range ExtractEndpoints(content, script) {
+			if _, ok := seenEndpoints[endpoint]; ok {
+				continue
+			}
+			seenEndpoints[endpoint] = struct{}{}
+			endpoints = append(endpoints, endpoint)
+		}
 	}
 
 	spin.Stop()
 
+	if len(endpoints) > 0 {
+		log.Info("extracted %d endpoints", len(endpoints))
+	}
+
 	result := JavascriptScanResult{
 		SupabaseResults:      supabaseResults,
 		FoundEnvironmentVars: map[string]string{},
+		SecretMatches:        secretMatches,
+		Endpoints:            endpoints,
 	}
 
-	log.Complete(len(supabaseResults), "found")
+	log.Complete(len(supabaseResults)+len(secretMatches)+len(endpoints), "found")
 
 	return &result, nil
 }

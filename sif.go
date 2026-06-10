@@ -391,6 +391,56 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.CORS {
+			result, err := scan.CORS(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running CORS probe: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "CORS")
+			}
+		}
+
+		if app.settings.Redirect {
+			result, err := scan.Redirect(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running open redirect probe: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "Open Redirect")
+			}
+		}
+
+		if app.settings.XSS {
+			result, err := scan.XSS(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running reflected XSS probe: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "Reflected XSS")
+			}
+		}
+
+		if app.settings.Crawl {
+			result, err := scan.Crawl(url, app.settings.CrawlDepth, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running web crawl: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "Crawl")
+			}
+		}
+
+		if app.settings.Passive {
+			result, err := scan.Passive(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running passive discovery: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "Passive")
+			}
+		}
+
 		// Load and run modules
 		if app.settings.AllModules || app.settings.Modules != "" || app.settings.ModuleTags != "" {
 			loader, err := modules.NewLoader()

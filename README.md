@@ -122,6 +122,9 @@ makepkg -si
 # sql recon + lfi scanning
 ./sif -u https://example.com -sql -lfi
 
+# web vuln probes (cors, open redirect, reflected xss)
+./sif -u https://example.com -cors -redirect -xss
+
 # framework detection (with cve lookup)
 ./sif -u https://example.com -framework
 
@@ -158,7 +161,7 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-ports` | port scanning (common/full) |
 | `-nuclei` | vulnerability scanning with nuclei templates |
 | `-dork` | automated google dorking |
-| `-js` | javascript analysis |
+| `-js` | javascript analysis + secret and endpoint extraction |
 | `-c3` | cloud storage misconfiguration |
 | `-headers` | http header analysis |
 | `-sh` | security header analysis (missing/weak headers) |
@@ -170,7 +173,13 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-securitytrails` | domain discovery + target expansion (requires SECURITYTRAILS_API_KEY) |
 | `-sql` | sql recon |
 | `-lfi` | local file inclusion |
+| `-cors` | cors misconfiguration probe |
+| `-redirect` | open redirect probe |
+| `-xss` | reflected xss probe |
 | `-framework` | framework detection with cve lookup |
+| `-crawl` | web crawler (spider same-host links/scripts/forms) |
+| `-crawl-depth` | max crawl recursion depth (default 2) |
+| `-passive` | passive subdomain/url discovery (zero traffic to target) |
 
 ### http options
 

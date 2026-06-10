@@ -79,7 +79,7 @@ scopes: `common` (top ports), `full` (all ports)
 
 ### javascript analysis
 
-`-js` - analyze javascript files
+`-js` - analyze javascript files + secret and endpoint extraction
 
 ```bash
 ./sif -u https://example.com -js
@@ -154,12 +154,56 @@ export SHODAN_API_KEY=your-api-key
 ./sif -u https://example.com -lfi
 ```
 
+### cors probe
+
+`-cors` - probe for cors misconfigurations (reflected/permissive origins)
+
+```bash
+./sif -u https://example.com -cors
+```
+
+### open redirect probe
+
+`-redirect` - probe redirect-prone params for open redirects
+
+```bash
+./sif -u https://example.com/login?next=home -redirect
+```
+
+### reflected xss probe
+
+`-xss` - inject a canary into params and report unescaped reflections
+
+```bash
+./sif -u https://example.com/search?q=test -xss
+```
+
 ### framework detection
 
 `-framework` - detect web frameworks with version and cve lookup
 
 ```bash
 ./sif -u https://example.com -framework
+```
+
+### web crawler
+
+`-crawl` - spider the target, following same-host links, scripts and forms
+
+`-crawl-depth` - max recursion depth (default 2). respects robots.txt and stays on the target host.
+
+```bash
+./sif -u https://example.com -crawl -crawl-depth 3
+```
+
+### passive discovery
+
+`-passive` - gather subdomains from certificate transparency (crt.sh, certspotter) and historical urls from the wayback machine
+
+keyless and zero traffic to the target itself - all lookups hit third-party feeds.
+
+```bash
+./sif -u https://example.com -passive
 ```
 
 ### whois lookup
@@ -339,6 +383,9 @@ the first time you run a new release sif also prints that release's notes once. 
   -git \
   -sql \
   -lfi \
+  -cors \
+  -redirect \
+  -xss \
   -am
 ```
 

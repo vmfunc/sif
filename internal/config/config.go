@@ -46,7 +46,13 @@ type Settings struct {
 	SecurityTrails    bool
 	SQL               bool
 	LFI               bool
+	CORS              bool
+	Redirect          bool
+	XSS               bool
 	Framework         bool
+	Crawl             bool
+	CrawlDepth        int
+	Passive           bool
 	Modules           string // Comma-separated list of module IDs to run
 	ModuleTags        string // Run modules matching these tags
 	AllModules        bool   // Run all loaded modules
@@ -61,6 +67,10 @@ type Settings struct {
 // scanners, so 0 silently runs nothing and a negative value panics with
 // "negative WaitGroup counter"; clamp the parsed value up to this.
 const minThreads = 1
+
+// defaultCrawlDepth bounds how far the spider recurses by default; deep enough
+// to find linked pages without crawling an entire site.
+const defaultCrawlDepth = 2
 
 const (
 	Nil goflags.EnumVariable = iota
@@ -107,7 +117,13 @@ func Parse() *Settings {
 		flagSet.BoolVar(&settings.SecurityTrails, "securitytrails", false, "Enable SecurityTrails domain discovery (requires SECURITYTRAILS_API_KEY env var)"),
 		flagSet.BoolVar(&settings.SQL, "sql", false, "Enable SQL reconnaissance (admin panels, error disclosure)"),
 		flagSet.BoolVar(&settings.LFI, "lfi", false, "Enable LFI (Local File Inclusion) reconnaissance"),
+		flagSet.BoolVar(&settings.CORS, "cors", false, "Enable CORS misconfiguration probe"),
+		flagSet.BoolVar(&settings.Redirect, "redirect", false, "Enable open redirect probe"),
+		flagSet.BoolVar(&settings.XSS, "xss", false, "Enable reflected XSS probe"),
 		flagSet.BoolVar(&settings.Framework, "framework", false, "Enable framework detection"),
+		flagSet.BoolVar(&settings.Crawl, "crawl", false, "Enable web crawling (spider same-host links/scripts/forms)"),
+		flagSet.IntVar(&settings.CrawlDepth, "crawl-depth", defaultCrawlDepth, "Max crawl recursion depth"),
+		flagSet.BoolVar(&settings.Passive, "passive", false, "Enable passive subdomain/url discovery (zero traffic to target)"),
 	)
 
 	flagSet.CreateGroup("runtime", "Runtime",
