@@ -29,6 +29,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/dropalldatabases/sif/internal/pool"
 )
 
 // directoryURL is a var so integration tests can repoint it at a fixture.
@@ -413,67 +414,54 @@ func Dirlist(size string, url string, timeout time.Duration, threads int, logdir
 
 	progress := output.NewProgress(len(directories), "fuzzing")
 
-	var wg sync.WaitGroup
 	var mu sync.Mutex
-	wg.Add(threads)
 
 	results := make(DirectoryResults, 0, 64)
-	for thread := 0; thread < threads; thread++ {
-		go func(thread int) {
-			defer wg.Done()
+	pool.Each(directories, threads, func(directory string) {
+		progress.Increment(directory)
 
-			for i, directory := range directories {
-				if i%threads != thread {
-					continue
-				}
+		charmlog.Debugf("%s", directory)
+		dirReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url+"/"+directory, http.NoBody)
+		if err != nil {
+			charmlog.Debugf("Error creating request for %s: %s", directory, err)
+			return
+		}
+		resp, err := client.Do(dirReq)
+		if err != nil {
+			charmlog.Debugf("Error %s: %s", directory, err)
+			return
+		}
 
-				progress.Increment(directory)
+		meta, body := readMeta(resp)
+		reqURL := resp.Request.URL.String()
+		resp.Body.Close()
 
-				charmlog.Debugf("%s", directory)
-				dirReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url+"/"+directory, http.NoBody)
-				if err != nil {
-					charmlog.Debugf("Error creating request for %s: %s", directory, err)
-					continue
-				}
-				resp, err := client.Do(dirReq)
-				if err != nil {
-					charmlog.Debugf("Error %s: %s", directory, err)
-					continue
-				}
+		if !matcher.Matches(meta, body) {
+			return
+		}
 
-				meta, body := readMeta(resp)
-				reqURL := resp.Request.URL.String()
-				resp.Body.Close()
+		progress.Pause()
+		log.Success("found: %s [%s] (size=%d words=%d)",
+			output.Highlight.Render(directory),
+			output.Status.Render(strconv.Itoa(meta.status)),
+			meta.size, meta.words)
+		progress.Resume()
 
-				if !matcher.Matches(meta, body) {
-					continue
-				}
+		if logdir != "" {
+			_ = logger.Write(sanitizedURL, logdir,
+				fmt.Sprintf("%s [%s] size=%d words=%d\n", strconv.Itoa(meta.status), directory, meta.size, meta.words))
+		}
 
-				progress.Pause()
-				log.Success("found: %s [%s] (size=%d words=%d)",
-					output.Highlight.Render(directory),
-					output.Status.Render(strconv.Itoa(meta.status)),
-					meta.size, meta.words)
-				progress.Resume()
-
-				if logdir != "" {
-					_ = logger.Write(sanitizedURL, logdir,
-						fmt.Sprintf("%s [%s] size=%d words=%d\n", strconv.Itoa(meta.status), directory, meta.size, meta.words))
-				}
-
-				result := DirectoryResult{
-					Url:        reqURL,
-					StatusCode: meta.status,
-					Size:       meta.size,
-					Words:      meta.words,
-				}
-				mu.Lock()
-				results = append(results, result)
-				mu.Unlock()
-			}
-		}(thread)
-	}
-	wg.Wait()
+		result := DirectoryResult{
+			Url:        reqURL,
+			StatusCode: meta.status,
+			Size:       meta.size,
+			Words:      meta.words,
+		}
+		mu.Lock()
+		results = append(results, result)
+		mu.Unlock()
+	})
 	progress.Done()
 
 	log.Complete(len(results), "found")

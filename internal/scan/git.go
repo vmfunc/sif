@@ -25,6 +25,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/dropalldatabases/sif/internal/pool"
 )
 
 // gitURL is a var so integration tests can repoint it at a fixture.
@@ -71,50 +72,37 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 		gitUrls = append(gitUrls, scanner.Text())
 	}
 
-	var wg sync.WaitGroup
 	var mu sync.Mutex
-	wg.Add(threads)
 
 	foundUrls := []string{}
-	for thread := 0; thread < threads; thread++ {
-		go func(thread int) {
-			defer wg.Done()
+	pool.Each(gitUrls, threads, func(repourl string) {
+		charmlog.Debugf("%s", repourl)
+		gitReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url+"/"+repourl, http.NoBody)
+		if err != nil {
+			charmlog.Debugf("Error creating request for %s: %s", repourl, err)
+			return
+		}
+		resp, err := client.Do(gitReq) //nolint:bodyclose // drained and closed via httpx.DrainClose
+		if err != nil {
+			charmlog.Debugf("Error %s: %s", repourl, err)
+			return
+		}
 
-			for i, repourl := range gitUrls {
-				if i%threads != thread {
-					continue
-				}
-
-				charmlog.Debugf("%s", repourl)
-				gitReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url+"/"+repourl, http.NoBody)
-				if err != nil {
-					charmlog.Debugf("Error creating request for %s: %s", repourl, err)
-					continue
-				}
-				resp, err := client.Do(gitReq) //nolint:bodyclose // drained and closed via httpx.DrainClose
-				if err != nil {
-					charmlog.Debugf("Error %s: %s", repourl, err)
-					continue
-				}
-
-				if resp.StatusCode == 200 && !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
-					spin.Stop()
-					log.Success("Git found at %s [%s]", output.Highlight.Render(repourl), output.Status.Render(strconv.Itoa(resp.StatusCode)))
-					spin.Start()
-					if logdir != "" {
-						logger.Write(sanitizedURL, logdir, strconv.Itoa(resp.StatusCode)+" git found at ["+repourl+"]\n")
-					}
-
-					mu.Lock()
-					foundUrls = append(foundUrls, resp.Request.URL.String())
-					mu.Unlock()
-				}
-				// status/headers only; drain so the conn returns to the pool.
-				httpx.DrainClose(resp)
+		if resp.StatusCode == 200 && !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+			spin.Stop()
+			log.Success("Git found at %s [%s]", output.Highlight.Render(repourl), output.Status.Render(strconv.Itoa(resp.StatusCode)))
+			spin.Start()
+			if logdir != "" {
+				logger.Write(sanitizedURL, logdir, strconv.Itoa(resp.StatusCode)+" git found at ["+repourl+"]\n")
 			}
-		}(thread)
-	}
-	wg.Wait()
+
+			mu.Lock()
+			foundUrls = append(foundUrls, resp.Request.URL.String())
+			mu.Unlock()
+		}
+		// status/headers only; drain so the conn returns to the pool.
+		httpx.DrainClose(resp)
+	})
 
 	spin.Stop()
 	log.Complete(len(foundUrls), "found")

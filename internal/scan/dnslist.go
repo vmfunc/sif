@@ -25,6 +25,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/dropalldatabases/sif/internal/pool"
 )
 
 // dnsURL is a var so integration tests can repoint it at a fixture.
@@ -148,61 +149,48 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 
 	progress := output.NewProgress(len(dns), "enumerating")
 
-	var wg sync.WaitGroup
 	var mu sync.Mutex
-	wg.Add(threads)
 
 	urls := make([]string, 0, 64)
-	for thread := 0; thread < threads; thread++ {
-		go func(thread int) {
-			defer wg.Done()
+	pool.Each(dns, threads, func(domain string) {
+		progress.Increment(domain)
 
-			for i, domain := range dns {
-				if i%threads != thread {
-					continue
-				}
+		charmlog.Debugf("Looking up: %s", domain)
 
-				progress.Increment(domain)
+		host := domain + "." + sanitizedURL
 
-				charmlog.Debugf("Looking up: %s", domain)
+		// dns gate: skip the http probe entirely for names that don't
+		// resolve or that a wildcard zone answers. this is the whole point -
+		// no request per dead candidate.
+		ok, err := resolver.Resolve(host)
+		if err != nil {
+			charmlog.Debugf("resolve %s: %s", host, err)
+			return
+		}
+		if !ok {
+			return
+		}
 
-				host := domain + "." + sanitizedURL
+		// probe http first, then https - but a subdomain is recorded at
+		// most once. firing both schemes and appending on each is what
+		// double-counted every host on the old path.
+		foundURL, scheme := probeSubdomain(client, host)
+		if foundURL == "" {
+			return
+		}
 
-				// dns gate: skip the http probe entirely for names that don't
-				// resolve or that a wildcard zone answers. this is the whole point -
-				// no request per dead candidate.
-				ok, err := resolver.Resolve(host)
-				if err != nil {
-					charmlog.Debugf("resolve %s: %s", host, err)
-					continue
-				}
-				if !ok {
-					continue
-				}
+		mu.Lock()
+		urls = append(urls, foundURL)
+		mu.Unlock()
 
-				// probe http first, then https - but a subdomain is recorded at
-				// most once. firing both schemes and appending on each is what
-				// double-counted every host on the old path.
-				foundURL, scheme := probeSubdomain(client, host)
-				if foundURL == "" {
-					continue
-				}
+		progress.Pause()
+		log.Success("found: %s [%s]", output.Highlight.Render(host), scheme)
+		progress.Resume()
 
-				mu.Lock()
-				urls = append(urls, foundURL)
-				mu.Unlock()
-
-				progress.Pause()
-				log.Success("found: %s [%s]", output.Highlight.Render(host), scheme)
-				progress.Resume()
-
-				if logdir != "" {
-					_ = logger.Write(sanitizedURL, logdir, fmt.Sprintf("[%s] %s\n", scheme, host))
-				}
-			}
-		}(thread)
-	}
-	wg.Wait()
+		if logdir != "" {
+			_ = logger.Write(sanitizedURL, logdir, fmt.Sprintf("[%s] %s\n", scheme, host))
+		}
+	})
 	progress.Done()
 
 	log.Complete(len(urls), "found")
