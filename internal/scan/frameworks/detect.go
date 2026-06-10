@@ -118,17 +118,22 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 		return nil, nil //nolint:nilnil // no framework detected is not an error
 	}
 
-	// Get version match details
+	// Get version match details. the detector's own best.version is often
+	// "unknown" (it only fingerprints the framework, not always the version),
+	// while ExtractVersionOptimized digs the real version out of the body. prefer
+	// that for both the reported version and the cve lookup, otherwise CVEs that
+	// only match a concrete version are silently missed.
 	versionMatch := ExtractVersionOptimized(bodyStr, best.name)
-	cves, suggestions := getVulnerabilities(best.name, best.version)
+	version := resolveVersion(best.version, versionMatch.Version)
+	cves, suggestions := getVulnerabilities(best.name, version)
 
-	result := NewFrameworkResult(best.name, best.version, best.confidence, versionMatch.Confidence)
+	result := NewFrameworkResult(best.name, version, best.confidence, versionMatch.Confidence)
 	result.WithVulnerabilities(cves, suggestions)
 
 	// Log results
 	if logdir != "" {
 		logEntry := fmt.Sprintf("Detected framework: %s (version: %s, confidence: %.2f, version_confidence: %.2f)\n",
-			best.name, best.version, best.confidence, versionMatch.Confidence)
+			best.name, version, best.confidence, versionMatch.Confidence)
 		if len(cves) > 0 {
 			logEntry += fmt.Sprintf("  Risk Level: %s\n", result.RiskLevel)
 			logEntry += fmt.Sprintf("  CVEs: %v\n", cves)
@@ -138,7 +143,7 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	}
 
 	log.Success("Detected %s framework (version: %s, confidence: %.2f)",
-		output.Highlight.Render(best.name), best.version, best.confidence)
+		output.Highlight.Render(best.name), version, best.confidence)
 
 	if versionMatch.Confidence > 0 {
 		charmlog.Debugf("Version detected from: %s (confidence: %.2f)",
@@ -158,6 +163,24 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	log.Complete(1, "detected")
 
 	return result, nil
+}
+
+// unknownVersion is the sentinel both detectors and the version extractor emit
+// when no concrete version could be read from the response.
+const unknownVersion = "unknown"
+
+// resolveVersion picks the version to report and look CVEs up against. the
+// detector's own value wins when it's concrete; otherwise we fall back to the
+// version dug out of the body by ExtractVersionOptimized. either being
+// "unknown"/empty means "no info", not a real version.
+func resolveVersion(detectorVersion, extractedVersion string) string {
+	if detectorVersion != "" && detectorVersion != unknownVersion {
+		return detectorVersion
+	}
+	if extractedVersion != "" && extractedVersion != unknownVersion {
+		return extractedVersion
+	}
+	return unknownVersion
 }
 
 // getVulnerabilities returns CVEs and recommendations for a framework version.

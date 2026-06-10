@@ -89,6 +89,7 @@ linters:
           - errcheck
           - noctx
           - gosec  # fake credentials in secret-scanner fixtures are not real keys
+          - bodyclose  # synthetic *http.Response fixtures carry no socket to close
 
 issues:
   max-issues-per-linter: 50

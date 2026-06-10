@@ -157,6 +157,14 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | flag | description |
 |------|-------------|
 | `-dirlist` | directory and file fuzzing (small/medium/large) |
+| `-mc` | dirlist: match these status codes (comma list, e.g. 200,301) |
+| `-fc` | dirlist: filter out these status codes (comma list) |
+| `-fs` | dirlist: filter out responses of these body sizes (comma list) |
+| `-fw` | dirlist: filter out responses with these word counts (comma list) |
+| `-fr` | dirlist: filter out responses whose body matches this regex |
+| `-ac` | dirlist: auto-calibrate the soft-404 wildcard baseline |
+| `-w` | dirlist: custom wordlist (local file or url; overrides `-dirlist` size) |
+| `-e` | dirlist: extensions appended to each word (comma list, e.g. php,bak,env) |
 | `-dnslist` | subdomain enumeration (small/medium/large) |
 | `-ports` | port scanning (common/full) |
 | `-nuclei` | vulnerability scanning with nuclei templates |
@@ -180,6 +188,7 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-crawl` | web crawler (spider same-host links/scripts/forms) |
 | `-crawl-depth` | max crawl recursion depth (default 2) |
 | `-passive` | passive subdomain/url discovery (zero traffic to target) |
+| `-probe` | live-host probe (status, title, server, redirect chain) |
 
 ### http options
 
@@ -198,6 +207,22 @@ these apply to every outbound request across all scanners:
 ```
 
 a scanner that sets a header explicitly (e.g. an api key) always wins over the global default.
+
+### report export
+
+write the run's findings out to a file for ci/cd or triage:
+
+| flag | description |
+|------|-------------|
+| `-sarif` | write a sarif 2.1.0 report to this file |
+| `-markdown`, `-md` | write a markdown report to this file |
+
+```bash
+# scan and emit both a sarif and markdown report
+./sif -u https://example.com -headers -cors -sarif out.sarif -md out.md
+```
+
+sarif output is ingestable by github code scanning; markdown is a readable per-target summary.
 
 ### yaml modules
 

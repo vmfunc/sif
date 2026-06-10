@@ -29,6 +29,7 @@ import (
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/modules"
 	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/dropalldatabases/sif/internal/report"
 	"github.com/dropalldatabases/sif/internal/scan"
 	"github.com/dropalldatabases/sif/internal/scan/builtin"
 	"github.com/dropalldatabases/sif/internal/scan/frameworks"
@@ -45,6 +46,10 @@ type App struct {
 
 // Version is set by main to the resolved build version and shown on the banner.
 var Version = "dev"
+
+// reportFileMode is the permission applied to written report files: owner
+// read/write, group/other read. reports aren't secret but may name targets.
+const reportFileMode = 0o644
 
 type UrlResult struct {
 	Url     string `json:"url"`
@@ -204,6 +209,12 @@ func (app *App) Run() error {
 
 	scansRun := make([]string, 0, 16)
 
+	// accumulate every module result across targets so the report writers can
+	// serialize the full run after the loop. only collected when an export flag
+	// is set, so the common path pays nothing.
+	wantReport := app.settings.SARIF != "" || app.settings.Markdown != ""
+	reportResults := make([]report.Result, 0, 16)
+
 	for _, url := range app.targets {
 		output.Info("Starting scan on %s", output.Highlight.Render(url))
 
@@ -231,11 +242,20 @@ func (app *App) Run() error {
 		}
 
 		if app.settings.Dirlist != "none" {
-			result, err := scan.Dirlist(app.settings.Dirlist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.Dirlist(app.settings.Dirlist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, scan.DirlistOptions{
+				MatchCodes:  app.settings.DirMatchCodes,
+				FilterCodes: app.settings.DirFilterCodes,
+				FilterSizes: app.settings.DirFilterSizes,
+				FilterWords: app.settings.DirFilterWords,
+				FilterRegex: app.settings.DirFilterRegex,
+				Calibrate:   app.settings.DirCalibrate,
+				Wordlist:    app.settings.DirWordlist,
+				Extensions:  app.settings.DirExtensions,
+			})
 			if err != nil {
 				log.Errorf("Error while running directory scan: %s", err)
 			} else {
-				moduleResults = append(moduleResults, ModuleResult{"dirlist", result})
+				moduleResults = append(moduleResults, NewModuleResult(result))
 				scansRun = append(scansRun, "Directory Listing")
 			}
 		}
@@ -441,6 +461,16 @@ func (app *App) Run() error {
 			}
 		}
 
+		if app.settings.Probe {
+			result, err := scan.Probe(url, app.settings.Timeout, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running probe: %s", err)
+			} else if result != nil {
+				moduleResults = append(moduleResults, NewModuleResult(result))
+				scansRun = append(scansRun, "Probe")
+			}
+		}
+
 		// Load and run modules
 		if app.settings.AllModules || app.settings.Modules != "" || app.settings.ModuleTags != "" {
 			loader, err := modules.NewLoader()
@@ -511,10 +541,62 @@ func (app *App) Run() error {
 			}
 			fmt.Println(string(marshalled))
 		}
+
+		if wantReport {
+			reportResults = append(reportResults, collectReportResults(url, moduleResults)...)
+		}
+	}
+
+	if wantReport {
+		if err := app.writeReports(reportResults); err != nil {
+			return err
+		}
 	}
 
 	if !app.settings.ApiMode {
 		output.PrintSummary(scansRun, app.logFiles)
+	}
+
+	return nil
+}
+
+// collectReportResults flattens one target's module results into the report
+// model, carrying each finding as raw json so the report package stays free of
+// scan types. a result that won't marshal is skipped rather than failing the run.
+func collectReportResults(target string, moduleResults []ModuleResult) []report.Result {
+	out := make([]report.Result, 0, len(moduleResults))
+	for _, mr := range moduleResults {
+		data, err := json.Marshal(mr.Data)
+		if err != nil {
+			log.Warnf("report: skipping %s result for %s: %v", mr.Id, target, err)
+			continue
+		}
+		out = append(out, report.Result{Target: target, Module: mr.Id, Data: data})
+	}
+	return out
+}
+
+// writeReports serializes the collected results to the requested export files.
+// each writer runs independently so a bad path for one format doesn't suppress
+// the other.
+func (app *App) writeReports(results []report.Result) error {
+	if path := app.settings.SARIF; path != "" {
+		data, err := report.SARIF(results)
+		if err != nil {
+			return fmt.Errorf("build sarif report: %w", err)
+		}
+		if err := os.WriteFile(path, data, reportFileMode); err != nil {
+			return fmt.Errorf("write sarif report %q: %w", path, err)
+		}
+		output.Success("sarif report written to %s", path)
+	}
+
+	if path := app.settings.Markdown; path != "" {
+		data := report.Markdown(results)
+		if err := os.WriteFile(path, data, reportFileMode); err != nil {
+			return fmt.Errorf("write markdown report %q: %w", path, err)
+		}
+		output.Success("markdown report written to %s", path)
 	}
 
 	return nil

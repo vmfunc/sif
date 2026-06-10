@@ -33,6 +33,42 @@ sizes: `small`, `medium`, `large`
 ./sif -u https://example.com -dirlist medium
 ```
 
+#### response filters
+
+modern apps serve a catch-all 200 for unknown routes, so a naive scan reports
+every path. these ffuf-style filters cut the noise (a filter always wins over a
+match):
+
+- `-mc <codes>` - match only these status codes (comma list, e.g. `200,301`)
+- `-fc <codes>` - filter out these status codes
+- `-fs <sizes>` - filter out responses of these body sizes
+- `-fw <counts>` - filter out responses with these word counts
+- `-fr <regex>` - filter out responses whose body matches this regex
+
+```bash
+./sif -u https://example.com -dirlist medium -mc 200,301 -fs 1234
+```
+
+#### wildcard calibration
+
+`-ac` probes a few paths that cannot exist, learns the soft-404 baseline
+(status + size + words), and auto-drops any response matching it - so SPA
+catch-all 200s stop flooding the output:
+
+```bash
+./sif -u https://example.com -dirlist medium -ac
+```
+
+#### custom wordlists and extensions
+
+`-w <path|url>` overrides the size switch with your own list (local file or
+remote url); `-e <exts>` appends each extension to every word, keeping the bare
+word too:
+
+```bash
+./sif -u https://example.com -w /path/to/words.txt -e php,bak,env
+```
+
 ### subdomain enumeration
 
 `-dnslist <size>` - enumerate subdomains
@@ -206,6 +242,14 @@ keyless and zero traffic to the target itself - all lookups hit third-party feed
 ./sif -u https://example.com -passive
 ```
 
+### live-host probe
+
+`-probe` - check whether the target is alive and report its final status, page title, server header, content-length and the redirect chain it walked
+
+```bash
+./sif -u https://example.com -probe
+```
+
 ### whois lookup
 
 `-whois` - perform whois lookups
@@ -325,6 +369,26 @@ cap outbound requests per second (0 = unlimited, default 0):
 
 ```bash
 ./sif -u https://example.com -rate-limit 20
+```
+
+## output options
+
+write the collected findings out to a file after the scan. both formats can be requested in the same run.
+
+### -sarif
+
+write a sarif 2.1.0 report (one run, tool `sif`, one result per finding). ingestable by github code scanning and other sarif consumers:
+
+```bash
+./sif -u https://example.com -headers -cors -sarif out.sarif
+```
+
+### -md, --markdown
+
+write a readable markdown report grouped by target, then by module:
+
+```bash
+./sif -u https://example.com -headers -cors -md report.md
 ```
 
 ## api options

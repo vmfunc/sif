@@ -38,6 +38,30 @@ file with one url per line.
 .BR \-dirlist " \fIsize\fR"
 directory and file fuzzing (small/medium/large).
 .TP
+.BR \-mc " \fIcodes\fR"
+dirlist: match only these status codes (comma list, e.g. 200,301).
+.TP
+.BR \-fc " \fIcodes\fR"
+dirlist: filter out these status codes (comma list).
+.TP
+.BR \-fs " \fIsizes\fR"
+dirlist: filter out responses of these body sizes (comma list).
+.TP
+.BR \-fw " \fIcounts\fR"
+dirlist: filter out responses with these word counts (comma list).
+.TP
+.BR \-fr " \fIregex\fR"
+dirlist: filter out responses whose body matches this regex.
+.TP
+.B \-ac
+dirlist: auto\-calibrate the soft\-404 wildcard baseline so catch\-all 200s are dropped.
+.TP
+.BR \-w " \fIpath|url\fR"
+dirlist: custom wordlist (local file or url); overrides the \fB\-dirlist\fR size.
+.TP
+.BR \-e " \fIexts\fR"
+dirlist: extensions appended to each word (comma list, e.g. php,bak,env).
+.TP
 .BR \-dnslist " \fIsize\fR"
 subdomain enumeration (small/medium/large).
 .TP
@@ -107,6 +131,9 @@ max crawl recursion depth (default 2).
 .B \-passive
 passive subdomain and historical url discovery from third\-party feeds (zero traffic to the target).
 .TP
+.B \-probe
+live\-host probe; reports liveness, final status, page title, server header and the redirect chain.
+.TP
 .B \-noscan
 skip the base url scan (robots.txt, etc).
 .SH OPTIONS
@@ -137,6 +164,12 @@ cookie header to send with every request.
 .TP
 .BR \-rate\-limit " \fIn\fR"
 cap outbound requests per second (0 = unlimited, default 0).
+.TP
+.BR \-sarif " \fIfile\fR"
+write a sarif 2.1.0 report of the run to \fIfile\fR.
+.TP
+.BR \-md ", " \-\-markdown " \fIfile\fR"
+write a markdown report of the run to \fIfile\fR.
 .TP
 .B \-api
 emit json results and suppress the interactive output.

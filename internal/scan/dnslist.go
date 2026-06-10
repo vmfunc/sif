@@ -39,6 +39,23 @@ const (
 	dnsBigFile    = "subdomains-10000.txt"
 )
 
+// dnsScheme labels which url won a subdomain so we don't probe the second
+// scheme once the first already counted it.
+type dnsScheme string
+
+const (
+	dnsSchemeHTTP  dnsScheme = "http"
+	dnsSchemeHTTPS dnsScheme = "https"
+)
+
+// meaningfulStatus reports whether a probe response is a real "this host
+// exists" signal rather than a 404 or a wildcard catch-all redirect. a
+// wildcard-DNS host answers every candidate with the same redirect/404, so
+// gating on a successful, non-redirect status keeps it from flooding results.
+func meaningfulStatus(code int) bool {
+	return code >= http.StatusOK && code < http.StatusMultipleChoices
+}
+
 // Dnslist performs DNS subdomain enumeration on the target domain.
 func Dnslist(size string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
 	log := output.Module("DNS")
@@ -88,6 +105,12 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 	if dnsTransport != nil {
 		client.Transport = dnsTransport
 	}
+	// don't chase redirects: a wildcard catch-all that 301s every candidate to
+	// the same landing page must read as a redirect status, not a 200, so it
+	// gets gated out instead of counting as a found host.
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
 
 	progress := output.NewProgress(len(dns), "enumerating")
 
@@ -109,52 +132,25 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 
 				charmlog.Debugf("Looking up: %s", domain)
 
-				// Check HTTP
-				httpReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "http://"+domain+"."+sanitizedURL, http.NoBody)
-				if err != nil {
-					charmlog.Debugf("Error %s: %s", domain, err)
+				// probe http first, then https - but a subdomain is recorded at
+				// most once. firing both schemes and appending on each is what
+				// double-counted every host on the old path.
+				host := domain + "." + sanitizedURL
+				foundURL, scheme := probeSubdomain(client, host)
+				if foundURL == "" {
 					continue
 				}
-				resp, err := client.Do(httpReq)
-				if err != nil {
-					charmlog.Debugf("Error %s: %s", domain, err)
-				} else {
-					mu.Lock()
-					urls = append(urls, resp.Request.URL.String())
-					mu.Unlock()
-					resp.Body.Close()
 
-					progress.Pause()
-					log.Success("found: %s.%s [http]", output.Highlight.Render(domain), sanitizedURL)
-					progress.Resume()
+				mu.Lock()
+				urls = append(urls, foundURL)
+				mu.Unlock()
 
-					if logdir != "" {
-						logger.Write(sanitizedURL, logdir, fmt.Sprintf("[http] %s.%s\n", domain, sanitizedURL))
-					}
-				}
+				progress.Pause()
+				log.Success("found: %s [%s]", output.Highlight.Render(host), scheme)
+				progress.Resume()
 
-				// Check HTTPS
-				httpsReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "https://"+domain+"."+sanitizedURL, http.NoBody)
-				if err != nil {
-					charmlog.Debugf("Error %s: %s", domain, err)
-					continue
-				}
-				resp, err = client.Do(httpsReq)
-				if err != nil {
-					charmlog.Debugf("Error %s: %s", domain, err)
-				} else {
-					mu.Lock()
-					urls = append(urls, resp.Request.URL.String())
-					mu.Unlock()
-					resp.Body.Close()
-
-					progress.Pause()
-					log.Success("found: %s.%s [https]", output.Highlight.Render(domain), sanitizedURL)
-					progress.Resume()
-
-					if logdir != "" {
-						_ = logger.Write(sanitizedURL, logdir, fmt.Sprintf("[https] %s.%s\n", domain, sanitizedURL))
-					}
+				if logdir != "" {
+					_ = logger.Write(sanitizedURL, logdir, fmt.Sprintf("[%s] %s\n", scheme, host))
 				}
 			}
 		}(thread)
@@ -165,4 +161,41 @@ func Dnslist(size string, url string, timeout time.Duration, threads int, logdir
 	log.Complete(len(urls), "found")
 
 	return urls, nil
+}
+
+// probeSubdomain tries http then https for one host and returns the resolved
+// url + winning scheme on the first meaningful hit, or "" if neither scheme
+// gave a real signal. trying https only when http didn't already count is the
+// per-subdomain dedupe.
+func probeSubdomain(client *http.Client, host string) (string, dnsScheme) {
+	schemes := []struct {
+		prefix string
+		label  dnsScheme
+	}{
+		{"http://", dnsSchemeHTTP},
+		{"https://", dnsSchemeHTTPS},
+	}
+
+	for i := 0; i < len(schemes); i++ {
+		req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, schemes[i].prefix+host, http.NoBody)
+		if err != nil {
+			charmlog.Debugf("Error %s: %s", host, err)
+			continue
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			charmlog.Debugf("Error %s: %s", host, err)
+			continue
+		}
+		code := resp.StatusCode
+		resolved := resp.Request.URL.String()
+		resp.Body.Close()
+
+		if meaningfulStatus(code) {
+			return resolved, schemes[i].label
+		}
+		charmlog.Debugf("skip %s [%s]: status %d", host, schemes[i].label, code)
+	}
+
+	return "", ""
 }

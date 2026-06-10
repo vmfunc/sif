@@ -3,7 +3,9 @@ package scan
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -152,6 +154,103 @@ func TestFetchRobotsTXT_Redirect(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+// an A->B->A redirect loop must terminate (return nil) instead of recursing
+// forever and blowing the stack.
+func TestFetchRobotsTXT_RedirectLoop(t *testing.T) {
+	var serverA, serverB *httptest.Server
+
+	serverA = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", serverB.URL+"/robots.txt")
+		w.WriteHeader(http.StatusMovedPermanently)
+	}))
+	defer serverA.Close()
+
+	serverB = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", serverA.URL+"/robots.txt")
+		w.WriteHeader(http.StatusMovedPermanently)
+	}))
+	defer serverB.Close()
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// the hop cap + visited set guarantee termination; a regression that drops
+	// either would spin forever and the test harness timeout would catch it.
+	resp := fetchRobotsTXT(serverA.URL+"/robots.txt", client)
+	if resp != nil {
+		resp.Body.Close()
+		t.Errorf("expected nil on redirect loop, got status %d", resp.StatusCode)
+	}
+}
+
+// a redirect chain longer than the hop cap stops at the bound rather than
+// following indefinitely.
+func TestFetchRobotsTXT_DepthCap(t *testing.T) {
+	var hops int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// each hop points at a fresh path so the visited set never trips; only
+		// the depth cap can stop this.
+		n := atomic.AddInt32(&hops, 1)
+		w.Header().Set("Location", "/r"+strconv.Itoa(int(n)))
+		w.WriteHeader(http.StatusMovedPermanently)
+	}))
+	defer srv.Close()
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	resp := fetchRobotsTXT(srv.URL+"/robots.txt", client)
+	if resp != nil {
+		resp.Body.Close()
+		t.Errorf("expected nil once depth cap exceeded, got status %d", resp.StatusCode)
+	}
+	if got := atomic.LoadInt32(&hops); got > maxRobotsRedirects {
+		t.Errorf("followed %d hops, expected at most %d", got, maxRobotsRedirects)
+	}
+}
+
+// the old code flagged a dangling cname on ANY cname, including LookupCNAME
+// echoing the host back for a plain A record. only an off-host cname into a
+// known takeoverable provider should count.
+func TestDanglingProvider(t *testing.T) {
+	tests := []struct {
+		name        string
+		subdomain   string
+		cname       string
+		wantService string
+		wantOK      bool
+	}{
+		{"github pages dangling", "blog.example.com", "example.github.io.", "GitHub Pages", true},
+		{"heroku dangling", "app.example.com", "example.herokuapp.com.", "Heroku", true},
+		{"s3 dangling", "files.example.com", "bucket.s3.amazonaws.com.", "Amazon S3", true},
+		{"self-reference is not dangling", "www.example.com", "www.example.com.", "", false},
+		{"on-domain cname is not dangling", "www.example.com", "lb.example.com.", "", false},
+		{"unknown provider is not dangling", "x.example.com", "host.notaprovider.net.", "", false},
+		{"empty cname is not dangling", "x.example.com", "", "", false},
+		{"case-insensitive match", "x.example.com", "X.GitHub.IO.", "GitHub Pages", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service, ok := danglingProvider(tt.subdomain, tt.cname)
+			if ok != tt.wantOK {
+				t.Errorf("danglingProvider(%q, %q) ok = %v, want %v", tt.subdomain, tt.cname, ok, tt.wantOK)
+			}
+			if service != tt.wantService {
+				t.Errorf("danglingProvider(%q, %q) service = %q, want %q", tt.subdomain, tt.cname, service, tt.wantService)
+			}
+		})
 	}
 }
 

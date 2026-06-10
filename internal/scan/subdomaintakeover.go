@@ -37,6 +37,36 @@ type SubdomainTakeoverResult struct {
 	Service    string `json:"service,omitempty"`
 }
 
+// takeoverProviders maps a takeoverable third-party's cname apex to its service
+// name. a "no such host" on a subdomain only counts as a dangling-cname takeover
+// when the cname points at one of these and the target is unclaimed - a cname
+// to anything else (or to the host itself) is a normal record, not a finding.
+var takeoverProviders = map[string]string{
+	"github.io":             "GitHub Pages",
+	"herokuapp.com":         "Heroku",
+	"herokudns.com":         "Heroku",
+	"myshopify.com":         "Shopify",
+	"wordpress.com":         "WordPress",
+	"s3.amazonaws.com":      "Amazon S3",
+	"ghost.io":              "Ghost",
+	"pantheonsite.io":       "Pantheon",
+	"zendesk.com":           "Zendesk",
+	"surge.sh":              "Surge",
+	"bitbucket.io":          "Bitbucket",
+	"fastly.net":            "Fastly",
+	"helpscoutdocs.com":     "Helpscout",
+	"cargocollective.com":   "Cargo",
+	"uservoice.com":         "Uservoice",
+	"webflow.io":            "Webflow",
+	"readthedocs.io":        "ReadTheDocs",
+	"azurewebsites.net":     "Azure",
+	"cloudapp.net":          "Azure",
+	"trafficmanager.net":    "Azure",
+	"blob.core.windows.net": "Azure",
+	"netlify.app":           "Netlify",
+	"netlify.com":           "Netlify",
+}
+
 // SubdomainTakeover checks dnsResults for dangling subdomains pointing at
 // unclaimed third-party services.
 func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, threads int, logdir string) ([]SubdomainTakeoverResult, error) {
@@ -104,6 +134,27 @@ func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, t
 	return results, nil
 }
 
+// danglingProvider reports whether cname points off-host at a known
+// takeoverable provider. a self-referential cname (LookupCNAME echoing an A
+// record back as the host) is rejected, since that's a live host, not a
+// dangling pointer.
+func danglingProvider(subdomain, cname string) (string, bool) {
+	// LookupCNAME returns a fqdn with a trailing dot; strip it so suffix and
+	// self-reference checks compare like-for-like.
+	target := strings.ToLower(strings.TrimSuffix(cname, "."))
+	host := strings.ToLower(strings.TrimSuffix(subdomain, "."))
+	if target == "" || target == host {
+		return "", false
+	}
+
+	for apex, service := range takeoverProviders {
+		if target == apex || strings.HasSuffix(target, "."+apex) {
+			return service, true
+		}
+	}
+	return "", false
+}
+
 func checkSubdomainTakeover(subdomain string, client *http.Client) (bool, string) {
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "http://"+subdomain, http.NoBody)
 	if err != nil {
@@ -111,11 +162,16 @@ func checkSubdomainTakeover(subdomain string, client *http.Client) (bool, string
 	}
 	resp, err := client.Do(req)
 	if err != nil {
+		// a dead host only matters if its cname still points at an unclaimed
+		// third-party service. LookupCNAME echoes the host back for plain A
+		// records, so "any cname" is not a signal - the cname must resolve to a
+		// known takeoverable provider and not be the host itself.
 		if strings.Contains(err.Error(), "no such host") {
-			// Check if CNAME exists
-			cname, err := net.DefaultResolver.LookupCNAME(context.TODO(), subdomain)
-			if err == nil && cname != "" {
-				return true, "Dangling CNAME"
+			cname, lookupErr := net.DefaultResolver.LookupCNAME(context.TODO(), subdomain)
+			if lookupErr == nil {
+				if service, ok := danglingProvider(subdomain, cname); ok {
+					return true, service + " (Dangling CNAME)"
+				}
 			}
 		}
 		return false, ""
