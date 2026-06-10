@@ -158,7 +158,7 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-ports` | port scanning (common/full) |
 | `-nuclei` | vulnerability scanning with nuclei templates |
 | `-dork` | automated google dorking |
-| `-js` | javascript analysis |
+| `-js` | javascript analysis + secret and endpoint extraction |
 | `-c3` | cloud storage misconfiguration |
 | `-headers` | http header analysis |
 | `-sh` | security header analysis (missing/weak headers) |

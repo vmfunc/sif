@@ -88,6 +88,7 @@ linters:
         linters:
           - errcheck
           - noctx
+          - gosec  # fake credentials in secret-scanner fixtures are not real keys
 
 issues:
   max-issues-per-linter: 50

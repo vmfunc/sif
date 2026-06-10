@@ -79,7 +79,7 @@ scopes: `common` (top ports), `full` (all ports)
 
 ### javascript analysis
 
-`-js` - analyze javascript files
+`-js` - analyze javascript files + secret and endpoint extraction
 
 ```bash
 ./sif -u https://example.com -js
