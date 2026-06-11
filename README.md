@@ -15,17 +15,31 @@
 
 **[install](#install) · [usage](#usage) · [modules](#modules) · [docs](docs/) · [contribute](#contribute)**
 
+*fast, concurrent recon to exploitation in one binary. every scanner shares one connection-pooled http client.*
+
 </div>
 
 ---
 
 ## what is sif?
 
-sif is a modular pentesting toolkit written in go. it's designed to be fast, concurrent, and extensible. run multiple scan types against targets with a single command.
+sif is a recon and exploitation scanner that runs the whole chain in one binary: subdomain enum, port scan, crawler, nuclei, framework/cve detection, js secret extraction, web-vuln probes (cors/xss/redirect), cloud and takeover checks. 25+ scan types, one command.
 
 ```bash
-./sif -u https://example.com -headers -sh -cms -framework -git
+sif -u https://example.com -dnslist -ports -crawl -js -framework -nuclei
 ```
+
+nuclei and colly are compiled in as libraries rather than shelled out to (there's no `exec.Command` in the tree), so it's a single static binary with no runtime dependencies and nothing to wire together.
+
+every scanner runs through one shared http client and a work-stealing worker pool. `-proxy`, `-H`, `-cookie` and `-rate-limit` apply to the whole run at once, connections get pooled and reused across the scan (a single-host run reuses one connection for ~50 requests instead of dialing 50 times), and a slow host doesn't hold the rest up. that shared client is the practical reason to use it over piping a stack of separate tools together. port scanning is `connect()`-based, so rustscan and nmap are still faster at raw port scans.
+
+it reads targets from stdin and prints findings one per line under `-silent`, so it composes:
+
+```bash
+subfinder -d example.com | sif -silent -crawl -js -nuclei | notify
+```
+
+`-diff` turns a re-scan into a monitor that only reports what changed, `-notify` posts to slack/discord/telegram/webhook, and runs export to sarif and markdown.
 
 ## install
 
@@ -49,7 +63,7 @@ paru -S sif
 ### nix
 
 ```bash
-# nixpkgs (declarative — add to configuration.nix or home-manager)
+# nixpkgs (declarative: add to configuration.nix or home-manager)
 environment.systemPackages = [ pkgs.sif ];
 
 # or imperatively
@@ -84,7 +98,7 @@ cd sif
 make
 ```
 
-requires go 1.23+
+requires go 1.25+
 
 ### aur (manual install)
 
