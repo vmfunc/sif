@@ -21,11 +21,23 @@
 
 ## what is sif?
 
-sif is a modular pentesting toolkit written in go. it's designed to be fast, concurrent, and extensible. run multiple scan types against targets with a single command.
+sif runs your whole recon-to-exploitation chain in one process — subdomain enum, port scan, crawler, nuclei, framework + cve detection, js secret extraction, active web-vuln probes, cloud + takeover checks. 25+ scan types, one static go binary, one command.
 
 ```bash
-./sif -u https://example.com -headers -sh -cms -framework -git
+sif -u https://example.com -dnslist -ports -crawl -js -framework -nuclei
 ```
+
+it's not a wrapper. nuclei, colly, and the projectdiscovery libraries are linked in and run in-process — there's no `exec.Command` anywhere in the tree, no five-binary pipeline to install and glue together, no temp files handed between stages.
+
+## why sif?
+
+**one binary, zero runtime deps.** `brew install sif` (or aur / nix / apt) and you have 25+ scanners. a typical recon setup is otherwise the projectdiscovery suite (5+ separate binaries you pipe together) or reconftw (shells out to ~50 tools behind a 15-45 min python+go+docker bootstrap).
+
+**one shared http layer across every scanner.** `-proxy socks5://… -H 'Authorization: …' -rate-limit 20` is set once and governs every outbound request from every scan type — enum, fuzzing, nuclei, crawling, probes. a piped multi-binary workflow can't enforce one coherent proxy / rate-limit / auth context across the whole chain; each tool has its own flags and its own connection pool. this is the thing sif does that the alternatives structurally can't.
+
+**built to compose.** reads targets from stdin and emits findings one-per-line under `-silent`, so it drops straight into a pipeline: `subfinder -d example.com | sif -silent -crawl -js -nuclei | notify`. exports SARIF (github code-scanning) and markdown. `-diff` turns a re-scan into a monitor that reports only what changed; `-notify` alerts slack/discord/telegram/webhook.
+
+**fast where it counts.** the shared transport pools and reuses connections across the whole scan — in a single-host flood that's a measured **50x fewer tcp handshakes** (50 requests served over 1 connection instead of 50), and work is distributed by a work-stealing pool so one slow host doesn't stall the rest. honest caveat: port scanning uses `connect()`, not raw SYN, so nmap/rustscan still win raw port-scan speed — sif's edge is whole-workflow latency, not beating each specialist at its one job.
 
 ## install
 
@@ -84,7 +96,7 @@ cd sif
 make
 ```
 
-requires go 1.23+
+requires go 1.25+
 
 ### aur (manual install)
 
