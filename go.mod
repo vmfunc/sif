@@ -11,8 +11,8 @@ require (
 	github.com/likexian/whois v1.15.7
 	github.com/projectdiscovery/goflags v0.1.74
 	github.com/projectdiscovery/nuclei/v3 v3.8.0
-	github.com/projectdiscovery/retryabledns v1.0.114
-	github.com/projectdiscovery/utils v0.10.1
+	github.com/projectdiscovery/retryabledns v1.0.115
+	github.com/projectdiscovery/utils v0.11.0
 	github.com/rocketlaunchr/google-search v1.1.6
 	github.com/twmb/murmur3 v1.1.6
 	golang.org/x/net v0.53.0
@@ -286,11 +286,11 @@ require (
 	github.com/projectdiscovery/machineid v0.0.0-20250715113114-c77eb3567582 // indirect
 	github.com/projectdiscovery/mapcidr v1.1.97 // indirect
 	github.com/projectdiscovery/n3iwf v0.0.0-20230523120440-b8cd232ff1f5 // indirect
-	github.com/projectdiscovery/networkpolicy v0.1.36 // indirect
+	github.com/projectdiscovery/networkpolicy v0.1.37 // indirect
 	github.com/projectdiscovery/ratelimit v0.0.85 // indirect
 	github.com/projectdiscovery/rawhttp v0.1.90 // indirect
 	github.com/projectdiscovery/rdap v0.9.1-0.20221108103045-9865884d1917 // indirect
-	github.com/projectdiscovery/retryablehttp-go v1.3.8 // indirect
+	github.com/projectdiscovery/retryablehttp-go v1.3.9 // indirect
 	github.com/projectdiscovery/sarif v0.0.1 // indirect
 	github.com/projectdiscovery/tlsx v1.2.2 // indirect
 	github.com/projectdiscovery/uncover v1.2.0 // indirect
