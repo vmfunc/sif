@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	github.com/antchfx/htmlquery v1.3.6
-	github.com/charmbracelet/glamour v0.10.0
+	github.com/charmbracelet/glamour v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/charmbracelet/log v1.0.0
 	github.com/gocolly/colly/v2 v2.1.0
@@ -80,7 +80,7 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
-	github.com/bits-and-blooms/bitset v1.22.0 // indirect
+	github.com/bits-and-blooms/bitset v1.24.0 // indirect
 	github.com/bits-and-blooms/bloom/v3 v3.5.0 // indirect
 	github.com/bluele/gcache v0.0.2 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
@@ -97,7 +97,7 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.3.2 // indirect
-	github.com/charmbracelet/x/ansi v0.10.1 // indirect
+	github.com/charmbracelet/x/ansi v0.10.2 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20250908092851-c2208eb08494 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
@@ -230,7 +230,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/mattn/go-runewidth v0.0.17 // indirect
 	github.com/mattn/go-sqlite3 v1.14.28 // indirect
 	github.com/maypok86/otter/v2 v2.2.1 // indirect
 	github.com/mholt/acmez/v3 v3.1.3 // indirect
