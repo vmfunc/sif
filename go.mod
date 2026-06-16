@@ -14,7 +14,7 @@ require (
 	github.com/projectdiscovery/retryabledns v1.0.114
 	github.com/projectdiscovery/utils v0.10.1
 	github.com/rocketlaunchr/google-search v1.1.6
-	github.com/twmb/murmur3 v1.1.6
+	github.com/twmb/murmur3 v1.1.8
 	golang.org/x/net v0.56.0
 	golang.org/x/time v0.14.0
 	gopkg.in/yaml.v3 v3.0.1
