@@ -60,8 +60,11 @@ gofmt -w .
 
 ### lint
 
+ci pins golangci-lint v2.11.4 (`.github/workflows/go.yml`); other versions
+report spurious issues against the v2 config, so pin it locally too:
+
 ```bash
-golangci-lint run
+go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run
 ```
 
 ### test
@@ -164,7 +167,7 @@ go test -tags=integration ./internal/scan/...
 1. fork the repository
 2. create a feature branch
 3. make changes
-4. run `gofmt -w .` and `golangci-lint run`
+4. run `gofmt -w .` and `golangci-lint run` (pinned version, see [lint](#lint))
 5. submit pr
 
 ### commit messages
