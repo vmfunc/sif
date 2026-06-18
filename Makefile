@@ -38,8 +38,7 @@ define SUPPORT_MESSAGE
 │                                                            │
 │  🌟 Enjoying sif? Please consider:                         │
 │                                                            │
-│  • Starring our repo: https://github.com/lunchcat/sif      │
-│  • Supporting the devs: https://lunchcat.dev               │
+│  • Starring our repo: https://github.com/vmfunc/sif        │
 │                                                            │
 │  Your support helps us continue improving sif!             │
 │                                                            │
