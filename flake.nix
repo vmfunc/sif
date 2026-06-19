@@ -21,7 +21,7 @@
             version = "unstable-${self.shortRev or self.dirtyShortRev or "dev"}";
             src = ./.;
 
-            vendorHash = "sha256-fR63/dStMsZon22vancuLWIAvZiEYMLjMwY1kmRDNgM=";
+            vendorHash = "sha256-37CzZAVGRfvpZ7WNEJtSXxhQJSYPk1BL03X9pZGhVQ4=";
 
             # Tests require network access (httptest)
             doCheck = false;
