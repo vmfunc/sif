@@ -1,0 +1,27 @@
+# TYPO3 CMS Detection Module
+
+id: cms-typo3
+info:
+  name: TYPO3 Detection
+  author: sif
+  severity: info
+  description: Detects TYPO3 CMS installations
+  tags: [cms, typo3, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+    - "{{BaseURL}}/typo3/"
+
+  matchers:
+    - type: word
+      part: all
+      words:
+        - "/typo3conf/"
+        - "/typo3temp/"
+        - "data-namespace-typo3-fluid"
+        - 'generator" content="TYPO3'
+      condition: or
