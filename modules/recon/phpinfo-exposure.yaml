@@ -1,0 +1,47 @@
+# PHP Info Exposure Detection Module
+
+id: phpinfo-exposure
+info:
+  name: PHP Info Exposure
+  author: sif
+  severity: high
+  description: Detects exposed phpinfo() pages leaking config and environment
+  tags: [php, phpinfo, exposure, misconfiguration, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/phpinfo.php"
+    - "{{BaseURL}}/info.php"
+    - "{{BaseURL}}/php_info.php"
+    - "{{BaseURL}}/test.php"
+    - "{{BaseURL}}/i.php"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      condition: or
+      regex:
+        - '<title>(PHP [0-9][0-9.]* - )?phpinfo\(\)</title>'
+        - 'Zend Scripting Language Engine:<br />Zend Engine v'
+
+    - type: regex
+      part: body
+      condition: or
+      regex:
+        - 'class="e">PHP Version\s*</td><td class="v">'
+        - 'class="e">System\s*</td>'
+
+  extractors:
+    - type: regex
+      name: php_version
+      part: body
+      regex:
+        - 'class="e">PHP Version\s*</td><td class="v">\s*([0-9]+(?:\.[0-9]+)*)'
+      group: 1
