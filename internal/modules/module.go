@@ -91,6 +91,7 @@ type Matcher struct {
 	Regex     []string `yaml:"regex,omitempty"`
 	Words     []string `yaml:"words,omitempty"`
 	Status    []int    `yaml:"status,omitempty"`
+	Size      []int    `yaml:"size,omitempty"`
 	Condition string   `yaml:"condition"` // and, or
 	Negative  bool     `yaml:"negative"`
 }
@@ -98,7 +99,7 @@ type Matcher struct {
 // Extractor defines data extraction from responses.
 // Extractors pull specific data from matched responses for reporting.
 type Extractor struct {
-	Type  string   `yaml:"type"` // regex, kval, json
+	Type  string   `yaml:"type"` // regex, kv, json
 	Name  string   `yaml:"name"`
 	Part  string   `yaml:"part"`
 	Regex []string `yaml:"regex,omitempty"`

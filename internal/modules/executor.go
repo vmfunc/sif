@@ -266,6 +266,15 @@ func checkMatcher(m *Matcher, resp *http.Response, body string) bool {
 	case "regex":
 		return checkRegex(part, m.Regex, m.Condition)
 
+	case "size":
+		// size matches the response body length against any listed value.
+		for _, n := range m.Size {
+			if len(body) == n {
+				return true
+			}
+		}
+		return false
+
 	default:
 		return false
 	}
@@ -356,9 +365,9 @@ func runExtractors(extractors []Extractor, resp *http.Response, body string) map
 	result := make(map[string]string)
 
 	for _, e := range extractors {
-		part := getPart(e.Part, resp, body)
-
-		if e.Type == "regex" {
+		switch e.Type {
+		case "regex":
+			part := getPart(e.Part, resp, body)
 			for _, pattern := range e.Regex {
 				re, err := regexp.Compile(pattern)
 				if err != nil {
@@ -369,6 +378,16 @@ func runExtractors(extractors []Extractor, resp *http.Response, body string) map
 					result[e.Name] = matches[e.Group]
 					break
 				}
+			}
+		case "kv":
+			// kv records response header key/values, namespaced by the extractor
+			// name when set (e.g. a headers module surfacing every header).
+			for k, v := range resp.Header {
+				key := k
+				if e.Name != "" {
+					key = e.Name + "." + k
+				}
+				result[key] = strings.Join(v, ", ")
 			}
 		}
 	}

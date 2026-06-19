@@ -339,9 +339,9 @@ func TestRunExtractors(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			name: "non-regex extractor type is ignored",
+			name: "unknown extractor type is ignored",
 			extractors: []Extractor{
-				{Type: "kval", Name: "session", Part: "body", Regex: []string{`"session":"([^"]+)"`}, Group: 1},
+				{Type: "bogus", Name: "session", Part: "body", Regex: []string{`"session":"([^"]+)"`}, Group: 1},
 			},
 			wantNil: true,
 		},
