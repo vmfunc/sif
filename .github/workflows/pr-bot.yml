@@ -1,7 +1,7 @@
 name: pr bot
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, edited]
 
 permissions:
@@ -9,7 +9,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -23,7 +23,6 @@ jobs:
   size:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
       - name: label pr size
         uses: actions/github-script@v9
         with:
