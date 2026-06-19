@@ -1,0 +1,38 @@
+# Prometheus Metrics Exposure Detection Module
+
+id: prometheus-metrics-exposure
+info:
+  name: Prometheus Metrics Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Prometheus metrics endpoint leaking internals
+  tags: [prometheus, metrics, exposure, misconfiguration, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/metrics"
+    - "{{BaseURL}}/actuator/prometheus"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      condition: and
+      regex:
+        - '(?m)^# HELP \S+ '
+        - '(?m)^# TYPE \S+ (counter|gauge|histogram|summary|untyped)'
+        - '(?m)^[a-zA-Z_][a-zA-Z0-9_:]*(\{[^}]*\})? -?[0-9]'
+
+  extractors:
+    - type: regex
+      name: go_version
+      part: body
+      regex:
+        - 'go_info\{version="([^"]+)"'
+      group: 1
