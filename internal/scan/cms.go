@@ -78,7 +78,7 @@ func CMS(url string, timeout time.Duration, logdir string) (*CMSResult, error) {
 	}
 
 	// Drupal
-	if strings.Contains(resp.Header.Get("X-Drupal-Cache"), "HIT") || strings.Contains(bodyString, "Drupal.settings") {
+	if detectDrupal(resp.Header, bodyString) {
 		spin.Stop()
 		result := &CMSResult{Name: "Drupal", Version: "Unknown"}
 		log.Success("Detected CMS: %s", output.Highlight.Render(result.Name))
@@ -159,4 +159,15 @@ func detectJoomla(body string) bool {
 	return strings.Contains(body, `generator" content="Joomla!`) ||
 		strings.Contains(body, "/media/vendor/joomla") ||
 		strings.Contains(body, "/media/system/js/core.js")
+}
+
+// detectDrupal reports whether the response looks like Drupal. the X-Drupal-* and
+// X-Generator headers survive cdn caching when the body markers do not, and an
+// X-Drupal-Cache of any value (even MISS) is a tell.
+func detectDrupal(header http.Header, body string) bool {
+	return strings.Contains(header.Get("X-Generator"), "Drupal") ||
+		header.Get("X-Drupal-Cache") != "" ||
+		header.Get("X-Drupal-Dynamic-Cache") != "" ||
+		strings.Contains(body, "Drupal.settings") ||
+		strings.Contains(body, "drupalSettings")
 }
