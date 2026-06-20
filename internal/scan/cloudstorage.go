@@ -84,15 +84,22 @@ func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStor
 }
 
 func extractPotentialBuckets(url string) []string {
-	// TODO: handle non-adjacent label combos and strip the tld
-	parts := strings.Split(url, ".")
-	var buckets []string
-	for i, part := range parts {
-		buckets = append(buckets, part, part+"-s3", "s3-"+part)
+	labels := strings.Split(url, ".")
+	// drop the tld label so we don't waste guesses on it ("com", "com-s3", ...);
+	// a single-label host has no tld to strip.
+	if len(labels) > 1 {
+		labels = labels[:len(labels)-1]
+	}
 
-		if i < len(parts)-1 {
-			domainExtension := part + "-" + parts[i+1]
-			buckets = append(buckets, domainExtension, parts[i+1]+"-"+part)
+	var buckets []string
+	for _, label := range labels {
+		buckets = append(buckets, label, label+"-s3", "s3-"+label)
+	}
+	// combine every label with every other, not just adjacent ones, so a deep
+	// host like shop.cdn.example yields shop-example too.
+	for i, a := range labels {
+		for _, b := range labels[i+1:] {
+			buckets = append(buckets, a+"-"+b, b+"-"+a)
 		}
 	}
 	return buckets
