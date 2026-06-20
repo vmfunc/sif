@@ -1,0 +1,28 @@
+# full: thorough and active, including intrusive probes that inject payloads
+# (xss, sql, lfi, redirect). api-key scans (shodan, securitytrails) stay opt-in
+# via their own flags.
+passive: true
+whois: true
+dork: true
+favicon: true
+headers: true
+security-headers: true
+cms: true
+framework: true
+probe: true
+git: true
+js: true
+nuclei: true
+openapi: true
+cors: true
+jwt: true
+c3: true
+st: true
+crawl: true
+sql: true
+lfi: true
+xss: true
+redirect: true
+dirlist: large
+dnslist: large
+ports: full
