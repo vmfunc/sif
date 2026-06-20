@@ -13,9 +13,12 @@
 package scan
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestDetectLFIFromResponse_EtcPasswd(t *testing.T) {
@@ -312,5 +315,53 @@ func TestLFI_MockServer(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestLFI_ReflectedPayloadIsNotEvidence(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, vs := range r.URL.Query() {
+			for _, v := range vs {
+				fmt.Fprintf(w, "Warning: include(%s): failed to open stream\n", v)
+			}
+		}
+	}))
+	defer srv.Close()
+
+	result, err := LFI(srv.URL, 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("LFI: %v", err)
+	}
+	if result != nil && len(result.Vulnerabilities) > 0 {
+		t.Errorf("reflected payload should not be flagged as LFI, got %+v", result.Vulnerabilities)
+	}
+}
+
+func TestLFI_GenuineBase64PHPStillDetected(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Query().Get("file"), "convert.base64-encode") {
+			// base64 php source carrying the PD9waHA marker
+			_, _ = w.Write([]byte("PD9waHAgZWNobyAnc2VjcmV0Jzs="))
+			return
+		}
+		_, _ = w.Write([]byte("<html>nothing to see</html>"))
+	}))
+	defer srv.Close()
+
+	result, err := LFI(srv.URL, 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("LFI: %v", err)
+	}
+	if result == nil {
+		t.Fatal("genuine base64-encoded php disclosure should still be detected")
+	}
+	var sawFilterHit bool
+	for _, v := range result.Vulnerabilities {
+		if v.Evidence == "base64 encoded PHP" && strings.Contains(v.Payload, "convert.base64-encode") {
+			sawFilterHit = true
+		}
+	}
+	if !sawFilterHit {
+		t.Errorf("expected a base64-php disclosure via the convert.base64-encode filter, got %+v", result.Vulnerabilities)
 	}
 }

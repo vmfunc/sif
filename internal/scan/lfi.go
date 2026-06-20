@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -234,7 +235,9 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 
 				// check for evidence patterns
 				for _, evidence := range lfiEvidencePatterns {
-					if evidence.pattern.MatchString(bodyStr) {
+					match := evidence.pattern.FindString(bodyStr)
+					// our own payload echoed back isn't proof of inclusion
+					if match != "" && !strings.Contains(item.payload.payload, match) {
 						key := item.param + "|" + item.payload.payload
 						mu.Lock()
 						if seen[key] {
