@@ -186,6 +186,30 @@ func TestDetectFramework_ASPNET(t *testing.T) {
 	}
 }
 
+// the dead "X-Powered-By: ASP.NET" signature only inflated the total weight
+// (containsHeader never builds a "name: value" string to match it against), so a
+// genuine asp.net response scored just under the threshold until it was removed.
+func TestDetectFramework_ASPNETPoweredByHeader(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-AspNetMvc-Version", "5.2")
+		w.Header().Set("X-Powered-By", "ASP.NET")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body><a href="/home/index.aspx">home</a></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "ASP.NET" {
+		t.Errorf("expected framework 'ASP.NET', got '%s'", result.Name)
+	}
+}
+
 func TestDetectFramework_NoMatch(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
