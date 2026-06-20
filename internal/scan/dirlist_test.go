@@ -13,6 +13,8 @@
 package scan
 
 import (
+	"bufio"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -357,4 +359,25 @@ func pathSet(results DirectoryResults) map[string]struct{} {
 func has(set map[string]struct{}, key string) bool {
 	_, ok := set[key]
 	return ok
+}
+
+func TestScanLines(t *testing.T) {
+	got, err := scanLines(strings.NewReader("admin\n\nlogin\n"))
+	if err != nil {
+		t.Fatalf("scanLines: %v", err)
+	}
+	want := []string{"admin", "login"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("scanLines = %v, want %v", got, want)
+	}
+}
+
+func TestScanLinesErrorsOnOverlongLine(t *testing.T) {
+	// a line past bufio's 64k cap must surface as an error, not silently
+	// truncate the wordlist (dropping that line and everything after it).
+	huge := strings.Repeat("a", bufio.MaxScanTokenSize+1)
+	_, err := scanLines(strings.NewReader("first\n" + huge + "\nlast\n"))
+	if !errors.Is(err, bufio.ErrTooLong) {
+		t.Fatalf("scanLines err = %v, want bufio.ErrTooLong", err)
+	}
 }
