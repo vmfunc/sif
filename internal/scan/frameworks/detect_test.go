@@ -424,6 +424,113 @@ func TestDetectFramework_Joomla(t *testing.T) {
 	}
 }
 
+func TestDetectFramework_AdonisJS(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Set-Cookie", "adonis-session=s%3Aabc.def; Path=/; HttpOnly")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body>Welcome</body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "AdonisJS" {
+		t.Errorf("expected framework 'AdonisJS', got '%s'", result.Name)
+	}
+}
+
+// a cosmetics brand page that merely contains "adonis" in its markup (CSS
+// classes, asset paths, links) must not be fingerprinted as AdonisJS, as the
+// old bare "adonis" substring signature did.
+func TestDetectFramework_AdonisFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<title>Adonis Cosmetics</title>
+				<link rel="stylesheet" href="/assets/adonis-theme.css">
+			</head>
+			<body class="adonis-store">
+				<h1>Adonis Cosmetics</h1>
+				<a href="/adonis/collections">Shop the adonis collection</a>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "AdonisJS" {
+		t.Errorf("false positive: plain page mentioning 'Adonis' detected as AdonisJS (%.2f)", result.Confidence)
+	}
+}
+
+func TestDetectFramework_Phoenix(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head><title>Phoenix App</title></head>
+			<body>
+				<div data-phx-main data-phx-session="abc" data-phx-static="def" id="phx-F1a2B3">
+					<span>Content</span>
+				</div>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "Phoenix" {
+		t.Errorf("expected framework 'Phoenix', got '%s'", result.Name)
+	}
+}
+
+// a Phoenix, Arizona business page using "phx-" CSS class prefixes must not be
+// fingerprinted as the Phoenix framework, as the old bare "phx-" signature did.
+func TestDetectFramework_PhoenixFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head><title>Phoenix AZ Roofing</title></head>
+			<body class="phx-page">
+				<nav class="phx-nav"><a href="/">Phoenix Home</a></nav>
+				<section class="phx-hero">Serving Phoenix, Arizona since 1998.</section>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "Phoenix" {
+		t.Errorf("false positive: phx- CSS class page detected as Phoenix (%.2f)", result.Confidence)
+	}
+}
+
 func TestDetectFramework_Astro(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

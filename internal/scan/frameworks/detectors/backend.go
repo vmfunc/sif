@@ -375,9 +375,9 @@ func (d *phoenixDetector) Name() string { return "Phoenix" }
 
 func (d *phoenixDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "_csrf_token", Weight: 0.4, HeaderOnly: true},
-		{Pattern: "phx-", Weight: 0.3},
-		{Pattern: "phoenix", Weight: 0.2},
+		{Pattern: "data-phx-main", Weight: 0.4},
+		{Pattern: "data-phx-session", Weight: 0.3},
+		{Pattern: "data-phx-static", Weight: 0.3},
 	}
 }
 
@@ -424,8 +424,7 @@ func (d *adonisDetector) Name() string { return "AdonisJS" }
 
 func (d *adonisDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "adonis", Weight: 0.4},
-		{Pattern: "_csrf", Weight: 0.2, HeaderOnly: true},
+		{Pattern: "adonis-session", Weight: 0.4, HeaderOnly: true},
 	}
 }
 
