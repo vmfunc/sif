@@ -1,0 +1,36 @@
+# Werkzeug Debugger Exposure Detection Module
+
+id: werkzeug-debugger-exposure
+info:
+  name: Werkzeug Debugger Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Flask/Werkzeug interactive debugger
+  tags: [werkzeug, flask, debug, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?__debugger__=yes&cmd=resource&f=debugger.js"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - 'if \(CONSOLE_MODE && EVALEX\) \{'
+        - 'EVALEX_TRUSTED'
+      condition: and
+
+  extractors:
+    - type: regex
+      name: werkzeug_version
+      part: header
+      regex:
+        - 'Werkzeug/([0-9]+(?:\.[0-9]+)+)'
+      group: 1
