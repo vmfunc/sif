@@ -1,0 +1,34 @@
+# CouchDB Exposure Detection Module
+
+id: couchdb-exposure
+info:
+  name: CouchDB Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed unauthenticated CouchDB database list
+  tags: [couchdb, datastore, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/_all_dbs"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '^\s*\['
+
+    - type: regex
+      part: body
+      regex:
+        - '"_users"'
+        - '"_replicator"'
+        - '"_global_changes"'
+      condition: or
