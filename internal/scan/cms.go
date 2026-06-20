@@ -87,7 +87,7 @@ func CMS(url string, timeout time.Duration, logdir string) (*CMSResult, error) {
 	}
 
 	// Joomla
-	if strings.Contains(bodyString, "joomla") || strings.Contains(bodyString, "/media/system/js/core.js") {
+	if detectJoomla(bodyString) {
 		spin.Stop()
 		result := &CMSResult{Name: "Joomla", Version: "Unknown"}
 		log.Success("Detected CMS: %s", output.Highlight.Render(result.Name))
@@ -140,4 +140,12 @@ func detectWordPress(url string, client *http.Client, bodyString string) bool {
 	}
 
 	return false
+}
+
+// detectJoomla keys on the capital Joomla! generator and joomla asset paths. a
+// bare "joomla" mention (the old check) matched marketing pages, so it is gone.
+func detectJoomla(body string) bool {
+	return strings.Contains(body, `generator" content="Joomla!`) ||
+		strings.Contains(body, "/media/vendor/joomla") ||
+		strings.Contains(body, "/media/system/js/core.js")
 }
