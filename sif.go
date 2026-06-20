@@ -354,7 +354,7 @@ func (app *App) Run() error {
 				FilterSizes: app.settings.DirFilterSizes,
 				FilterWords: app.settings.DirFilterWords,
 				FilterRegex: app.settings.DirFilterRegex,
-				Calibrate:   app.settings.DirCalibrate,
+				Calibrate:   app.settings.Calibrate,
 				Wordlist:    app.settings.DirWordlist,
 				Extensions:  app.settings.DirExtensions,
 			})
@@ -498,7 +498,7 @@ func (app *App) Run() error {
 		}
 
 		if app.settings.SQL {
-			result, err := scan.SQL(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			result, err := scan.SQL(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, app.settings.Calibrate)
 			if err != nil {
 				log.Errorf("Error while running SQL reconnaissance: %s", err)
 			} else if result != nil {

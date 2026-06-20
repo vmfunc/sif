@@ -115,7 +115,7 @@ var databaseErrorPatterns = []struct {
 }
 
 // SQL performs SQL reconnaissance on the target URL
-func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*SQLResult, error) {
+func SQL(targetURL string, timeout time.Duration, threads int, logdir string, calibrate bool) (*SQLResult, error) {
 	log := output.Module("SQL")
 	log.Start()
 
@@ -149,6 +149,15 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 		return nil
 	}
 
+	// a catch-all that answers 200/403/401 for every path would make each probe
+	// look like a hit. with -ac, calibrate the soft-404 wildcard shape first (as
+	// dirlist does) and drop probes whose shape matches it before isAdminPanel.
+	// off by default so the scan keeps reporting every hit unless asked otherwise.
+	var baselines []responseMeta
+	if calibrate {
+		baselines = calibrateSQLBaseline(targetURL, client)
+	}
+
 	// check for admin panels
 	wg.Add(threads)
 	adminPathsChan := make(chan int, len(sqlAdminPaths))
@@ -178,9 +187,12 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 				// check for successful response (not 404)
 				if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
 					// read body to check for common admin panel indicators
-					body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*100)) // limit to 100KB
+					meta, body := readMeta(resp)
 					resp.Body.Close()
-					if err != nil {
+
+					// a catch-all hands the same shape to every path; drop it so a
+					// wildcard 200/403/401 is not reported as an admin panel.
+					if containsBaseline(baselines, meta) {
 						continue
 					}
 					bodyStr := string(body)
@@ -254,6 +266,36 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string) (*
 
 	log.Complete(totalFindings, "found")
 	return result, nil
+}
+
+// calibrateSQLBaseline probes paths that cannot exist and records the response
+// shapes a catch-all returns, so soft-404 200/403/401 pages are suppressed before
+// isAdminPanel runs. deterministic: probe suffixes come from the loop index.
+func calibrateSQLBaseline(targetURL string, client *http.Client) []responseMeta {
+	base := strings.TrimSuffix(targetURL, "/")
+	var baselines []responseMeta
+	for i := 0; i < calibrationProbes; i++ {
+		probe := base + calibrationPrefix + strconv.Itoa(i) + "/"
+		req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, probe, http.NoBody)
+		if err != nil {
+			continue
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		meta, _ := readMeta(resp)
+		resp.Body.Close()
+		// a hard 404 is already filtered by status; only soft 200/403/401 shapes
+		// need a baseline to suppress them.
+		if meta.status == statusNotFound {
+			continue
+		}
+		if !containsBaseline(baselines, meta) {
+			baselines = append(baselines, meta)
+		}
+	}
+	return baselines
 }
 
 func isAdminPanel(body string, panelType string) bool {
