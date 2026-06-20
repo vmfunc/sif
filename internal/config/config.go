@@ -110,9 +110,9 @@ const (
 	Full
 )
 
-func Parse() *Settings {
-	settings := &Settings{}
-
+// registerFlags builds the flag set for the given settings without parsing it,
+// so callers (Parse and tests) can inspect the registered flags.
+func registerFlags(settings *Settings) *goflags.FlagSet {
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription("a blazing-fast pentesting (recon/exploitation) suite")
 
@@ -203,6 +203,13 @@ func Parse() *Settings {
 		flagSet.BoolVarP(&settings.AllModules, "all-modules", "am", false, "Run all loaded modules"),
 		flagSet.BoolVarP(&settings.ListModules, "list-modules", "lm", false, "List available modules and exit"),
 	)
+
+	return flagSet
+}
+
+func Parse() *Settings {
+	settings := &Settings{}
+	flagSet := registerFlags(settings)
 
 	if err := flagSet.Parse(); err != nil {
 		log.Fatalf("Could not parse flags: %s", err)
