@@ -1,0 +1,47 @@
+# Exposed Bazaar Repository Detection Module
+
+id: bazaar-exposure
+info:
+  name: Exposed Bazaar Repository
+  author: sif
+  severity: high
+  description: Detects an exposed .bzr repository through its branch-format file that may leak source code
+  tags: [bazaar, bzr, exposure, source-code, misconfiguration]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.bzr/branch-format"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "Bazaar"
+
+    - type: word
+      part: body
+      words:
+        - "meta directory"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<html"
+
+  extractors:
+    - type: regex
+      name: bzr_format
+      part: body
+      regex:
+        - '(Bazaar[^\r\n]*)'
+      group: 1
