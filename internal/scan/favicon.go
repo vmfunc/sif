@@ -14,7 +14,6 @@ package scan
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,10 +21,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dropalldatabases/sif/internal/fingerprint"
 	"github.com/dropalldatabases/sif/internal/httpx"
 	"github.com/dropalldatabases/sif/internal/logger"
 	"github.com/dropalldatabases/sif/internal/output"
-	"github.com/twmb/murmur3"
 )
 
 // FaviconResult is the computed shodan-style favicon hash plus the pivot query
@@ -41,11 +40,6 @@ type FaviconResult struct {
 // a megabyte ceiling covers oversized ones without letting a hostile endpoint
 // stream forever.
 const faviconBodyReadCap = 1 << 20
-
-// b64LineLen is python's base64.encodebytes line width. mmh3/shodan hash the
-// chunked base64 (newline every 76 chars, trailing newline), so we must wrap at
-// exactly this width to land on the same hash.
-const b64LineLen = 76
 
 // faviconLinkRegex pulls the href off a <link rel="...icon..."> tag so we can
 // fall back to a declared icon when /favicon.ico is absent.
@@ -95,7 +89,7 @@ func Favicon(targetURL string, timeout time.Duration, logdir string) (*FaviconRe
 		return nil, nil //nolint:nilnil // a missing favicon is not an error
 	}
 
-	hash := FaviconHash(data)
+	hash := fingerprint.FaviconHash(data)
 	result := &FaviconResult{
 		FaviconURL: iconURL,
 		Hash:       hash,
@@ -214,38 +208,6 @@ func resolveFaviconURL(base, href string) string {
 		return base + href
 	}
 	return base + "/" + href
-}
-
-// FaviconHash computes shodan's favicon hash: murmur3 32-bit over the python
-// base64.encodebytes encoding of the raw icon (newline every 76 chars plus a
-// trailing newline), reinterpreted as a signed int32. the chunking and the sign
-// are both load-bearing - shodan stores the value python's mmh3.hash() returns,
-// which is signed, over the wrapped base64, not the raw bytes. the golden test
-// pins this exactly.
-func FaviconHash(data []byte) int32 {
-	encoded := encodeFaviconBase64(data)
-	return int32(murmur3.Sum32(encoded)) //nolint:gosec // shodan stores the signed reinterpretation on purpose
-}
-
-// encodeFaviconBase64 mirrors python's base64.encodebytes: standard base64 with
-// a newline inserted every 76 output characters and a trailing newline. this is
-// the exact byte stream shodan feeds to mmh3, so it must match byte-for-byte.
-func encodeFaviconBase64(data []byte) []byte {
-	raw := base64.StdEncoding.EncodeToString(data)
-
-	var b strings.Builder
-	// final size: the base64 body plus one '\n' per (full or partial) 76-char
-	// line. preallocate so the builder never regrows mid-loop.
-	b.Grow(len(raw) + len(raw)/b64LineLen + 1)
-	for i := 0; i < len(raw); i += b64LineLen {
-		end := i + b64LineLen
-		if end > len(raw) {
-			end = len(raw)
-		}
-		b.WriteString(raw[i:end])
-		b.WriteByte('\n')
-	}
-	return []byte(b.String())
 }
 
 // ResultType identifies favicon findings for the result registry.
