@@ -145,6 +145,29 @@ func TestPassive_ResultType(t *testing.T) {
 	}
 }
 
+func TestPassive_ScopesSubdomainsToTarget(t *testing.T) {
+	// notexample.com guards the suffix-match trap: not a subdomain of example.com.
+	const sharedCert = `[
+		{"name_value": "www.example.com\nshared.othersite.com"},
+		{"name_value": "notexample.com\n*.example.com"}
+	]`
+	fixtureServer(t, sharedCert, "[]", "")
+
+	result, err := Passive("https://example.com", 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("Passive: %v", err)
+	}
+
+	for _, off := range []string{"shared.othersite.com", "notexample.com"} {
+		if urlsContain(result.Subdomains, off) {
+			t.Errorf("off-scope name %q leaked as a subdomain: %v", off, result.Subdomains)
+		}
+	}
+	if !urlsContain(result.Subdomains, "www.example.com") {
+		t.Errorf("expected the in-scope subdomain to remain: %v", result.Subdomains)
+	}
+}
+
 func TestNormalizeHost(t *testing.T) {
 	tests := []struct {
 		in   string
@@ -152,6 +175,7 @@ func TestNormalizeHost(t *testing.T) {
 	}{
 		{"www.example.com", "www.example.com"},
 		{"*.example.com", "example.com"},
+		{"www.example.com.", "www.example.com"},
 		{"  WWW.Example.COM  ", "www.example.com"},
 		{"", ""},
 	}

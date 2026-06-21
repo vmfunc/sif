@@ -141,7 +141,7 @@ func fetchCrtsh(ctx context.Context, client *http.Client, domain string) ([]stri
 	for i := 0; i < len(entries); i++ {
 		// name_value can pack several names separated by newlines.
 		for _, name := range strings.Split(entries[i].NameValue, "\n") {
-			if host := normalizeHost(name); host != "" {
+			if host := normalizeHost(name); host != "" && inDomain(host, domain) {
 				names = append(names, host)
 			}
 		}
@@ -164,7 +164,7 @@ func fetchCertspotter(ctx context.Context, client *http.Client, domain string) (
 	var names []string
 	for i := 0; i < len(entries); i++ {
 		for _, name := range entries[i].DNSNames {
-			if host := normalizeHost(name); host != "" {
+			if host := normalizeHost(name); host != "" && inDomain(host, domain) {
 				names = append(names, host)
 			}
 		}
@@ -224,12 +224,19 @@ func passiveGET(ctx context.Context, client *http.Client, reqURL string) ([]byte
 	return body, nil
 }
 
-// normalizeHost lowercases a name and strips a leading wildcard label so
-// "*.example.com" and "EXAMPLE.com" collapse to one canonical host.
+// normalizeHost lowercases a name and strips a leading wildcard label and a
+// trailing root dot so "*.example.com" and "example.com." collapse to one host.
 func normalizeHost(name string) string {
 	host := strings.ToLower(strings.TrimSpace(name))
 	host = strings.TrimPrefix(host, "*.")
+	host = strings.TrimSuffix(host, ".")
 	return host
+}
+
+// inDomain rejects off-scope names a shared/multi-SAN cert happens to list.
+func inDomain(host, domain string) bool {
+	domain = strings.ToLower(domain)
+	return host == domain || strings.HasSuffix(host, "."+domain)
 }
 
 // addAll inserts every value into the dedupe set.
