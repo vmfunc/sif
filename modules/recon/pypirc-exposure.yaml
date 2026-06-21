@@ -1,0 +1,57 @@
+# Pypirc Exposure Detection Module
+
+id: pypirc-exposure
+info:
+  name: Pypirc Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed pypirc that leaks the package index upload credentials
+  tags: [python, pypi, credentials, token, secret, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.pypirc"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "[pypi]"
+        - "[testpypi]"
+        - "[distutils]"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "password"
+        - "username"
+        - "pypi-"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: pypi_token
+      part: body
+      regex:
+        - '(pypi-[A-Za-z0-9_-]{8,})'
+      group: 1
