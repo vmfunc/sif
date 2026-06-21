@@ -1,0 +1,47 @@
+# Adminer Database Panel Detection Module
+
+id: adminer-panel
+info:
+  name: Adminer Database Panel
+  author: sif
+  severity: info
+  description: Detects exposed Adminer database management login panels
+  tags: [adminer, database, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/adminer.php"
+    - "{{BaseURL}}/adminer/"
+    - "{{BaseURL}}/adminer-4.8.1.php"
+    - "{{BaseURL}}/_adminer.php"
+    - "{{BaseURL}}/db/adminer.php"
+    - "{{BaseURL}}/adminer/adminer.php"
+
+  threads: 5
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: all
+      condition: or
+      words:
+        - 'name="auth[driver]"'
+        - 'name="auth[server]"'
+        - 'name="auth[username]"'
+        - 'name="auth[password]"'
+        - "www.adminer.org"
+
+  extractors:
+    - type: regex
+      name: adminer_version
+      part: body
+      regex:
+        - 'class="version">v?([0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+        - 'Adminer[^0-9<]{0,40}([0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+      group: 1

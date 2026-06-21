@@ -1,0 +1,48 @@
+# phpMyAdmin Database Panel Detection Module
+
+id: phpmyadmin-panel
+info:
+  name: phpMyAdmin Database Panel
+  author: sif
+  severity: info
+  description: Detects exposed phpMyAdmin database management login panels
+  tags: [phpmyadmin, database, mysql, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/phpmyadmin/"
+    - "{{BaseURL}}/phpMyAdmin/"
+    - "{{BaseURL}}/pma/"
+    - "{{BaseURL}}/PMA/"
+    - "{{BaseURL}}/mysql/"
+    - "{{BaseURL}}/dbadmin/"
+    - "{{BaseURL}}/phpmyadmin/index.php"
+
+  threads: 5
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: all
+      condition: or
+      words:
+        - 'name="pma_username"'
+        - 'name="pma_password"'
+        - "pmahomme"
+        - 'content="phpMyAdmin"'
+        - "phpMyAdmin="
+
+  extractors:
+    - type: regex
+      name: phpmyadmin_version
+      part: all
+      regex:
+        - 'PMA_VERSION["'']?\s*[:=]\s*["'']([0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+        - 'phpMyAdmin[^0-9<]{0,30}([0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+      group: 1
