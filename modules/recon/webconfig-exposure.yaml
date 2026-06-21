@@ -1,0 +1,43 @@
+# Web.config Exposure Detection Module
+
+id: webconfig-exposure
+info:
+  name: Web.config Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed ASP.NET web.config that leaks connection strings and app settings
+  tags: [aspnet, iis, web-config, connection-string, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/web.config"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "<configuration"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "<connectionStrings"
+        - "<system.web"
+        - "<system.webServer"
+        - "<appSettings"
+
+  extractors:
+    - type: regex
+      name: connection_string
+      part: body
+      regex:
+        - 'connectionString="([^"]+)"'
+      group: 1

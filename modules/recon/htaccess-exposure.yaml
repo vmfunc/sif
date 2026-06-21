@@ -1,0 +1,62 @@
+# Htaccess Exposure Detection Module
+
+id: htaccess-exposure
+info:
+  name: Htaccess Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed htaccess file that leaks rewrite rules and access control config
+  tags: [apache, htaccess, config, info-disclosure, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.htaccess"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "RewriteEngine"
+        - "RewriteRule"
+        - "RewriteCond"
+        - "AuthUserFile"
+        - "AuthType"
+        - "<FilesMatch"
+        - "<Files "
+        - "Order allow,deny"
+        - "Deny from"
+        - "Options -"
+        - "Options +"
+        - "ErrorDocument"
+        - "DirectoryIndex"
+        - "php_flag"
+        - "php_value"
+        - "Header set"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: auth_user_file
+      part: body
+      regex:
+        - 'AuthUserFile\s+(\S+)'
+      group: 1
