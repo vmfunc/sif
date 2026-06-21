@@ -1,0 +1,56 @@
+# Terraform State Exposure Detection Module
+
+id: terraform-state-exposure
+info:
+  name: Terraform State Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed terraform state file that leaks infrastructure secrets and resource attributes
+  tags: [terraform, iac, state, secrets, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/terraform.tfstate"
+    - "{{BaseURL}}/terraform.tfstate.backup"
+    - "{{BaseURL}}/.terraform/terraform.tfstate"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - '"terraform_version"'
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - '"lineage"'
+        - '"serial"'
+        - '"resources"'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: terraform_version
+      part: body
+      regex:
+        - '"terraform_version"\s*:\s*"([0-9]+\.[0-9]+\.[0-9]+)'
+      group: 1
