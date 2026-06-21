@@ -1,0 +1,45 @@
+# phpinfo Exposure Detection Module
+
+id: phpinfo-exposure
+info:
+  name: phpinfo Page Exposure
+  author: sif
+  severity: medium
+  description: Detects exposed phpinfo pages that leak the full PHP configuration and environment
+  tags: [php, phpinfo, exposure, info-disclosure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/phpinfo.php"
+    - "{{BaseURL}}/info.php"
+    - "{{BaseURL}}/php_info.php"
+    - "{{BaseURL}}/test.php"
+    - "{{BaseURL}}/i.php"
+
+  threads: 5
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "<title>phpinfo()"
+
+    - type: word
+      part: body
+      words:
+        - "PHP Version"
+
+  extractors:
+    - type: regex
+      name: php_version
+      part: body
+      regex:
+        - 'PHP Version ([0-9]+\.[0-9]+\.[0-9]+)'
+      group: 1

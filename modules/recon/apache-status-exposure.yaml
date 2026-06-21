@@ -1,0 +1,41 @@
+# Apache Status Page Exposure Detection Module
+
+id: apache-status-exposure
+info:
+  name: Apache Status Page Exposure
+  author: sif
+  severity: medium
+  description: Detects exposed Apache mod_status and mod_info pages that leak request URLs, client addresses and server internals
+  tags: [apache, mod-status, exposure, info-disclosure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/server-status"
+    - "{{BaseURL}}/server-status?auto"
+    - "{{BaseURL}}/server-info"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "Apache Server Status"
+        - "Apache Server Information"
+        - "Total Accesses:"
+        - "BusyWorkers:"
+        - "Scoreboard:"
+
+  extractors:
+    - type: regex
+      name: apache_version
+      part: body
+      regex:
+        - 'Apache/([0-9]+\.[0-9]+\.[0-9]+)'
+      group: 1
