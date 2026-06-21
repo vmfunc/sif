@@ -1,0 +1,35 @@
+# Rails Master Key Exposure Detection Module
+
+id: rails-master-key-exposure
+info:
+  name: Rails Master Key Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Rails master key that decrypts the encrypted credentials store
+  tags: [rails, ruby, master-key, credentials, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/config/master.key"
+    - "{{BaseURL}}/config/credentials/production.key"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '^[a-f0-9]{32}\s*$'
+
+  extractors:
+    - type: regex
+      name: master_key
+      part: body
+      regex:
+        - '^([a-f0-9]{32})'
+      group: 1
