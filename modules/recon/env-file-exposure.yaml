@@ -1,0 +1,71 @@
+# Environment File Exposure Detection Module
+
+id: env-file-exposure
+info:
+  name: Environment File Exposure
+  author: sif
+  severity: high
+  description: Detects exposed .env files leaking application secrets and credentials
+  tags: [env, dotenv, secrets, credentials, exposure, misconfiguration, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.env"
+    - "{{BaseURL}}/.env.local"
+    - "{{BaseURL}}/.env.dev"
+    - "{{BaseURL}}/.env.development"
+    - "{{BaseURL}}/.env.prod"
+    - "{{BaseURL}}/.env.production"
+    - "{{BaseURL}}/.env.staging"
+    - "{{BaseURL}}/.env.backup"
+    - "{{BaseURL}}/.env.bak"
+    - "{{BaseURL}}/.env.save"
+    - "{{BaseURL}}/.env.old"
+
+  threads: 5
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "DB_PASSWORD="
+        - "DATABASE_URL="
+        - "APP_KEY="
+        - "APP_SECRET="
+        - "SECRET_KEY="
+        - "SECRET_KEY_BASE="
+        - "AWS_ACCESS_KEY_ID="
+        - "AWS_SECRET_ACCESS_KEY="
+        - "MYSQL_ROOT_PASSWORD="
+        - "POSTGRES_PASSWORD="
+        - "REDIS_PASSWORD="
+        - "MAIL_PASSWORD="
+        - "JWT_SECRET="
+
+    - type: word
+      part: body
+      condition: or
+      negative: true
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: leaked_key
+      part: body
+      regex:
+        - '(?m)^(DB_PASSWORD|DATABASE_URL|APP_KEY|APP_SECRET|SECRET_KEY|SECRET_KEY_BASE|AWS_SECRET_ACCESS_KEY|JWT_SECRET|MAIL_PASSWORD|REDIS_PASSWORD)='
+      group: 1
