@@ -518,3 +518,55 @@ func TestDetectorRegistry(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractVersion_Htmx(t *testing.T) {
+	tests := []struct {
+		body     string
+		expected string
+	}{
+		{`<script src="https://unpkg.com/htmx.org@1.9.10"></script>`, "1.9.10"},
+		{`https://cdn.jsdelivr.net/npm/htmx@2.0.3/dist/htmx.min.js`, "2.0.3"},
+		{`"htmx.org": "^1.9.12"`, "1.9.12"},
+		{"no version", "unknown"},
+	}
+
+	for _, tt := range tests {
+		result := frameworks.ExtractVersionOptimized(tt.body, "htmx").Version
+		if result != tt.expected {
+			t.Errorf("ExtractVersionOptimized(%q, 'htmx') = %q, want %q", tt.body, result, tt.expected)
+		}
+	}
+}
+
+func TestDetectFramework_Htmx(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head><script src="https://unpkg.com/htmx.org@1.9.10"></script></head>
+			<body>
+				<button hx-get="/clicked" hx-target="#out" hx-swap="outerHTML">Click</button>
+				<form hx-post="/submit" hx-boost="true"></form>
+				<div id="out"></div>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "htmx" {
+		t.Errorf("expected framework 'htmx', got '%s'", result.Name)
+	}
+	if result.Version != "1.9.10" {
+		t.Errorf("expected version '1.9.10', got '%s'", result.Version)
+	}
+}

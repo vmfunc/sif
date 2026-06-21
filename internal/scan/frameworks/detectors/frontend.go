@@ -34,6 +34,7 @@ func init() {
 	fw.Register(&emberDetector{})
 	fw.Register(&backboneDetector{})
 	fw.Register(&meteorDetector{})
+	fw.Register(&htmxDetector{})
 }
 
 // reactDetector detects React framework.
@@ -184,6 +185,34 @@ func (d *backboneDetector) Signatures() []fw.Signature {
 }
 
 func (d *backboneDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// htmxDetector detects the htmx library.
+type htmxDetector struct{}
+
+func (d *htmxDetector) Name() string { return "htmx" }
+
+func (d *htmxDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "hx-get", Weight: 0.5},
+		{Pattern: "hx-post", Weight: 0.5},
+		{Pattern: "hx-swap", Weight: 0.4},
+		{Pattern: "hx-target", Weight: 0.4},
+		{Pattern: "hx-boost", Weight: 0.4},
+		{Pattern: "htmx.org", Weight: 0.5},
+	}
+}
+
+func (d *htmxDetector) Detect(body string, headers http.Header) (float32, string) {
 	base := fw.NewBaseDetector(d.Name(), d.Signatures())
 	score := base.MatchSignatures(body, headers)
 	confidence := sigmoidConfidence(score)

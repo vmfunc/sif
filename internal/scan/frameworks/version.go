@@ -107,6 +107,10 @@ func init() {
 		"SvelteKit": {
 			{`"@sveltejs/kit":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
 		},
+		"htmx": {
+			{`htmx(?:\.org)?@(\d+\.\d+(?:\.\d+)?)`, 0.85, "CDN reference"},
+			{`"htmx\.org":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
+		},
 		"WordPress": {
 			{`<meta name="generator" content="WordPress (\d+\.\d+(?:\.\d+)?)"`, 0.95, "generator meta"},
 			{`WordPress (\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
