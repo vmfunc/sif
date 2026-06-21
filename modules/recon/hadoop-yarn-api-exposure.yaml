@@ -1,0 +1,39 @@
+# Apache Hadoop YARN API Exposure Detection Module
+
+id: hadoop-yarn-api-exposure
+info:
+  name: Apache Hadoop YARN API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Hadoop YARN resource manager api reachable without authentication
+  tags: [hadoop, yarn, apache, cluster, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/ws/v1/cluster/info"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"clusterInfo\""
+
+    - type: word
+      part: body
+      words:
+        - "\"resourceManagerVersion\""
+
+  extractors:
+    - type: regex
+      name: hadoop_version
+      part: body
+      regex:
+        - '"hadoopVersion"\s*:\s*"([^"]+)"'
+      group: 1

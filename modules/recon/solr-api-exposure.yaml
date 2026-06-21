@@ -1,0 +1,39 @@
+# Apache Solr API Exposure Detection Module
+
+id: solr-api-exposure
+info:
+  name: Apache Solr API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Apache Solr admin api reachable without authentication
+  tags: [solr, apache, search, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/solr/admin/info/system"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"solr-spec-version\""
+
+    - type: word
+      part: body
+      words:
+        - "\"solr_home\""
+
+  extractors:
+    - type: regex
+      name: solr_version
+      part: body
+      regex:
+        - '"solr-spec-version"\s*:\s*"([^"]+)"'
+      group: 1
