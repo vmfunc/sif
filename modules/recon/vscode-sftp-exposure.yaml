@@ -1,0 +1,57 @@
+# VSCode SFTP Deploy Config Exposure Detection Module
+
+id: vscode-sftp-exposure
+info:
+  name: VSCode SFTP Deploy Config Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed vscode-sftp config that leaks deploy host and credentials
+  tags: [vscode, sftp, deploy, credentials, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.vscode/sftp.json"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - '"remotePath"'
+        - '"uploadOnSave"'
+        - '"syncOption"'
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - '"password"'
+        - '"privateKeyPath"'
+        - '"username"'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: remote_host
+      part: body
+      regex:
+        - '"host"\s*:\s*"([^"]+)"'
+      group: 1

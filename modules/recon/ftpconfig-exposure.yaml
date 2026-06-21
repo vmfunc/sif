@@ -1,0 +1,55 @@
+# Atom remote-ftp Deploy Config Exposure Detection Module
+
+id: ftpconfig-exposure
+info:
+  name: Atom remote-ftp Deploy Config Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed remote-ftp config that leaks deploy host and credentials
+  tags: [atom, ftp, sftp, deploy, credentials, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.ftpconfig"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - '"pasvTimeout"'
+        - '"connTimeout"'
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - '"pass"'
+        - '"user"'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: remote_host
+      part: body
+      regex:
+        - '"host"\s*:\s*"([^"]+)"'
+      group: 1
