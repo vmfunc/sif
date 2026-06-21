@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	retryabledns "github.com/projectdiscovery/retryabledns"
 	"github.com/vmfunc/sif/internal/httpx"
 )
 
@@ -263,28 +264,19 @@ func TestExecuteHTTPModuleContextCancel(t *testing.T) {
 	}
 }
 
-// TestExecuteDNSModuleUnsupported pins the current behavior: DNS execution is
-// not implemented and must signal it via ErrUnsupportedModuleType, not by
-// quietly returning an empty (successful-looking) result.
-func TestExecuteDNSModuleUnsupported(t *testing.T) {
-	def := &YAMLModule{ID: "dns-mod", Type: TypeDNS, DNS: &DNSConfig{Type: "A"}}
-	result, err := ExecuteDNSModule(context.Background(), "example.com", def, Options{})
-	if result != nil {
-		t.Errorf("result = %v, want nil for unsupported type", result)
-	}
-	if !errors.Is(err, ErrUnsupportedModuleType) {
-		t.Fatalf("err = %v, want ErrUnsupportedModuleType", err)
-	}
-}
-
 // TestWrapperExecuteRoutesByType confirms the Module wrapper dispatches each
-// type to the right executor and propagates the unsupported-type sentinel.
+// type to the right executor: dns to the dns executor, tcp to the unsupported
+// sentinel, and a missing config to a clear error.
 func TestWrapperExecuteRoutesByType(t *testing.T) {
-	t.Run("dns routes to unsupported", func(t *testing.T) {
-		def := &YAMLModule{ID: "d", Type: TypeDNS, DNS: &DNSConfig{}}
+	t.Run("dns routes to executor", func(t *testing.T) {
+		withFakeDNS(t, &retryabledns.DNSData{StatusCode: "NOERROR", Raw: "NOERROR"}, nil)
+		def := &YAMLModule{ID: "d", Type: TypeDNS, DNS: &DNSConfig{
+			Type:     "a",
+			Matchers: []Matcher{{Type: "word", Part: "rcode", Words: []string{"NOERROR"}}},
+		}}
 		w := newYAMLModuleWrapper(def, "d.yaml")
-		if _, err := w.Execute(context.Background(), "t", Options{}); !errors.Is(err, ErrUnsupportedModuleType) {
-			t.Fatalf("err = %v, want ErrUnsupportedModuleType", err)
+		if _, err := w.Execute(context.Background(), "example.com", Options{}); err != nil {
+			t.Fatalf("dns execute: %v", err)
 		}
 	})
 
