@@ -1,0 +1,43 @@
+# Gradle Properties Credential Exposure Detection Module
+
+id: gradle-properties-exposure
+info:
+  name: Gradle Properties Credential Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed gradle.properties that leaks a signing or publishing credential
+  tags: [gradle, properties, credentials, secrets, recon, exposure]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/gradle.properties"
+    - "{{BaseURL}}/.gradle/gradle.properties"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '(?im)^[^#=\n]*(?:password|secret|token)[^=\n]*=[ \t]*\S+'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<html"
+
+  extractors:
+    - type: regex
+      name: gradle_secret_property
+      part: body
+      regex:
+        - '(?im)^\s*([^#=\s]*(?:password|secret|token)[^=\s]*)\s*='
+      group: 1

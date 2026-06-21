@@ -1,0 +1,51 @@
+# NuGet Config Credential Exposure Detection Module
+
+id: nuget-config-exposure
+info:
+  name: NuGet Config Credential Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed nuget.config that leaks package source credentials in cleartext
+  tags: [nuget, dotnet, credentials, secrets, recon, exposure]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/nuget.config"
+    - "{{BaseURL}}/NuGet.Config"
+    - "{{BaseURL}}/.nuget/NuGet/NuGet.Config"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "packageSourceCredentials"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "ClearTextPassword"
+        - "\"Password\""
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<html"
+
+  extractors:
+    - type: regex
+      name: nuget_username
+      part: body
+      regex:
+        - 'key="Username"\s+value="([^"]+)"'
+      group: 1
