@@ -1,0 +1,41 @@
+# Jenkins Login Panel Detection Module
+
+id: jenkins-panel
+info:
+  name: Jenkins Login Panel
+  author: sif
+  severity: info
+  description: Detects exposed Jenkins automation server login panels
+  tags: [jenkins, ci, automation, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+    - "{{BaseURL}}/login"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+        - 403
+
+    - type: word
+      part: all
+      condition: or
+      words:
+        - "X-Jenkins"
+        - "Dashboard [Jenkins]"
+        - "Welcome to Jenkins!"
+        - "j_username"
+        - "jenkins-session"
+
+  extractors:
+    - type: regex
+      name: jenkins_version
+      part: all
+      regex:
+        - 'X-Jenkins: ?([0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+      group: 1
