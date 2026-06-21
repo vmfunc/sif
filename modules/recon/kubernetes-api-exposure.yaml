@@ -1,0 +1,42 @@
+# Kubernetes API Server Exposure Detection Module
+
+id: kubernetes-api-exposure
+info:
+  name: Kubernetes API Server Exposure
+  author: sif
+  severity: medium
+  description: Detects an internet reachable Kubernetes api server through its anonymous version endpoint
+  tags: [kubernetes, k8s, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"gitVersion\""
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "\"gitTreeState\""
+        - "\"buildDate\""
+        - "\"compiler\""
+
+  extractors:
+    - type: regex
+      name: k8s_version
+      part: body
+      regex:
+        - '"gitVersion"\s*:\s*"([^"]+)"'
+      group: 1
