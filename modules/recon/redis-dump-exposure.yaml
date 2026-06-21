@@ -1,0 +1,37 @@
+# Redis RDB Dump Exposure Detection Module
+
+id: redis-dump-exposure
+info:
+  name: Redis RDB Dump Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Redis RDB snapshot that leaks the full keyspace
+  tags: [database, redis, rdb, dump, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/dump.rdb"
+    - "{{BaseURL}}/redis/dump.rdb"
+    - "{{BaseURL}}/data/dump.rdb"
+    - "{{BaseURL}}/var/lib/redis/dump.rdb"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '^REDIS00\d\d'
+
+  extractors:
+    - type: regex
+      name: rdb_version
+      part: body
+      regex:
+        - 'REDIS(\d{4})'
+      group: 1

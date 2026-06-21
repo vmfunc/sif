@@ -1,0 +1,39 @@
+# SQLite Database Exposure Detection Module
+
+id: sqlite-database-exposure
+info:
+  name: SQLite Database Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed SQLite database file that leaks the full application data
+  tags: [database, sqlite, laravel, dump, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/database.sqlite"
+    - "{{BaseURL}}/database.sqlite3"
+    - "{{BaseURL}}/db.sqlite3"
+    - "{{BaseURL}}/data.db"
+    - "{{BaseURL}}/database/database.sqlite"
+    - "{{BaseURL}}/storage/database.sqlite"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '^SQLite format 3\x00'
+
+  extractors:
+    - type: regex
+      name: table_name
+      part: body
+      regex:
+        - 'CREATE TABLE ["`]?([A-Za-z0-9_]+)'
+      group: 1

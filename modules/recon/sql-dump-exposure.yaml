@@ -1,0 +1,60 @@
+# SQL Dump Exposure Detection Module
+
+id: sql-dump-exposure
+info:
+  name: SQL Dump Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed SQL database dump that leaks schema and row data
+  tags: [database, sql, mysql, postgres, dump, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/dump.sql"
+    - "{{BaseURL}}/backup.sql"
+    - "{{BaseURL}}/database.sql"
+    - "{{BaseURL}}/db.sql"
+    - "{{BaseURL}}/mysql.sql"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "-- MySQL dump"
+        - "-- PostgreSQL database dump"
+        - "-- Dumping data for table"
+        - "-- Server version"
+        - "DROP TABLE IF EXISTS"
+        - "CREATE TABLE IF NOT EXISTS"
+        - "ENGINE=InnoDB"
+        - "ENGINE=MyISAM"
+        - "COPY public."
+        - "INSERT INTO "
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: dump_table
+      part: body
+      regex:
+        - '(?:CREATE TABLE|INSERT INTO)\s+(?:IF NOT EXISTS\s+)?["`]?(?:[A-Za-z0-9_]+\.)?["`]?([A-Za-z0-9_]+)'
+      group: 1
