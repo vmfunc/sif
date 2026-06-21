@@ -234,8 +234,9 @@ func probeXSS(client *http.Client, parsedURL *url.URL, existing url.Values, para
 
 // classifyXSSContext guesses where the canary was reflected. We look at the
 // markup immediately around the token: a live <canary> tag means html text, a
-// reflection inside a <script> block means js, otherwise it sits in an attribute
-// value. The html-tag check wins because it's the most directly exploitable.
+// reflection inside a <script> block means js, a reflection sitting inside a tag
+// is an attribute value, and anything else is inert element text. The html-tag
+// check wins because it's the most directly exploitable.
 func classifyXSSContext(body string) string {
 	// a surviving "<canary>" means the < and > both passed through into markup
 	if strings.Contains(body, "<"+canaryToken+">") {
@@ -259,8 +260,34 @@ func classifyXSSContext(body string) string {
 		body = body[open+closeIdx+len("</script>"):]
 	}
 
-	// default: echoed inside an html attribute value
-	return "attribute"
+	// only an attribute value when the canary actually lands inside a tag; a quote
+	// can only break out of a delimiter that exists. assuming attribute by default
+	// flags inert quotes in element text (angle brackets escaped) as a high finding.
+	if reflectedInsideTag(body) {
+		return "attribute"
+	}
+
+	// reflected in element text: with the angle brackets escaped there's no markup
+	// to break into, so surviving quotes are harmless.
+	return "text"
+}
+
+// reflectedInsideTag reports whether any canary occurrence sits inside an open html
+// tag, the only place a surviving quote can close an attribute value and break out.
+// true when the nearest preceding '<' is not yet closed by a '>'. it's a cheap byte-scan,
+// not a parser, so a stray '<' or a quoted '>' can mis-bucket rare malformed markup.
+func reflectedInsideTag(body string) bool {
+	for off := 0; ; {
+		i := strings.Index(body[off:], canaryToken)
+		if i < 0 {
+			return false
+		}
+		pos := off + i
+		if strings.LastIndex(body[:pos], "<") > strings.LastIndex(body[:pos], ">") {
+			return true
+		}
+		off = pos + len(canaryToken)
+	}
 }
 
 // survivingBreakChars reports which dangerous chars came back next to the canary
@@ -309,6 +336,9 @@ func survivingBreakChars(body string) []string {
 // backticks matter inside attributes/scripts.
 func relevantForContext(reflectCtx string, survived []string) []string {
 	wanted := make(map[string]bool, len(survived))
+	// a context with no exploitable delimiter (e.g. "text") is left unlisted and
+	// falls through to an empty set, which drops the finding; a default case here
+	// would resurrect the inert-reflection false positive.
 	switch reflectCtx {
 	case "html":
 		wanted["<"] = true

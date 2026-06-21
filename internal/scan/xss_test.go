@@ -16,6 +16,7 @@ import (
 	"html"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -29,6 +30,36 @@ func reflectsRaw(param string) *httptest.Server {
 		w.WriteHeader(http.StatusOK)
 		//nolint:gosec // deliberate reflected-xss fixture for the probe under test
 		w.Write([]byte("<html><body><div>" + v + "</div></body></html>"))
+	}))
+}
+
+// reflectsQuotesInText echoes the param into element text but escapes only the
+// angle brackets, the way an encoder limited to < > & does. quotes survive raw,
+// yet in text context they delimit nothing, so this is not an injection sink.
+func reflectsQuotesInText(param string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		v := r.URL.Query().Get(param)
+		v = strings.ReplaceAll(v, "<", "&lt;")
+		v = strings.ReplaceAll(v, ">", "&gt;")
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		//nolint:gosec // fixture: quotes raw in element text is not exploitable
+		w.Write([]byte("<html><body><p>no results for " + v + "</p></body></html>"))
+	}))
+}
+
+// reflectsInAttribute echoes the param into a tag attribute value with the angle
+// brackets escaped but quotes raw. a surviving quote closes the value and breaks
+// out, so this is a genuine attribute-context sink the fix must still report.
+func reflectsInAttribute(param string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		v := r.URL.Query().Get(param)
+		v = strings.ReplaceAll(v, "<", "&lt;")
+		v = strings.ReplaceAll(v, ">", "&gt;")
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		//nolint:gosec // deliberate attribute-context xss fixture for the probe under test
+		w.Write([]byte(`<html><body><input value="` + v + `"></body></html>`))
 	}))
 }
 
@@ -98,6 +129,45 @@ func TestXSS_NoFalsePositiveWhenNotReflected(t *testing.T) {
 	}
 }
 
+func TestXSS_NoFalsePositiveOnQuotesInText(t *testing.T) {
+	srv := reflectsQuotesInText("q")
+	defer srv.Close()
+
+	result, err := XSS(srv.URL, 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("XSS: %v", err)
+	}
+	if result != nil && len(result.Findings) > 0 {
+		t.Errorf("quotes reflected in element text are inert; expected no findings, got %+v", result.Findings)
+	}
+}
+
+func TestXSS_DetectsAttributeReflection(t *testing.T) {
+	srv := reflectsInAttribute("q")
+	defer srv.Close()
+
+	result, err := XSS(srv.URL, 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("XSS: %v", err)
+	}
+	if result == nil || len(result.Findings) == 0 {
+		t.Fatalf("expected an attribute-context finding, got %+v", result)
+	}
+
+	var found *XSSFinding
+	for i := range result.Findings {
+		if result.Findings[i].Parameter == "q" {
+			found = &result.Findings[i]
+		}
+	}
+	if found == nil {
+		t.Fatalf("expected a finding on param 'q', got %+v", result.Findings)
+	}
+	if found.Context != "attribute" {
+		t.Errorf("expected attribute context, got %s", found.Context)
+	}
+}
+
 func TestClassifyXSSContext(t *testing.T) {
 	tests := []struct {
 		name string
@@ -118,6 +188,11 @@ func TestClassifyXSSContext(t *testing.T) {
 			name: "attribute value",
 			body: `<input value="` + canaryToken + `">`,
 			want: "attribute",
+		},
+		{
+			name: "escaped brackets in element text",
+			body: `<p>no results for &lt;` + canaryToken + `&gt;"` + canaryToken + `'</p>`,
+			want: "text",
 		},
 	}
 
