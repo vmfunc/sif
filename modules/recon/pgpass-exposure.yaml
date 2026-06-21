@@ -1,0 +1,43 @@
+# PostgreSQL pgpass File Exposure Detection Module
+
+id: pgpass-exposure
+info:
+  name: PostgreSQL pgpass File Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed .pgpass file that leaks postgres connection passwords in cleartext
+  tags: [pgpass, postgres, credentials, secrets, recon, exposure]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.pgpass"
+    - "{{BaseURL}}/pgpass.conf"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '(?m)^[^:\s#]+:(?:\d+|\*):[^:\n]*:[^:\n]*:[^\n]+$'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<html"
+
+  extractors:
+    - type: regex
+      name: pgpass_host
+      part: body
+      regex:
+        - '(?m)^([^:\s#]+):(?:\d+|\*):'
+      group: 1

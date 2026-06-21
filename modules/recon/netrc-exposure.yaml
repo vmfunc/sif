@@ -1,0 +1,43 @@
+# netrc Credential File Exposure Detection Module
+
+id: netrc-exposure
+info:
+  name: netrc Credential File Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed .netrc file that leaks machine login credentials in cleartext
+  tags: [netrc, credentials, secrets, recon, exposure]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.netrc"
+    - "{{BaseURL}}/netrc"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '(?:machine\s+\S+|default)\s+login\s+\S+\s+password\s+\S+'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<html"
+
+  extractors:
+    - type: regex
+      name: netrc_machine
+      part: body
+      regex:
+        - 'machine\s+(\S+)'
+      group: 1
