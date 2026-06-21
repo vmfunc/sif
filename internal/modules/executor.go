@@ -149,23 +149,50 @@ func generateHTTPRequests(target string, cfg *HTTPConfig) []*httpRequest {
 		return requests
 	}
 
-	// Generate requests with payloads
+	// pitchfork pairs path[i] with payload[i] and stops at the shorter list;
+	// clusterbomb (default) crosses every path with every payload.
+	if strings.EqualFold(cfg.Attack, "pitchfork") {
+		n := len(cfg.Paths)
+		if len(cfg.Payloads) < n {
+			n = len(cfg.Payloads)
+		}
+		for i := 0; i < n; i++ {
+			requests = append(requests, newPayloadRequest(method, target, cfg.Paths[i], cfg.Payloads[i], cfg))
+		}
+		return requests
+	}
+
 	for _, path := range cfg.Paths {
 		for _, payload := range cfg.Payloads {
-			url := substituteVariables(path, target, payload)
-			body := substituteVariables(cfg.Body, target, payload)
-			requests = append(requests, &httpRequest{
-				Method:   method,
-				URL:      url,
-				Headers:  cfg.Headers,
-				Body:     body,
-				Payload:  payload,
-				Original: path,
-			})
+			requests = append(requests, newPayloadRequest(method, target, path, payload, cfg))
 		}
 	}
 
 	return requests
+}
+
+// newPayloadRequest builds one request with the path and body templates
+// substituted for the given payload.
+func newPayloadRequest(method, target, path, payload string, cfg *HTTPConfig) *httpRequest {
+	return &httpRequest{
+		Method:   method,
+		URL:      substituteVariables(path, target, payload),
+		Headers:  cfg.Headers,
+		Body:     substituteVariables(cfg.Body, target, payload),
+		Payload:  payload,
+		Original: path,
+	}
+}
+
+// validateAttack rejects an attack mode that is not "", "clusterbomb", or
+// "pitchfork"; an empty value defaults to clusterbomb.
+func validateAttack(attack string) error {
+	switch strings.ToLower(attack) {
+	case "", "clusterbomb", "pitchfork":
+		return nil
+	default:
+		return fmt.Errorf("invalid attack %q (want \"clusterbomb\" or \"pitchfork\")", attack)
+	}
 }
 
 // substituteVariables replaces template variables in a string.

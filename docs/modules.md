@@ -115,6 +115,18 @@ http:
 
 each payload creates a separate request for each path.
 
+#### attack
+
+how paths and payloads combine into requests.
+
+```yaml
+http:
+  attack: pitchfork
+```
+
+- `clusterbomb` (default) - every path is tried with every payload
+- `pitchfork` - path and payload are paired by index, stopping at the shorter list
+
 #### headers
 
 custom headers to send.
