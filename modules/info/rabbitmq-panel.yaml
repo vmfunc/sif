@@ -1,0 +1,30 @@
+# RabbitMQ Management Detection Module
+
+id: rabbitmq-panel
+info:
+  name: RabbitMQ Management
+  author: sif
+  severity: info
+  description: Detects an exposed RabbitMQ management UI login panel
+  tags: [rabbitmq, amqp, messaging, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+    - "{{BaseURL}}/rabbitmq/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: all
+      condition: or
+      words:
+        - "RabbitMQ Management"
+        - "rabbitmqlogo"
+        - "<title>RabbitMQ"

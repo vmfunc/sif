@@ -1,0 +1,38 @@
+# Keycloak Panel Detection Module
+
+id: keycloak-panel
+info:
+  name: Keycloak Panel
+  author: sif
+  severity: info
+  description: Detects an exposed Keycloak identity server via its public realm endpoint
+  tags: [keycloak, iam, sso, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/realms/master"
+    - "{{BaseURL}}/auth/realms/master"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: and
+      words:
+        - '"public_key"'
+        - '"token-service"'
+        - '"account-service"'
+
+  extractors:
+    - type: regex
+      name: keycloak_realm
+      part: body
+      regex:
+        - '"realm"\s*:\s*"([^"]+)"'
+      group: 1

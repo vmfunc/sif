@@ -1,0 +1,38 @@
+# Traefik Dashboard Detection Module
+
+id: traefik-panel
+info:
+  name: Traefik Dashboard
+  author: sif
+  severity: info
+  description: Detects an exposed Traefik API and dashboard via the public version endpoint
+  tags: [traefik, proxy, dashboard, panel, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/version"
+    - "{{BaseURL}}/traefik/api/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: and
+      words:
+        - '"Version"'
+        - '"Codename"'
+        - '"startDate"'
+
+  extractors:
+    - type: regex
+      name: traefik_version
+      part: body
+      regex:
+        - '"Version":\s*"v?([0-9]+\.[0-9]+(?:\.[0-9]+)?)"'
+      group: 1

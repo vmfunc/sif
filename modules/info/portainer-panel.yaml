@@ -1,0 +1,38 @@
+# Portainer Panel Detection Module
+
+id: portainer-panel
+info:
+  name: Portainer Panel
+  author: sif
+  severity: info
+  description: Detects exposed Portainer container management instances via the public status API
+  tags: [portainer, docker, container, panel, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/status"
+    - "{{BaseURL}}/portainer/api/status"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: and
+      words:
+        - '"Edition"'
+        - '"Version"'
+        - '"InstanceID"'
+
+  extractors:
+    - type: regex
+      name: portainer_version
+      part: body
+      regex:
+        - '"Version":\s*"([0-9]+\.[0-9]+(?:\.[0-9]+)?)"'
+      group: 1
