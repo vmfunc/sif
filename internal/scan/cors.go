@@ -42,10 +42,6 @@ type CORSFinding struct {
 	Note             string `json:"note"`
 }
 
-// corsMaxRedirects caps the redirect chain so we read the cors headers off the
-// host we actually asked about, not whatever it bounces us to.
-const corsMaxRedirects = 3
-
 // the sentinel attacker origin; if it comes back in Access-Control-Allow-Origin
 // the target reflects arbitrary origins and any site can read the response.
 const corsEvilOrigin = "https://sif-cors-probe.evil.com"
@@ -97,11 +93,10 @@ func CORS(targetURL string, timeout time.Duration, threads int, logdir string) (
 	host := parsedURL.Host
 
 	client := httpx.Client(timeout)
-	client.CheckRedirect = func(_ *http.Request, via []*http.Request) error {
-		if len(via) >= corsMaxRedirects {
-			return http.ErrUseLastResponse
-		}
-		return nil
+	// don't follow redirects: cors is judged on the host we asked about, so a
+	// bounce to a permissive third party can't be pinned on the target.
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
 	}
 
 	result := &CORSResult{Findings: make([]CORSFinding, 0, len(corsOrigins))}

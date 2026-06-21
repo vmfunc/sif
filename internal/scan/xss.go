@@ -47,6 +47,10 @@ type XSSFinding struct {
 // xssMaxBody caps the body we scan for the canary (100KB).
 const xssMaxBody = 1024 * 100
 
+// xssMaxRedirects caps the redirect chain we follow before reading the body; a
+// reflection can land a hop past the first response.
+const xssMaxRedirects = 3
+
 // canaryToken is a unique, alnum-only marker we can grep for unambiguously; it
 // survives every output encoder so a missing reflection means no echo at all.
 const canaryToken = "sifxss9173canary" //nolint:gosec // not a credential, just a reflection marker
@@ -97,7 +101,7 @@ func XSS(targetURL string, timeout time.Duration, threads int, logdir string) (*
 
 	client := httpx.Client(timeout)
 	client.CheckRedirect = func(_ *http.Request, via []*http.Request) error {
-		if len(via) >= corsMaxRedirects {
+		if len(via) >= xssMaxRedirects {
 			return http.ErrUseLastResponse
 		}
 		return nil

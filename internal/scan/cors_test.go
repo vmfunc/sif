@@ -15,6 +15,7 @@ package scan
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -129,6 +130,38 @@ func TestCORS_NoFalsePositiveOnSafeServer(t *testing.T) {
 				t.Errorf("expected no findings on safe server, got %+v", result.Findings)
 			}
 		})
+	}
+}
+
+// TestCORS_JudgesRequestedHostNotRedirectTarget pins the redirect behavior: the
+// requested host bounces to a reflecting third party, so following the redirect would
+// pin that party's misconfig on the target. the counter proves we never left the host.
+func TestCORS_JudgesRequestedHostNotRedirectTarget(t *testing.T) {
+	var destHits int32
+	dest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&destHits, 1)
+		if origin := r.Header.Get("Origin"); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer dest.Close()
+
+	redirector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, dest.URL, http.StatusFound)
+	}))
+	defer redirector.Close()
+
+	result, err := CORS(redirector.URL, 5*time.Second, 3, "")
+	if err != nil {
+		t.Fatalf("CORS: %v", err)
+	}
+	if n := atomic.LoadInt32(&destHits); n != 0 {
+		t.Errorf("followed the redirect to the reflecting host %d time(s); cors must stay on the requested host", n)
+	}
+	if result != nil && len(result.Findings) > 0 {
+		t.Errorf("expected no findings: the reflection is on the redirect target, not the requested host; got %+v", result.Findings)
 	}
 }
 
