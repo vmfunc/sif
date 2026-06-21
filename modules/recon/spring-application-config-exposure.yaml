@@ -1,0 +1,61 @@
+# Spring Application Config Exposure Detection Module
+
+id: spring-application-config-exposure
+info:
+  name: Spring Application Config Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Spring application config that leaks the datasource credentials
+  tags: [spring, java, application-properties, datasource, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/application.properties"
+    - "{{BaseURL}}/application.yml"
+    - "{{BaseURL}}/config/application.properties"
+    - "{{BaseURL}}/config/application.yml"
+    - "{{BaseURL}}/WEB-INF/classes/application.properties"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "spring.datasource"
+        - "spring.application"
+        - "datasource:"
+        - "jdbc:"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "password"
+        - "secret"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: jdbc_url
+      part: body
+      regex:
+        - '(jdbc:[a-zA-Z0-9]+://[^\s"'',]+)'
+      group: 1

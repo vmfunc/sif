@@ -1,0 +1,60 @@
+# WordPress Config Backup Exposure Detection Module
+
+id: wp-config-backup-exposure
+info:
+  name: WordPress Config Backup Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed wp-config backup that leaks the WordPress database credentials
+  tags: [wordpress, php, wp-config, database, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/wp-config.php.bak"
+    - "{{BaseURL}}/wp-config.php~"
+    - "{{BaseURL}}/wp-config.php.save"
+    - "{{BaseURL}}/wp-config.php.orig"
+    - "{{BaseURL}}/wp-config.php.old"
+    - "{{BaseURL}}/wp-config.php.txt"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "DB_PASSWORD"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "DB_NAME"
+        - "DB_USER"
+        - "DB_HOST"
+        - "define("
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: db_password
+      part: body
+      regex:
+        - "DB_PASSWORD'\\s*,\\s*'([^']+)'"
+      group: 1
