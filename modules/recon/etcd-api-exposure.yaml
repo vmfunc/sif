@@ -1,0 +1,39 @@
+# etcd API Exposure Detection Module
+
+id: etcd-api-exposure
+info:
+  name: etcd API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed etcd api whose keyspace often holds kubernetes secrets
+  tags: [etcd, kubernetes, key-value, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"etcdserver\""
+
+    - type: word
+      part: body
+      words:
+        - "\"etcdcluster\""
+
+  extractors:
+    - type: regex
+      name: etcd_version
+      part: body
+      regex:
+        - '"etcdserver"\s*:\s*"([0-9]+\.[0-9]+\.[0-9]+)"'
+      group: 1

@@ -1,0 +1,44 @@
+# Consul API Exposure Detection Module
+
+id: consul-api-exposure
+info:
+  name: Consul API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Consul http api that leaks the agent config without an acl token
+  tags: [consul, hashicorp, service-discovery, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v1/agent/self"
+    - "{{BaseURL}}/v1/catalog/nodes"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"Datacenter\""
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "\"NodeName\""
+        - "\"Server\""
+        - "\"Member\""
+        - "\"Address\""
+
+  extractors:
+    - type: regex
+      name: consul_datacenter
+      part: body
+      regex:
+        - '"Datacenter"\s*:\s*"([^"]+)"'
+      group: 1
