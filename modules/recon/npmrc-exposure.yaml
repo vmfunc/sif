@@ -1,0 +1,50 @@
+# npmrc Token Exposure Detection Module
+
+id: npmrc-exposure
+info:
+  name: npmrc Token Exposure
+  author: sif
+  severity: high
+  description: Detects exposed .npmrc files that leak registry auth tokens or passwords
+  tags: [npm, npmrc, token, secrets, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.npmrc"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "_authToken"
+        - "_auth="
+        - "_auth ="
+        - ":_password"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: npm_registry
+      part: body
+      regex:
+        - '//([^/:]+)/:_authToken'
+      group: 1

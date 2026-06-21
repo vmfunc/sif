@@ -1,0 +1,47 @@
+# Docker Config Credential Exposure Detection Module
+
+id: docker-config-exposure
+info:
+  name: Docker Config Credential Exposure
+  author: sif
+  severity: high
+  description: Detects exposed docker config files that leak base64 encoded registry credentials
+  tags: [docker, registry, credentials, secrets, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.docker/config.json"
+    - "{{BaseURL}}/.dockercfg"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"auth"\s*:\s*"[A-Za-z0-9+/=]{20,}"'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: docker_registry
+      part: body
+      regex:
+        - '"auths"\s*:\s*\{\s*"([^"]+)"'
+      group: 1
