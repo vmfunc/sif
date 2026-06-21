@@ -1,0 +1,34 @@
+# Laravel Ignition Debug Exposure Detection Module
+
+id: laravel-ignition-exposure
+info:
+  name: Laravel Ignition Debug Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Laravel Ignition debug endpoint that may allow remote code execution
+  tags: [laravel, ignition, debug, rce, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/_ignition/health-check"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "can_execute_commands"
+
+  extractors:
+    - type: regex
+      name: can_execute_commands
+      part: body
+      regex:
+        - '"can_execute_commands"\s*:\s*(true|false)'
+      group: 1
