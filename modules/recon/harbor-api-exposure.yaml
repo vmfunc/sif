@@ -1,0 +1,39 @@
+# Harbor API Exposure Detection Module
+
+id: harbor-api-exposure
+info:
+  name: Harbor API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Harbor registry through its unauthenticated systeminfo endpoint
+  tags: [harbor, registry, container, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v2.0/systeminfo"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"harbor_version\""
+
+    - type: word
+      part: body
+      words:
+        - "\"auth_mode\""
+
+  extractors:
+    - type: regex
+      name: harbor_version
+      part: body
+      regex:
+        - '"harbor_version"\s*:\s*"([^"]+)"'
+      group: 1
