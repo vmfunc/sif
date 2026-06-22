@@ -1,0 +1,39 @@
+# Argo CD API Exposure Detection Module
+
+id: argocd-api-exposure
+info:
+  name: Argo CD API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Argo CD api server through its unauthenticated version endpoint
+  tags: [argocd, gitops, kubernetes, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"KustomizeVersion\""
+
+    - type: word
+      part: body
+      words:
+        - "\"HelmVersion\""
+
+  extractors:
+    - type: regex
+      name: argocd_version
+      part: body
+      regex:
+        - '"Version"\s*:\s*"([^"]+)"'
+      group: 1
