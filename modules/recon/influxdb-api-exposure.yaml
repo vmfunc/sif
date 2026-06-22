@@ -1,0 +1,39 @@
+# InfluxDB API Exposure Detection Module
+
+id: influxdb-api-exposure
+info:
+  name: InfluxDB API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed InfluxDB instance through its unauthenticated health endpoint
+  tags: [influxdb, database, timeseries, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/health"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"influxdb\""
+
+    - type: word
+      part: body
+      words:
+        - "ready for queries and writes"
+
+  extractors:
+    - type: regex
+      name: influxdb_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

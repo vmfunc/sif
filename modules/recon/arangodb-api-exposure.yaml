@@ -1,0 +1,39 @@
+# ArangoDB API Exposure Detection Module
+
+id: arangodb-api-exposure
+info:
+  name: ArangoDB API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed ArangoDB instance through its unauthenticated version endpoint
+  tags: [arangodb, database, graph, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/_api/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"arango\""
+
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+
+  extractors:
+    - type: regex
+      name: arangodb_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
