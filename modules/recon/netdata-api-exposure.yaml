@@ -1,0 +1,39 @@
+# Netdata API Exposure Detection Module
+
+id: netdata-api-exposure
+info:
+  name: Netdata API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Netdata agent through its unauthenticated info endpoint
+  tags: [netdata, monitoring, metrics, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1/info"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"mirrored_hosts\""
+
+    - type: word
+      part: body
+      words:
+        - "\"cores_total\""
+
+  extractors:
+    - type: regex
+      name: netdata_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
