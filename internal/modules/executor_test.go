@@ -143,6 +143,79 @@ func TestExecuteHTTPModulePayloadExpansion(t *testing.T) {
 	}
 }
 
+// TestExecuteHTTPModuleSizeMatcher pins the size matcher: it fires when the
+// response body length equals a listed value and stays silent otherwise.
+func TestExecuteHTTPModuleSizeMatcher(t *testing.T) {
+	body := "1234567890" // 10 bytes
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	opts := Options{Timeout: testTimeout, Client: httpx.Client(testTimeout)}
+	mod := func(id string, size int) *YAMLModule {
+		return &YAMLModule{
+			ID: id, Type: TypeHTTP,
+			HTTP: &HTTPConfig{
+				Paths:    []string{"{{BaseURL}}/"},
+				Matchers: []Matcher{{Type: "size", Size: []int{size}}},
+			},
+		}
+	}
+
+	hit, err := ExecuteHTTPModule(context.Background(), srv.URL, mod("size-hit", len(body)), opts)
+	if err != nil {
+		t.Fatalf("ExecuteHTTPModule(hit): %v", err)
+	}
+	if len(hit.Findings) != 1 {
+		t.Fatalf("size match: got %d findings, want 1", len(hit.Findings))
+	}
+
+	miss, err := ExecuteHTTPModule(context.Background(), srv.URL, mod("size-miss", len(body)+1), opts)
+	if err != nil {
+		t.Fatalf("ExecuteHTTPModule(miss): %v", err)
+	}
+	if len(miss.Findings) != 0 {
+		t.Fatalf("size mismatch: got %d findings, want 0", len(miss.Findings))
+	}
+}
+
+// TestExecuteHTTPModuleKvExtractor pins the kv extractor: it records response
+// header key/values onto the finding, namespaced by the extractor name.
+func TestExecuteHTTPModuleKvExtractor(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Server", "nginx/1.25.3")
+		w.Header().Set("X-Powered-By", "PHP/8.2.0")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("hello"))
+	}))
+	defer srv.Close()
+
+	def := &YAMLModule{
+		ID: "kv-mod", Type: TypeHTTP,
+		HTTP: &HTTPConfig{
+			Paths:      []string{"{{BaseURL}}/"},
+			Matchers:   []Matcher{{Type: "status", Status: []int{200}}},
+			Extractors: []Extractor{{Type: "kv", Name: "headers", Part: "header"}},
+		},
+	}
+
+	result, err := ExecuteHTTPModule(context.Background(), srv.URL, def, Options{Timeout: testTimeout, Client: httpx.Client(testTimeout)})
+	if err != nil {
+		t.Fatalf("ExecuteHTTPModule: %v", err)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("got %d findings, want 1", len(result.Findings))
+	}
+	ex := result.Findings[0].Extracted
+	if ex["headers.Server"] != "nginx/1.25.3" {
+		t.Errorf("kv headers.Server = %q, want nginx/1.25.3", ex["headers.Server"])
+	}
+	if ex["headers.X-Powered-By"] != "PHP/8.2.0" {
+		t.Errorf("kv headers.X-Powered-By = %q, want PHP/8.2.0", ex["headers.X-Powered-By"])
+	}
+}
+
 func TestExecuteHTTPModuleNoConfig(t *testing.T) {
 	def := &YAMLModule{ID: "x", Type: TypeHTTP}
 	if _, err := ExecuteHTTPModule(context.Background(), "http://h", def, Options{}); err == nil {

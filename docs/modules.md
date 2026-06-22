@@ -199,6 +199,18 @@ matchers:
     condition: or
 ```
 
+### size matcher
+
+match the response body length in bytes (measured after the 5 MB response cap, so larger sizes never match).
+
+```yaml
+matchers:
+  - type: size
+    size:
+      - 0
+      - 1337
+```
+
 ### combining matchers
 
 multiple matchers are combined with AND logic by default.
@@ -238,7 +250,7 @@ extractors:
 
 ### kv extractor
 
-extract key-value pairs.
+record every response header as a key-value pair, namespaced by `name`.
 
 ```yaml
 extractors:
