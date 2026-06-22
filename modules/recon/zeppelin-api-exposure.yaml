@@ -1,0 +1,39 @@
+# Apache Zeppelin API Exposure Detection Module
+
+id: zeppelin-api-exposure
+info:
+  name: Apache Zeppelin API Exposure
+  author: sif
+  severity: medium
+  description: Detects an Apache Zeppelin server that discloses its version and build commit over the anonymous version api
+  tags: [zeppelin, apache, notebook, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "Zeppelin version"
+
+    - type: word
+      part: body
+      words:
+        - "\"git-commit-id\""
+
+  extractors:
+    - type: regex
+      name: zeppelin_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

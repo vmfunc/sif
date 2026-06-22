@@ -1,0 +1,39 @@
+# Metabase Setup Token Exposure Detection Module
+
+id: metabase-api-exposure
+info:
+  name: Metabase Setup Token Exposure
+  author: sif
+  severity: high
+  description: Detects a Metabase instance that exposes a live setup token without authentication
+  tags: [metabase, analytics, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/session/properties"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"setup-token"\s*:\s*"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"'
+
+    - type: word
+      part: body
+      words:
+        - "\"anon-tracking-enabled\""
+
+  extractors:
+    - type: regex
+      name: metabase_version
+      part: body
+      regex:
+        - '"version"\s*:\s*\{[^}]*?"tag"\s*:\s*"([^"]+)"'
+      group: 1

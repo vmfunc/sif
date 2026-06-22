@@ -1,0 +1,44 @@
+# Jupyter Server API Exposure Detection Module
+
+id: jupyter-api-exposure
+info:
+  name: Jupyter Server API Exposure
+  author: sif
+  severity: high
+  description: Detects a Jupyter server whose status api answers without authentication
+  tags: [jupyter, notebook, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/status"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"last_activity\""
+
+    - type: word
+      part: body
+      words:
+        - "\"connections\""
+
+    - type: word
+      part: body
+      words:
+        - "\"kernels\""
+
+  extractors:
+    - type: regex
+      name: jupyter_active_kernels
+      part: body
+      regex:
+        - '"kernels"\s*:\s*([0-9]+)'
+      group: 1
