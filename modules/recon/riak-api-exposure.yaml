@@ -1,0 +1,39 @@
+# Riak HTTP API Exposure Detection Module
+
+id: riak-api-exposure
+info:
+  name: Riak HTTP API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Riak http api reachable without authentication
+  tags: [riak, database, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/stats"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"riak_kv_version\""
+
+    - type: word
+      part: body
+      words:
+        - "\"riak_core_version\""
+
+  extractors:
+    - type: regex
+      name: riak_version
+      part: body
+      regex:
+        - '"riak_kv_version"\s*:\s*"([^"]+)"'
+      group: 1
