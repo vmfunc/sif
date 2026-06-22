@@ -194,7 +194,7 @@ func Parse() *Settings {
 	)
 
 	flagSet.CreateGroup("api", "API",
-		flagSet.BoolVar(&settings.ApiMode, "api", false, "Enable API mode. Only useful for internal lunchcat usage"),
+		flagSet.BoolVar(&settings.ApiMode, "api", false, "Enable API mode. Only useful for internal usage"),
 	)
 
 	flagSet.CreateGroup("modules", "Modules",
