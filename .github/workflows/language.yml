@@ -24,7 +24,7 @@ jobs:
     name: profanity check
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Profanity check step
         uses: tailaiw/mind-your-language-action@v1.0.3
         env:

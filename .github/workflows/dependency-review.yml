@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: dependency review
         uses: actions/dependency-review-action@v5
         continue-on-error: ${{ github.event_name == 'push' }}
