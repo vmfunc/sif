@@ -1,0 +1,27 @@
+# Magento CMS Detection Module
+
+id: cms-magento
+info:
+  name: Magento Detection
+  author: sif
+  severity: info
+  description: Detects Magento / Adobe Commerce e-commerce installations
+  tags: [cms, magento, ecommerce, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+    - "{{BaseURL}}/customer/account/login/"
+
+  matchers:
+    - type: word
+      part: all
+      words:
+        - "data-mage-init"
+        - "text/x-magento-init"
+        - "mage/cookies"
+        - "Mage.Cookies"
+      condition: or

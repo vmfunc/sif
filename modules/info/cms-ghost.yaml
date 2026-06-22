@@ -1,0 +1,35 @@
+# Ghost CMS Detection Module
+
+id: cms-ghost
+info:
+  name: Ghost Detection
+  author: sif
+  severity: info
+  description: Detects Ghost publishing platform installations
+  tags: [cms, ghost, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+    - "{{BaseURL}}/ghost/"
+
+  matchers:
+    - type: word
+      part: all
+      words:
+        - 'generator" content="Ghost'
+        - "/ghost/api/"
+        - "data-ghost"
+        - "ghost-portal"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: ghost_version
+      part: body
+      regex:
+        - 'generator" content="Ghost ([0-9]+(?:\.[0-9]+)*)'
+      group: 1
