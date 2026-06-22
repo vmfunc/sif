@@ -1,0 +1,39 @@
+# Kafka Connect API Exposure Detection Module
+
+id: kafka-connect-api-exposure
+info:
+  name: Kafka Connect API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Kafka Connect rest api reachable without authentication
+  tags: [kafka, connect, streaming, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"kafka_cluster_id\""
+
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+
+  extractors:
+    - type: regex
+      name: kafka_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

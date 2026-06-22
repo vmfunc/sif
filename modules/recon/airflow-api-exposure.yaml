@@ -1,0 +1,39 @@
+# Apache Airflow API Exposure Detection Module
+
+id: airflow-api-exposure
+info:
+  name: Apache Airflow API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Apache Airflow webserver through its unauthenticated health endpoint
+  tags: [airflow, apache, pipeline, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/health"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"metadatabase\""
+
+    - type: word
+      part: body
+      words:
+        - "\"scheduler\""
+
+  extractors:
+    - type: regex
+      name: airflow_scheduler_heartbeat
+      part: body
+      regex:
+        - '"latest_scheduler_heartbeat"\s*:\s*"([^"]+)"'
+      group: 1
