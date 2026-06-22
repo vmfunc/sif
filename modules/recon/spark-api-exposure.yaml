@@ -1,0 +1,39 @@
+# Apache Spark Master API Exposure Detection Module
+
+id: spark-api-exposure
+info:
+  name: Apache Spark Master API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Apache Spark master that leaks its cluster workers and applications
+  tags: [spark, apache, cluster, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/json/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"url"\s*:\s*"spark://'
+
+    - type: word
+      part: body
+      words:
+        - "\"aliveworkers\""
+
+  extractors:
+    - type: regex
+      name: spark_master_url
+      part: body
+      regex:
+        - '"url"\s*:\s*"(spark://[^"]+)"'
+      group: 1
