@@ -1,0 +1,39 @@
+# NATS Monitoring API Exposure Detection Module
+
+id: nats-api-exposure
+info:
+  name: NATS Monitoring API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed NATS monitoring endpoint that leaks the server topology
+  tags: [nats, messaging, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/varz"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"server_id\""
+
+    - type: word
+      part: body
+      words:
+        - "\"max_payload\""
+
+  extractors:
+    - type: regex
+      name: nats_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
