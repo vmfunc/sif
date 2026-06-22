@@ -79,6 +79,9 @@ var metaRefreshRe = regexp.MustCompile(`(?i)<meta[^>]+http-equiv=["']?refresh["'
 // client-side redirects baked into a script body
 var jsRedirectRe = regexp.MustCompile(`(?i)(?:location\.(?:href|replace|assign)\s*(?:=|\()|window\.location\s*=)\s*["']([^"']+)["']`)
 
+// a leading http(s) scheme and its authority slashes, however few.
+var schemeSlashesRe = regexp.MustCompile(`(?i)^(https?):/*`)
+
 // Redirect probes the target's redirect-prone params for open-redirect.
 func Redirect(targetURL string, timeout time.Duration, threads int, logdir string) (*RedirectResult, error) {
 	log := output.Module("REDIRECT")
@@ -273,6 +276,9 @@ func pointsAtSentinel(location string) bool {
 
 	// browsers treat backslashes in the authority as forward slashes
 	normalized := strings.ReplaceAll(location, "\\", "/")
+
+	// "https:/host" still navigates off-site; normalise the slashes so it parses.
+	normalized = schemeSlashesRe.ReplaceAllString(normalized, "$1://")
 
 	parsed, err := url.Parse(normalized)
 	if err != nil {
