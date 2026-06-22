@@ -1,0 +1,42 @@
+# Jolokia API Exposure Detection Module
+
+id: jolokia-api-exposure
+info:
+  name: Jolokia API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Jolokia agent that bridges http to jmx for remote management
+  tags: [jolokia, jmx, java, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/jolokia/version"
+    - "{{BaseURL}}/actuator/jolokia/version"
+    - "{{BaseURL}}/api/jolokia/version"
+    - "{{BaseURL}}/hawtio/jolokia/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"agent\""
+
+    - type: word
+      part: body
+      words:
+        - "\"protocol\""
+
+  extractors:
+    - type: regex
+      name: jolokia_agent_version
+      part: body
+      regex:
+        - '"agent"\s*:\s*"([^"]+)"'
+      group: 1

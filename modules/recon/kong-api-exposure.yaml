@@ -1,0 +1,39 @@
+# Kong Admin API Exposure Detection Module
+
+id: kong-api-exposure
+info:
+  name: Kong Admin API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Kong admin api that grants full control of the gateway
+  tags: [kong, gateway, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"available_on_server\""
+
+    - type: word
+      part: body
+      words:
+        - "\"admin_listen\""
+
+  extractors:
+    - type: regex
+      name: kong_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
