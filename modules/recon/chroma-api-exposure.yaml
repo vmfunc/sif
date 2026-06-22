@@ -1,0 +1,27 @@
+# Chroma Heartbeat API Exposure Detection Module
+
+id: chroma-api-exposure
+info:
+  name: Chroma Heartbeat API Exposure
+  author: sif
+  severity: medium
+  description: Detects a reachable Chroma vector database by its unauthenticated heartbeat api
+  tags: [chroma, vector, database, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1/heartbeat"
+    - "{{BaseURL}}/api/v2/heartbeat"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"nanosecond heartbeat\""
