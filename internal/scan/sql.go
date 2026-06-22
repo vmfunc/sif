@@ -280,10 +280,10 @@ func isAdminPanel(body string, panelType string) bool {
 	case "phpRedisAdmin":
 		return strings.Contains(bodyLower, "phpredisadmin")
 	default:
-		// for generic database interfaces, check for common keywords
+		// generic db paths have no product marker, so match db keywords. "query"
+		// is dropped: it is a substring of jQuery/querySelector (on every js page).
 		return strings.Contains(bodyLower, "database") ||
 			strings.Contains(bodyLower, "sql") ||
-			strings.Contains(bodyLower, "query") ||
 			strings.Contains(bodyLower, "mysql") ||
 			strings.Contains(bodyLower, "postgresql") ||
 			strings.Contains(bodyLower, "mongodb")
