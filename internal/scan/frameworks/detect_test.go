@@ -568,6 +568,85 @@ func TestDetectFramework_Astro(t *testing.T) {
 	}
 }
 
+func TestDetectFramework_Ghost(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<meta name="generator" content="Ghost 6.46">
+			</head>
+			<body>Content</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "Ghost" {
+		t.Errorf("expected framework 'Ghost', got '%s'", result.Name)
+	}
+}
+
+// ghost-button is a common generic CSS class and must not read as Ghost CMS.
+func TestDetectFramework_GhostButtonNoMatch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<body>
+				<a class="ghost-button" href="/signup">Sign up</a>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "Ghost" {
+		t.Errorf("expected no Ghost detection for a ghost-button page, got confidence %.2f", result.Confidence)
+	}
+}
+
+// the /ghost/api/ path is the only Ghost marker left for pages without the
+// generator meta, so guard that it still detects on its own.
+func TestDetectFramework_GhostAPIPath(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<body>
+				<script src="/ghost/api/content/posts/?key=abc"></script>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "Ghost" {
+		t.Errorf("expected framework 'Ghost', got '%s'", result.Name)
+	}
+}
+
 func TestExtractVersion_Astro(t *testing.T) {
 	tests := []struct {
 		body     string

@@ -173,7 +173,7 @@ func (d *ghostDetector) Name() string { return "Ghost" }
 
 func (d *ghostDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "ghost-", Weight: 0.4},
+		{Pattern: `<meta name="generator" content="Ghost`, Weight: 0.4},
 		{Pattern: "Ghost", Weight: 0.3, HeaderOnly: true},
 		{Pattern: "/ghost/api/", Weight: 0.4},
 	}
