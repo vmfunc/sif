@@ -151,7 +151,9 @@ func gradeSecurityHeaders(header http.Header, https bool) SecurityHeaderResults 
 func hstsMaxAge(value string) int {
 	for _, part := range strings.Split(value, ";") {
 		if age, ok := strings.CutPrefix(strings.ToLower(strings.TrimSpace(part)), "max-age="); ok {
-			n, err := strconv.Atoi(strings.TrimSpace(age))
+			// rfc 6797 allows a quoted-string value
+			age = strings.Trim(strings.TrimSpace(age), `"`)
+			n, err := strconv.Atoi(age)
 			if err != nil {
 				return 0
 			}

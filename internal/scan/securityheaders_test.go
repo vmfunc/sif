@@ -110,6 +110,28 @@ func TestGradeSecurityHeaders_WeakHSTS(t *testing.T) {
 	}
 }
 
+func TestGradeSecurityHeaders_QuotedHSTS(t *testing.T) {
+	// rfc 6797 allows a quoted value; strip the quotes before grading
+	tests := []struct {
+		name    string
+		value   string
+		flagged bool
+	}{
+		{"quoted strong", `max-age="63072000"; includeSubDomains`, false},
+		{"quoted weak still flagged", `max-age="0"`, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := buildHeader(map[string]string{"Strict-Transport-Security": tt.value})
+			_, flagged := findFinding(gradeSecurityHeaders(h, true), "Strict-Transport-Security")
+			if flagged != tt.flagged {
+				t.Errorf("value %q flagged=%v, want %v", tt.value, flagged, tt.flagged)
+			}
+		})
+	}
+}
+
 func TestGradeSecurityHeaders_Disclosure(t *testing.T) {
 	h := buildHeader(map[string]string{
 		"Server":       "Apache/2.4.1 (Ubuntu)",
