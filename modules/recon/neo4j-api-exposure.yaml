@@ -1,0 +1,39 @@
+# Neo4j API Exposure Detection Module
+
+id: neo4j-api-exposure
+info:
+  name: Neo4j API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Neo4j instance through its unauthenticated discovery endpoint
+  tags: [neo4j, database, graph, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"neo4j_version\""
+
+    - type: word
+      part: body
+      words:
+        - "\"neo4j_edition\""
+
+  extractors:
+    - type: regex
+      name: neo4j_version
+      part: body
+      regex:
+        - '"neo4j_version"\s*:\s*"([^"]+)"'
+      group: 1
