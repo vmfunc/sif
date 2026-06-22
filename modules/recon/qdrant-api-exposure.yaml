@@ -1,0 +1,39 @@
+# Qdrant Collections API Exposure Detection Module
+
+id: qdrant-api-exposure
+info:
+  name: Qdrant Collections API Exposure
+  author: sif
+  severity: high
+  description: Detects a Qdrant vector database serving its collections without an api key
+  tags: [qdrant, vector, database, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/collections"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"result"\s*:\s*\{\s*"collections"'
+
+    - type: regex
+      part: body
+      regex:
+        - '"status"\s*:\s*"ok"'
+
+  extractors:
+    - type: regex
+      name: qdrant_collection
+      part: body
+      regex:
+        - '"collections"\s*:\s*\[\s*\{[^}]*?"name"\s*:\s*"([^"]+)"'
+      group: 1

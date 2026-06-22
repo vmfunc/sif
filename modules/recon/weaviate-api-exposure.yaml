@@ -1,0 +1,39 @@
+# Weaviate Metadata API Exposure Detection Module
+
+id: weaviate-api-exposure
+info:
+  name: Weaviate Metadata API Exposure
+  author: sif
+  severity: medium
+  description: Detects a Weaviate vector database that leaks its host address and version over the meta api
+  tags: [weaviate, vector, database, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v1/meta"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"hostname"\s*:\s*"https?://'
+
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+
+  extractors:
+    - type: regex
+      name: weaviate_hostname
+      part: body
+      regex:
+        - '"hostname"\s*:\s*"([^"]+)"'
+      group: 1
