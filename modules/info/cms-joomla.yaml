@@ -1,0 +1,36 @@
+# Joomla CMS Detection Module
+
+id: cms-joomla
+info:
+  name: Joomla Detection
+  author: sif
+  severity: info
+  description: Detects Joomla CMS installations
+  tags: [cms, joomla, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+    - "{{BaseURL}}/administrator/"
+
+  matchers:
+    - type: word
+      part: all
+      words:
+        - 'generator" content="Joomla!'
+        - "/media/system/js/core.js"
+        - "/media/jui/"
+        - "joomla-script-options"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: joomla_version
+      part: all
+      regex:
+        - 'Joomla! ([0-9]+(?:\.[0-9]+)*) - Open Source'
+        - 'X-Content-Encoded-By: Joomla! ([0-9]+(?:\.[0-9]+)*)'
+      group: 1
