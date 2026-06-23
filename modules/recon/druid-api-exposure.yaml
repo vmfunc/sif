@@ -1,0 +1,39 @@
+# Apache Druid API Exposure Detection Module
+
+id: druid-api-exposure
+info:
+  name: Apache Druid API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Apache Druid process that runs without authentication
+  tags: [druid, apache, database, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/status"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "org.apache.druid"
+
+    - type: word
+      part: body
+      words:
+        - "\"memory\""
+
+  extractors:
+    - type: regex
+      name: druid_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

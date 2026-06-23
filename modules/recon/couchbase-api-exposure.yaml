@@ -1,0 +1,39 @@
+# Couchbase Cluster API Exposure Detection Module
+
+id: couchbase-api-exposure
+info:
+  name: Couchbase Cluster API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Couchbase cluster management api that leaks the build and topology
+  tags: [couchbase, database, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/pools"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"implementationVersion\""
+
+    - type: word
+      part: body
+      words:
+        - "\"componentsVersion\""
+
+  extractors:
+    - type: regex
+      name: couchbase_version
+      part: body
+      regex:
+        - '"implementationVersion"\s*:\s*"([^"]+)"'
+      group: 1
