@@ -1,0 +1,50 @@
+# Maven settings.xml Credential Exposure Detection Module
+
+id: maven-settings-exposure
+info:
+  name: Maven settings.xml Credential Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed maven settings.xml that leaks server credentials in cleartext
+  tags: [maven, settings, credentials, secrets, recon, exposure]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.m2/settings.xml"
+    - "{{BaseURL}}/settings.xml"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "<settings"
+        - "<servers>"
+
+    - type: word
+      part: body
+      words:
+        - "<password>"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<html"
+
+  extractors:
+    - type: regex
+      name: maven_username
+      part: body
+      regex:
+        - '<username>([^<]+)</username>'
+      group: 1
