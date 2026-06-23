@@ -142,7 +142,7 @@ func TestCheckMatcherFaviconNegative(t *testing.T) {
 	signed := int64(fingerprint.FaviconHash(faviconFixture))
 	matchers := []Matcher{{Type: "favicon", Hash: []int64{signed}, Negative: true}}
 	resp := fakeResponse(t, 200, nil)
-	if checkMatchers(matchers, resp, string(faviconFixture)) {
+	if checkMatchers(matchers, "", resp, string(faviconFixture)) {
 		t.Error("negative favicon matcher should not match its own hash")
 	}
 }
