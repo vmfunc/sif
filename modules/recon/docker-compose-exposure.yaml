@@ -1,0 +1,56 @@
+# Docker Compose Exposure Detection Module
+
+id: docker-compose-exposure
+info:
+  name: Docker Compose Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed docker compose file that leaks service topology and image versions
+  tags: [docker, compose, container, info-disclosure, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/docker-compose.yml"
+    - "{{BaseURL}}/docker-compose.yaml"
+    - "{{BaseURL}}/docker-compose.prod.yml"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "services:"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "image:"
+        - "container_name:"
+        - "build:"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: compose_image
+      part: body
+      regex:
+        - 'image:\s*["'']?([^\s"'']+)'
+      group: 1
