@@ -1,0 +1,44 @@
+# Vault API Exposure Detection Module
+
+id: vault-api-exposure
+info:
+  name: Vault API Exposure
+  author: sif
+  severity: medium
+  description: Detects an internet reachable HashiCorp Vault through its unauthenticated status api
+  tags: [vault, hashicorp, secrets, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v1/sys/seal-status"
+    - "{{BaseURL}}/v1/sys/health"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"sealed\""
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "\"initialized\""
+        - "\"cluster_name\""
+        - "\"recovery_seal\""
+        - "\"storage_type\""
+
+  extractors:
+    - type: regex
+      name: vault_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([0-9]+\.[0-9]+\.[0-9]+)"'
+      group: 1
