@@ -1,0 +1,41 @@
+# Kibana Login Panel Detection Module
+
+id: kibana-panel
+info:
+  name: Kibana Login Panel
+  author: sif
+  severity: info
+  description: Detects exposed Kibana dashboards and login panels
+  tags: [kibana, elastic, monitoring, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+    - "{{BaseURL}}/login"
+    - "{{BaseURL}}/app/kibana"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: all
+      condition: or
+      words:
+        - "Kbn-Version"
+        - "Kbn-Name"
+        - "kbn-injected-metadata"
+        - "kbnLoadingMessage"
+
+  extractors:
+    - type: regex
+      name: kibana_version
+      part: all
+      regex:
+        - '[Kk]bn-[Vv]ersion: ?([0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+        - '"version":"([0-9]+\.[0-9]+\.[0-9]+)","buildNumber"'
+      group: 1

@@ -1,0 +1,40 @@
+# Grafana Login Panel Detection Module
+
+id: grafana-panel
+info:
+  name: Grafana Login Panel
+  author: sif
+  severity: info
+  description: Detects exposed Grafana dashboards and login panels
+  tags: [grafana, monitoring, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/login"
+    - "{{BaseURL}}"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: all
+      condition: or
+      words:
+        - "window.grafanaBootData"
+        - 'grafana-app'
+        - "<title>Grafana</title>"
+        - "grafana_session"
+
+  extractors:
+    - type: regex
+      name: grafana_version
+      part: body
+      regex:
+        - '"buildInfo":\{[^}]*"version":"([0-9]+\.[0-9]+\.[0-9]+)"'
+        - 'Grafana v([0-9]+\.[0-9]+\.[0-9]+)'
+      group: 1
