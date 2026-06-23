@@ -50,8 +50,9 @@ const dirlistBodyCap = 512 * 1024
 // cannot exist, then treat any response shape they share as the wildcard
 // baseline. deterministic (no rng) so the workflow stays reproducible.
 const (
-	calibrationProbes = 3
-	calibrationPrefix = "/sif-cal-"
+	calibrationProbes  = 3
+	calibrationPrefix  = "/sif-cal-"
+	calibrationPadStep = 8 // per-probe suffix growth; see calibrationSuffix
 )
 
 // statusNotFound / statusForbidden are the historical default "not interesting"
@@ -88,6 +89,20 @@ type responseMeta struct {
 	status int
 	size   int
 	words  int
+}
+
+// anySize, as a baseline size, marks a catch-all whose body size is unreliable (it
+// reflects the request path), so the baseline matches on status and word count alone.
+const anySize = -1
+
+// matchesBaseline reports whether meta looks like the calibrated soft-404 shape b.
+// a normal baseline compares status, size and words exactly; a reflecting catch-all
+// (b.size == anySize) compares status and words only, since its size is not stable.
+func (b responseMeta) matchesBaseline(meta responseMeta) bool {
+	if b.status != meta.status || b.words != meta.words {
+		return false
+	}
+	return b.size == anySize || b.size == meta.size
 }
 
 // matcher decides whether a response is "interesting" using the same precedence
@@ -154,13 +169,10 @@ func newMatcher(opts *DirlistOptions) (*matcher, error) {
 // over matches: a calibrated baseline, an -fc/-fs/-fw hit, or an -fr body match
 // always drops the response; otherwise the -mc set (when set) gates it.
 func (m *matcher) Matches(meta responseMeta, body []byte) bool {
-	// a calibrated soft-404 shape is the same response the catch-all hands every
-	// bogus path, so drop anything that matches a baseline exactly.
-	for i := 0; i < len(m.baselines); i++ {
-		b := m.baselines[i]
-		if b.status == meta.status && b.size == meta.size && b.words == meta.words {
-			return false
-		}
+	// a calibrated soft-404 shape is the response the catch-all hands every bogus
+	// path, so drop anything matching a baseline.
+	if containsBaseline(m.baselines, meta) {
+		return false
 	}
 
 	if _, drop := m.filterCodes[meta.status]; drop {
@@ -342,11 +354,18 @@ func scanLines(r io.Reader) ([]string, error) {
 
 // calibrate probes a few paths that cannot exist and records the response shapes
 // the catch-all hands them. those baselines feed the matcher so a soft-404 200
-// (the SPA wildcard) is suppressed before the real run. deterministic by design:
-// the probe paths come from the loop index, never a random source.
+// (the SPA wildcard) is suppressed before the real run.
 func calibrate(m *matcher, baseURL string, client *http.Client) {
+	m.baselines = baselinesFromProbes(probeCalibration(baseURL, client))
+}
+
+// probeCalibration requests calibrationProbes bogus paths and returns their soft
+// (non-hard-404) response shapes. paths grow in length (see calibrationSuffix) so a
+// path-reflecting catch-all is detectable. deterministic: paths come from the index.
+func probeCalibration(baseURL string, client *http.Client) []responseMeta {
+	probes := make([]responseMeta, 0, calibrationProbes)
 	for i := 0; i < calibrationProbes; i++ {
-		probe := baseURL + calibrationPrefix + strconv.Itoa(i)
+		probe := baseURL + calibrationPrefix + calibrationSuffix(i)
 		req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, probe, http.NoBody)
 		if err != nil {
 			charmlog.Debugf("dirlist: build calibration request: %v", err)
@@ -365,17 +384,51 @@ func calibrate(m *matcher, baseURL string, client *http.Client) {
 		if meta.status == statusNotFound {
 			continue
 		}
-		if !containsBaseline(m.baselines, meta) {
-			m.baselines = append(m.baselines, meta)
-		}
+		probes = append(probes, meta)
 	}
+	return probes
 }
 
-// containsBaseline reports whether the shape is already recorded, so repeated
-// probes returning the same soft-404 don't bloat the baseline set.
+// calibrationSuffix returns the i-th probe suffix. each suffix is unique and longer
+// than the last, so a path-reflecting catch-all returns a different size per probe.
+func calibrationSuffix(i int) string {
+	return strconv.Itoa(i) + strings.Repeat("a", i*calibrationPadStep)
+}
+
+// baselinesFromProbes reduces raw calibration responses to the soft-404 shapes to
+// suppress. probes sharing status/word-count but differing in size are a reflecting
+// catch-all, collapsed to one word-count-tolerant baseline (size anySize); others exact.
+func baselinesFromProbes(probes []responseMeta) []responseMeta {
+	type shapeKey struct{ status, words int }
+	order := make([]shapeKey, 0, len(probes))
+	sizes := make(map[shapeKey]map[int]struct{})
+	for _, p := range probes {
+		k := shapeKey{p.status, p.words}
+		if sizes[k] == nil {
+			sizes[k] = make(map[int]struct{})
+			order = append(order, k)
+		}
+		sizes[k][p.size] = struct{}{}
+	}
+
+	baselines := make([]responseMeta, 0, len(order))
+	for _, k := range order {
+		size := anySize
+		if len(sizes[k]) == 1 {
+			// one stable size for this status/words: keep exact-shape matching.
+			for s := range sizes[k] {
+				size = s
+			}
+		}
+		baselines = append(baselines, responseMeta{status: k.status, size: size, words: k.words})
+	}
+	return baselines
+}
+
+// containsBaseline reports whether meta matches any calibrated soft-404 baseline.
 func containsBaseline(baselines []responseMeta, meta responseMeta) bool {
 	for i := 0; i < len(baselines); i++ {
-		if baselines[i] == meta {
+		if baselines[i].matchesBaseline(meta) {
 			return true
 		}
 	}
