@@ -381,3 +381,116 @@ func TestScanLinesErrorsOnOverlongLine(t *testing.T) {
 		t.Fatalf("scanLines err = %v, want bufio.ErrTooLong", err)
 	}
 }
+
+// reflectingWildcardApp serves a catch-all whose body echoes the request path, so
+// its size tracks path length; /admin returns a distinct real page.
+func reflectingWildcardApp() *httptest.Server {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("<html><body>admin control panel dashboard credentials</body></html>"))
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/admin" {
+			return
+		}
+		w.Write([]byte("<html><body>page not found: " + r.URL.Path + "</body></html>"))
+	})
+	return httptest.NewServer(mux)
+}
+
+// a reflecting catch-all hands each path a different size, so exact-shape calibration
+// misses it; the varied probe lengths expose it and -ac suppresses the bogus paths.
+func TestDirlist_CalibrationSuppressesReflectingWildcard(t *testing.T) {
+	srv := reflectingWildcardApp()
+	defer srv.Close()
+
+	dir := t.TempDir()
+	wordlist := filepath.Join(dir, "words.txt")
+	if err := os.WriteFile(wordlist, []byte("admin\nnope\nbogus\nmissing\n"), 0o600); err != nil {
+		t.Fatalf("write wordlist: %v", err)
+	}
+
+	results, err := Dirlist("small", srv.URL, 5*time.Second, 3, "", DirlistOptions{
+		Wordlist:  wordlist,
+		Calibrate: true,
+	})
+	if err != nil {
+		t.Fatalf("Dirlist (-ac): %v", err)
+	}
+
+	got := pathSet(results)
+	if !has(got, "/admin") {
+		t.Errorf("real /admin must still surface, got %v", sortedKeys(got))
+	}
+	for _, bogus := range []string{"/nope", "/bogus", "/missing"} {
+		if has(got, bogus) {
+			t.Errorf("reflecting soft-404 %s should be suppressed by -ac, got %v", bogus, sortedKeys(got))
+		}
+	}
+}
+
+func TestBaselinesFromProbes(t *testing.T) {
+	tests := []struct {
+		name   string
+		probes []responseMeta
+		want   []responseMeta
+	}{
+		{
+			name:   "stable catch-all keeps exact shape",
+			probes: []responseMeta{{status: 200, size: 63, words: 7}, {status: 200, size: 63, words: 7}},
+			want:   []responseMeta{{status: 200, size: 63, words: 7}},
+		},
+		{
+			name:   "reflecting catch-all collapses to words-tolerant",
+			probes: []responseMeta{{status: 200, size: 40, words: 4}, {status: 200, size: 48, words: 4}, {status: 200, size: 56, words: 4}},
+			want:   []responseMeta{{status: 200, size: anySize, words: 4}},
+		},
+		{
+			name:   "distinct shapes kept separately",
+			probes: []responseMeta{{status: 200, size: 40, words: 4}, {status: 301, size: 0, words: 0}},
+			want:   []responseMeta{{status: 200, size: 40, words: 4}, {status: 301, size: 0, words: 0}},
+		},
+		{
+			name:   "no probes yields no baseline",
+			probes: nil,
+			want:   []responseMeta{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := baselinesFromProbes(tt.probes); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("baselinesFromProbes(%v) = %v, want %v", tt.probes, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMatchesBaseline_AnySize(t *testing.T) {
+	tolerant := responseMeta{status: 200, size: anySize, words: 4}
+	if !tolerant.matchesBaseline(responseMeta{status: 200, size: 999, words: 4}) {
+		t.Error("anySize baseline should match any size with the same status/words")
+	}
+	if tolerant.matchesBaseline(responseMeta{status: 200, size: 999, words: 5}) {
+		t.Error("anySize baseline must still discriminate on word count")
+	}
+	exact := responseMeta{status: 200, size: 42, words: 5}
+	if exact.matchesBaseline(responseMeta{status: 200, size: 43, words: 5}) {
+		t.Error("exact baseline should not match a different size")
+	}
+}
+
+func TestCalibrationSuffix_UniqueAndGrowing(t *testing.T) {
+	prev := -1
+	seen := make(map[string]struct{})
+	for i := 0; i < calibrationProbes; i++ {
+		s := calibrationSuffix(i)
+		if _, dup := seen[s]; dup {
+			t.Errorf("suffix %q repeats across probes", s)
+		}
+		seen[s] = struct{}{}
+		if len(s) <= prev {
+			t.Errorf("suffix %d %q length %d not greater than previous %d", i, s, len(s), prev)
+		}
+		prev = len(s)
+	}
+}

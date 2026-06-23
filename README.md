@@ -176,7 +176,7 @@ sif has a modular architecture. modules are defined in yaml and can be extended 
 | `-fs` | dirlist: filter out responses of these body sizes (comma list) |
 | `-fw` | dirlist: filter out responses with these word counts (comma list) |
 | `-fr` | dirlist: filter out responses whose body matches this regex |
-| `-ac` | dirlist: auto-calibrate the soft-404 wildcard baseline |
+| `-ac` | auto-calibrate the soft-404 wildcard baseline (dirlist, sql) |
 | `-w` | dirlist: custom wordlist (local file or url; overrides `-dirlist` size) |
 | `-e` | dirlist: extensions appended to each word (comma list, e.g. php,bak,env) |
 | `-dnslist` | subdomain enumeration (small/medium/large) |

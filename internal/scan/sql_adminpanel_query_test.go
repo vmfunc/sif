@@ -111,7 +111,7 @@ func TestSQL_JQueryCatchAllNotReported(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	result, err := SQL(srv.URL, 5*time.Second, 4, "")
+	result, err := SQL(srv.URL, 5*time.Second, 4, "", false)
 	if err != nil {
 		t.Fatalf("SQL: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestSQL_RealPhpMyAdminReported(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	result, err := SQL(srv.URL, 5*time.Second, 4, "")
+	result, err := SQL(srv.URL, 5*time.Second, 4, "", false)
 	if err != nil {
 		t.Fatalf("SQL: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestSQL_RealGenericPanelReported(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	result, err := SQL(srv.URL, 5*time.Second, 4, "")
+	result, err := SQL(srv.URL, 5*time.Second, 4, "", false)
 	if err != nil {
 		t.Fatalf("SQL: %v", err)
 	}

@@ -27,7 +27,7 @@ type Settings struct {
 	DirFilterSizes    string // -fs dirlist: body sizes to drop
 	DirFilterWords    string // -fw dirlist: word counts to drop
 	DirFilterRegex    string // -fr dirlist: regex; body match drops response
-	DirCalibrate      bool   // -ac dirlist: auto-calibrate soft-404 baseline
+	Calibrate         bool   // -ac auto-calibrate the soft-404 baseline (dirlist, sql)
 	DirWordlist       string // -w  dirlist: custom wordlist (file path or url)
 	DirExtensions     string // -e  dirlist: extensions appended to each word
 	Dnslist           string
@@ -131,7 +131,7 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 		flagSet.StringVar(&settings.DirFilterSizes, "fs", "", "Dirlist: filter out responses of these body sizes (comma list)"),
 		flagSet.StringVar(&settings.DirFilterWords, "fw", "", "Dirlist: filter out responses with these word counts (comma list)"),
 		flagSet.StringVar(&settings.DirFilterRegex, "fr", "", "Dirlist: filter out responses whose body matches this regex"),
-		flagSet.BoolVar(&settings.DirCalibrate, "ac", false, "Dirlist: auto-calibrate the soft-404 wildcard baseline"),
+		flagSet.BoolVar(&settings.Calibrate, "ac", false, "Auto-calibrate the soft-404 wildcard baseline (dirlist, sql)"),
 		flagSet.StringVar(&settings.DirWordlist, "w", "", "Dirlist: custom wordlist (local file path or url; overrides -dirlist size)"),
 		flagSet.StringVar(&settings.DirExtensions, "e", "", "Dirlist: extensions appended to each word (comma list, e.g. php,bak,env)"),
 		flagSet.EnumVar(&settings.Dnslist, "dnslist", Nil, "DNS fuzzing scan size (small/medium/large)", listSizes),
