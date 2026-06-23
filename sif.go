@@ -639,6 +639,16 @@ func (app *App) Run() error {
 					}
 				}
 
+				seen := make(map[string]bool, len(toRun))
+				deduped := make([]modules.Module, 0, len(toRun))
+				for _, m := range toRun {
+					if id := m.Info().ID; !seen[id] {
+						seen[id] = true
+						deduped = append(deduped, m)
+					}
+				}
+				toRun = deduped
+
 				// Execute modules
 				opts := modules.Options{
 					Timeout: app.settings.Timeout,
