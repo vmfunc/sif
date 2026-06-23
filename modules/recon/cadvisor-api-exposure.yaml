@@ -1,0 +1,39 @@
+# cAdvisor API Exposure Detection Module
+
+id: cadvisor-api-exposure
+info:
+  name: cAdvisor API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed cAdvisor container monitor through its unauthenticated machine endpoint
+  tags: [cadvisor, container, monitoring, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1.3/machine"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"machine_id\""
+
+    - type: word
+      part: body
+      words:
+        - "\"cpu_frequency_khz\""
+
+  extractors:
+    - type: regex
+      name: cadvisor_machine_id
+      part: body
+      regex:
+        - '"machine_id"\s*:\s*"([^"]+)"'
+      group: 1
