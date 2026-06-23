@@ -1,0 +1,44 @@
+# GraphQL Introspection Detection Module
+
+id: graphql-introspection
+info:
+  name: GraphQL Introspection Enabled
+  author: sif
+  severity: low
+  description: Detects GraphQL endpoints with introspection enabled
+  tags: [graphql, introspection, exposure, info]
+
+type: http
+
+http:
+  method: POST
+  paths:
+    - "{{BaseURL}}"
+    - "{{BaseURL}}/graphql"
+    - "{{BaseURL}}/api/graphql"
+    - "{{BaseURL}}/graphql/v1"
+    - "{{BaseURL}}/v1/graphql"
+    - "{{BaseURL}}/query"
+    - "{{BaseURL}}/gql"
+
+  headers:
+    Content-Type: application/json
+    Accept: application/json
+
+  body: '{"query":"{__schema{queryType{name}}}"}'
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"__schema"\s*:\s*\{'
+        - '"queryType"\s*:\s*\{'
+      condition: and
+
+  extractors:
+    - type: regex
+      name: query_type
+      part: body
+      regex:
+        - '"queryType"\s*:\s*\{\s*"name"\s*:\s*"([^"]+)"'
+      group: 1
