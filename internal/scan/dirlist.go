@@ -303,7 +303,11 @@ func fetchWordlist(listURL string, client *http.Client) ([]string, error) {
 		return nil, fmt.Errorf("download wordlist %q: %w", listURL, err)
 	}
 	defer resp.Body.Close()
-	return scanLines(resp.Body), nil
+	lines, err := scanLines(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("download wordlist %q: %w", listURL, err)
+	}
+	return lines, nil
 }
 
 // readWordlistFile loads a local wordlist file.
@@ -313,11 +317,15 @@ func readWordlistFile(path string) ([]string, error) {
 		return nil, fmt.Errorf("open wordlist %q: %w", path, err)
 	}
 	defer f.Close()
-	return scanLines(f), nil
+	lines, err := scanLines(f)
+	if err != nil {
+		return nil, fmt.Errorf("read wordlist %q: %w", path, err)
+	}
+	return lines, nil
 }
 
 // scanLines reads non-empty lines into a slice.
-func scanLines(r io.Reader) []string {
+func scanLines(r io.Reader) ([]string, error) {
 	var lines []string
 	scanner := bufio.NewScanner(r)
 	scanner.Split(bufio.ScanLines)
@@ -327,7 +335,9 @@ func scanLines(r io.Reader) []string {
 			lines = append(lines, line)
 		}
 	}
-	return lines
+	// a line past bufio's 64k cap halts the scan; surface it instead of
+	// silently dropping that line and everything after it.
+	return lines, scanner.Err()
 }
 
 // calibrate probes a few paths that cannot exist and records the response shapes
