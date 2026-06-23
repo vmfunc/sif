@@ -1,0 +1,39 @@
+# Apache Flink API Exposure Detection Module
+
+id: flink-api-exposure
+info:
+  name: Apache Flink API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Apache Flink dashboard reachable without authentication
+  tags: [flink, apache, cluster, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/overview"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"flink-version\""
+
+    - type: word
+      part: body
+      words:
+        - "\"slots-total\""
+
+  extractors:
+    - type: regex
+      name: flink_version
+      part: body
+      regex:
+        - '"flink-version"\s*:\s*"([^"]+)"'
+      group: 1
