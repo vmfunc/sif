@@ -13,7 +13,6 @@
 package js
 
 import (
-	"bufio"
 	"context"
 	"io"
 	"net/http"
@@ -64,6 +63,10 @@ func (r *JavascriptScanResult) SupabaseFindings() []SupabaseFinding {
 	return out
 }
 
+// maxHTMLBodySize caps how much of a page we read for script extraction so a
+// huge or hostile response cannot exhaust memory.
+const maxHTMLBodySize = 5 * 1024 * 1024
+
 func JavascriptScan(url string, timeout time.Duration, threads int, logdir string) (*JavascriptScanResult, error) {
 	log := output.Module("JS")
 	log.Start()
@@ -90,15 +93,7 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 	}
 	defer resp.Body.Close()
 
-	var sb strings.Builder
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		sb.WriteString(scanner.Text())
-	}
-	html := sb.String()
-
-	doc, err := htmlquery.Parse(strings.NewReader(html))
+	doc, err := htmlquery.Parse(io.LimitReader(resp.Body, maxHTMLBodySize))
 	if err != nil {
 		return nil, err
 	}

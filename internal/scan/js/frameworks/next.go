@@ -23,9 +23,9 @@
 package frameworks
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -36,6 +36,10 @@ import (
 
 // nextPagesRegex matches JavaScript file references in Next.js build manifest.
 var nextPagesRegex = regexp.MustCompile(`\[("([^"]+\.js)"(,?))`)
+
+// maxManifestSize caps the build manifest read so a huge or hostile file
+// cannot exhaust memory.
+const maxManifestSize = 5 * 1024 * 1024
 
 func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
 	baseUrl, err := urlutil.Parse(scriptUrl)
@@ -58,13 +62,14 @@ func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	var sb strings.Builder
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		sb.WriteString(scanner.Text())
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestSize))
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
 	}
-	manifestText := sb.String()
+	// the manifest ships minified on one line; strip line breaks so the regex
+	// treats a (rare) pretty-printed one the same as the minified form.
+	manifestText := strings.NewReplacer("\r", "", "\n", "").Replace(string(body))
 
 	list := nextPagesRegex.FindAllStringSubmatch(manifestText, -1)
 
