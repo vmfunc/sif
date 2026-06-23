@@ -1090,3 +1090,49 @@ func TestDetectFramework_SpringBootFalsePositive(t *testing.T) {
 		t.Errorf("expected no Spring Boot match for prose mentioning it, got %.2f confidence", result.Confidence)
 	}
 }
+
+func TestDetectFramework_CodeIgniter(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Set-Cookie", "ci_session=a1b2c3d4e5; path=/; HttpOnly")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body><h1>My Shop</h1></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "CodeIgniter" {
+		t.Errorf("expected framework 'CodeIgniter', got '%s'", result.Name)
+	}
+}
+
+func TestDetectFramework_CodeIgniterFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<body>
+				<h1>Best PHP frameworks in 2026</h1>
+				<p>Laravel and codeigniter both ship a router and an ORM.</p>
+				<a href="https://codeigniter.com">codeigniter.com</a>
+				<pre>composer create-project codeigniter4/appstarter</pre>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "CodeIgniter" {
+		t.Errorf("expected no CodeIgniter match for prose mentioning it, got %.2f confidence", result.Confidence)
+	}
+}

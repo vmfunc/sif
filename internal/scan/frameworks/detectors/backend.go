@@ -468,7 +468,6 @@ func (d *codeigniterDetector) Name() string { return "CodeIgniter" }
 
 func (d *codeigniterDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "codeigniter", Weight: 0.4},
 		{Pattern: "ci_session", Weight: 0.4, HeaderOnly: true},
 	}
 }
