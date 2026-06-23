@@ -86,12 +86,13 @@ type Finding struct {
 // Matcher defines matching logic for module responses.
 // Matchers are used to determine if a response indicates a vulnerability.
 type Matcher struct {
-	Type      string   `yaml:"type"` // regex, status, word, size
+	Type      string   `yaml:"type"` // regex, status, word, favicon
 	Part      string   `yaml:"part"` // body, header, all
 	Regex     []string `yaml:"regex,omitempty"`
 	Words     []string `yaml:"words,omitempty"`
 	Status    []int    `yaml:"status,omitempty"`
 	Size      []int    `yaml:"size,omitempty"`
+	Hash      []int64  `yaml:"hash,omitempty"` // favicon: shodan mmh3 hashes (signed or unsigned)
 	Condition string   `yaml:"condition"` // and, or
 	Negative  bool     `yaml:"negative"`
 }
