@@ -657,6 +657,24 @@ func (app *App) Run() error {
 				}
 
 				for _, m := range toRun {
+					switch m.Info().ID {
+					case "nuclei-scan":
+						if app.settings.Nuclei {
+							continue
+						}
+					case "framework-detection":
+						if app.settings.Framework {
+							continue
+						}
+					case "shodan-lookup":
+						if app.settings.Shodan {
+							continue
+						}
+					case "whois-lookup":
+						if app.settings.Whois {
+							continue
+						}
+					}
 					modLog := output.Module(m.Info().ID)
 					modLog.Start()
 					result, err := m.Execute(context.Background(), url, opts)
