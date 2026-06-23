@@ -55,6 +55,7 @@ type YAMLModuleInfo struct {
 type HTTPConfig struct {
 	Method            string            `yaml:"method"`
 	Paths             []string          `yaml:"paths"`
+	Wordlist          string            `yaml:"wordlist,omitempty"`
 	Payloads          []string          `yaml:"payloads,omitempty"`
 	Headers           map[string]string `yaml:"headers,omitempty"`
 	Body              string            `yaml:"body,omitempty"`

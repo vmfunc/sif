@@ -13,11 +13,13 @@
 package modules
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -71,7 +73,10 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 	}
 
 	// Generate requests based on paths and payloads
-	requests := generateHTTPRequests(target, cfg)
+	requests, err := generateHTTPRequests(target, cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	// Determine thread count
 	threads := cfg.Threads
@@ -125,8 +130,13 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 }
 
 // generateHTTPRequests creates all requests based on paths and payloads.
-func generateHTTPRequests(target string, cfg *HTTPConfig) []*httpRequest {
+func generateHTTPRequests(target string, cfg *HTTPConfig) ([]*httpRequest, error) {
 	var requests []*httpRequest
+
+	paths, err := resolvePaths(cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	// Ensure target has no trailing slash
 	target = strings.TrimSuffix(target, "/")
@@ -138,7 +148,7 @@ func generateHTTPRequests(target string, cfg *HTTPConfig) []*httpRequest {
 
 	// If no payloads, just use paths directly
 	if len(cfg.Payloads) == 0 {
-		for _, path := range cfg.Paths {
+		for _, path := range paths {
 			url := substituteVariables(path, target, "")
 			requests = append(requests, &httpRequest{
 				Method:   method,
@@ -148,29 +158,82 @@ func generateHTTPRequests(target string, cfg *HTTPConfig) []*httpRequest {
 				Original: path,
 			})
 		}
-		return requests
+		return requests, nil
 	}
 
 	// pitchfork pairs path[i] with payload[i] and stops at the shorter list;
 	// clusterbomb (default) crosses every path with every payload.
 	if strings.EqualFold(cfg.Attack, "pitchfork") {
-		n := len(cfg.Paths)
+		n := len(paths)
 		if len(cfg.Payloads) < n {
 			n = len(cfg.Payloads)
 		}
 		for i := 0; i < n; i++ {
-			requests = append(requests, newPayloadRequest(method, target, cfg.Paths[i], cfg.Payloads[i], cfg))
+			requests = append(requests, newPayloadRequest(method, target, paths[i], cfg.Payloads[i], cfg))
 		}
-		return requests
+		return requests, nil
 	}
 
-	for _, path := range cfg.Paths {
+	for _, path := range paths {
 		for _, payload := range cfg.Payloads {
 			requests = append(requests, newPayloadRequest(method, target, path, payload, cfg))
 		}
 	}
 
-	return requests
+	return requests, nil
+}
+
+// resolvePaths expands a wordlist over any {{word}} path templates so one
+// "{{BaseURL}}/{{word}}" path fuzzes the whole list; paths without {{word}}
+// pass through literally. no wordlist leaves cfg.Paths untouched.
+func resolvePaths(cfg *HTTPConfig) ([]string, error) {
+	if cfg.Wordlist == "" {
+		return cfg.Paths, nil
+	}
+
+	words, err := loadWordlist(cfg.Wordlist)
+	if err != nil {
+		return nil, err
+	}
+
+	var paths []string
+	for _, path := range cfg.Paths {
+		if !strings.Contains(path, "{{word}}") && !strings.Contains(path, "{{Word}}") {
+			paths = append(paths, path)
+			continue
+		}
+		for _, word := range words {
+			expanded := strings.ReplaceAll(path, "{{word}}", word)
+			expanded = strings.ReplaceAll(expanded, "{{Word}}", word)
+			paths = append(paths, expanded)
+		}
+	}
+
+	return paths, nil
+}
+
+// loadWordlist reads non-empty lines from a local wordlist file, mirroring the
+// dirlist scanner's scanLines so a converted module fuzzes the identical words.
+func loadWordlist(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open wordlist %q: %w", path, err)
+	}
+	defer f.Close()
+
+	var words []string
+	scanner := bufio.NewScanner(f)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		if line := scanner.Text(); line != "" {
+			words = append(words, line)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("read wordlist %q: %w", path, err)
+	}
+
+	return words, nil
 }
 
 // newPayloadRequest builds one request with the path and body templates

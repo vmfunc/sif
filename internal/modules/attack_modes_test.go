@@ -60,7 +60,11 @@ func TestGenerateHTTPRequestsAttack(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &HTTPConfig{Paths: tt.paths, Payloads: tt.payloads, Attack: tt.attack}
-			got := reqURLs(generateHTTPRequests(target, cfg))
+			reqs, err := generateHTTPRequests(target, cfg)
+			if err != nil {
+				t.Fatalf("generateHTTPRequests: %v", err)
+			}
+			got := reqURLs(reqs)
 			want := append([]string(nil), tt.want...)
 			sort.Strings(want)
 			if !reflect.DeepEqual(got, want) {
