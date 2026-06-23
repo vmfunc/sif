@@ -13,6 +13,7 @@
 package config
 
 import (
+	"os"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -110,9 +111,9 @@ const (
 	Full
 )
 
-func Parse() *Settings {
-	settings := &Settings{}
-
+// registerFlags builds the flag set for the given settings without parsing it,
+// so callers (Parse and tests) can inspect the registered flags.
+func registerFlags(settings *Settings) *goflags.FlagSet {
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription("a blazing-fast pentesting (recon/exploitation) suite")
 
@@ -169,7 +170,7 @@ func Parse() *Settings {
 		flagSet.DurationVarP(&settings.Timeout, "timeout", "t", 10*time.Second, "HTTP request timeout"),
 		flagSet.StringVarP(&settings.LogDir, "log", "l", "", "Directory to store logs in"),
 		flagSet.IntVar(&settings.Threads, "threads", 10, "Number of threads to run scans on"),
-		flagSet.StringVar(&settings.Template, "template", "", "Sif runtime template to use"),
+		flagSet.StringVar(&settings.Template, "template", "", "Load scan settings from a template (preset minimal/recon/full, or a local yaml file)"),
 	)
 
 	flagSet.CreateGroup("http", "HTTP",
@@ -204,8 +205,32 @@ func Parse() *Settings {
 		flagSet.BoolVarP(&settings.ListModules, "list-modules", "lm", false, "List available modules and exit"),
 	)
 
-	if err := flagSet.Parse(); err != nil {
-		log.Fatalf("Could not parse flags: %s", err)
+	return flagSet
+}
+
+func Parse() *Settings {
+	settings := &Settings{}
+	flagSet := registerFlags(settings)
+
+	// -template presets a batch of scans from a yaml file or named preset; point
+	// goflags at it before Parse so it merges as config (cli flags still win) and
+	// replaces the ambient config for this run.
+	templatePath, cleanup, err := templateConfigPath(os.Args[1:])
+	if err != nil {
+		log.Fatalf("Could not load template: %s", err)
+	}
+	if templatePath != "" {
+		flagSet.SetConfigFilePath(templatePath)
+	}
+
+	// Parse merges the template config synchronously, so a temp preset file can
+	// be removed right after, before any fatal exit (no leaking defer).
+	parseErr := flagSet.Parse()
+	if cleanup != nil {
+		cleanup()
+	}
+	if parseErr != nil {
+		log.Fatalf("Could not parse flags: %s", parseErr)
 	}
 
 	// threads feeds wg.Add directly; floor it so 0 isn't a silent no-op and a

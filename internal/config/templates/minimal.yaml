@@ -1,0 +1,4 @@
+# minimal: fast liveness + fingerprint, a handful of benign GETs per target.
+probe: true
+headers: true
+favicon: true

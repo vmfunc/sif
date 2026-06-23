@@ -57,6 +57,12 @@ enable verbose logging:
 ./sif -u https://example.com -d
 ```
 
+### templates
+
+`-template` loads a batch of scan settings from a built-in preset or a local yaml file, so a run does not have to pass every flag. see the [usage guide](usage.md) for the presets and file format. command-line flags still take precedence over the template.
+
+sif also reads an ambient config at `~/.config/sif/config.yaml` (created on first run) keyed by the same flag names. passing `-template` uses that template as the config for the run instead of the ambient file.
+
 ## user modules
 
 place custom modules in:

@@ -378,6 +378,33 @@ enable debug logging:
 ./sif -u https://example.com -d
 ```
 
+### --template
+
+load a batch of scan settings from a template instead of passing each flag. the value is either a built-in preset or a local yaml file keyed by flag long-names:
+
+```bash
+./sif -u https://example.com --template recon
+./sif -u https://example.com --template ./my-scans.yaml
+```
+
+built-in presets:
+
+- `minimal`: liveness and fingerprint only (probe, headers, favicon)
+- `recon`: broad non-intrusive discovery, no attack payloads
+- `full`: every scan except the api-key ones (shodan, securitytrails), including the intrusive probes (xss, sql, lfi, redirect)
+
+`full` sends attack payloads, so only run it against targets you are authorized to test.
+
+a local template lists flag long-names, for example:
+
+```yaml
+cms: true
+dirlist: medium
+threads: 20
+```
+
+flags passed on the command line take precedence over the template, so `--template recon -xss` runs the recon preset with an added xss probe.
+
 ## http options
 
 these apply to every outbound request across all scanners (proxy, custom headers, cookie and rate limiting share one client). a scanner that sets a header explicitly still wins over the global default.
