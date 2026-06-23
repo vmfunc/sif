@@ -241,7 +241,7 @@ func executeHTTPRequest(ctx context.Context, client *http.Client, r *httpRequest
 	bodyStr := string(respBody)
 
 	// Check matchers
-	if !checkMatchers(cfg.Matchers, resp, bodyStr) {
+	if !checkMatchers(cfg.Matchers, cfg.MatchersCondition, resp, bodyStr) {
 		return Finding{}, false
 	}
 
@@ -256,24 +256,38 @@ func executeHTTPRequest(ctx context.Context, client *http.Client, r *httpRequest
 	}, true
 }
 
-// checkMatchers evaluates all matchers against the response.
-func checkMatchers(matchers []Matcher, resp *http.Response, body string) bool {
+// checkMatchers combines matchers with condition "and" (default, all match) or "or" (any).
+func checkMatchers(matchers []Matcher, condition string, resp *http.Response, body string) bool {
 	if len(matchers) == 0 {
 		return false
 	}
 
-	// Default to AND condition across matchers
+	or := strings.EqualFold(condition, "or")
 	for i := range matchers {
 		matched := checkMatcher(&matchers[i], resp, body)
 		if matchers[i].Negative {
 			matched = !matched
 		}
-		if !matched {
-			return false // AND logic
+		if or && matched {
+			return true
+		}
+		if !or && !matched {
+			return false
 		}
 	}
 
-	return true
+	// and: all matched; or: none matched.
+	return !or
+}
+
+// validateMatchersCondition rejects a matchers-condition that is not "", "and", or "or".
+func validateMatchersCondition(condition string) error {
+	switch strings.ToLower(condition) {
+	case "", "and", "or":
+		return nil
+	default:
+		return fmt.Errorf("invalid matchers-condition %q (want \"and\" or \"or\")", condition)
+	}
 }
 
 // checkMatcher evaluates a single matcher.

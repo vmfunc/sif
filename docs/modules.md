@@ -242,6 +242,25 @@ matchers:
 
 this matches responses with status 200 AND containing "ref: refs/".
 
+to require any matcher instead of all, set `matchers-condition: or` on the http
+block; the module then reports a finding when any one matcher matches.
+
+```yaml
+http:
+  matchers-condition: or
+  matchers:
+    - type: status
+      status:
+        - 401
+
+    - type: status
+      status:
+        - 403
+```
+
+this matches a 401 OR a 403 response. `matchers-condition` accepts `and` (the
+default) or `or`; any other value fails at load.
+
 ## extractors
 
 extractors pull data from responses.
