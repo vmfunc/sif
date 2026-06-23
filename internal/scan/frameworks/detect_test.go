@@ -1043,3 +1043,50 @@ func TestDetectFramework_ShopifyFalsePositive(t *testing.T) {
 		t.Errorf("false positive: article mentioning Shopify detected as Shopify (%.2f)", result.Confidence)
 	}
 }
+
+func TestDetectFramework_SpringBoot(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`<html><body><h1>Whitelabel Error Page</h1>` +
+			`<p>This application has no explicit mapping for /error, so you are seeing this as a fallback.</p>` +
+			`<div>There was an unexpected error (type=Internal Server Error, status=500).</div>` +
+			`</body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "Spring Boot" {
+		t.Errorf("expected framework 'Spring Boot', got '%s'", result.Name)
+	}
+}
+
+func TestDetectFramework_SpringBootFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<body>
+				<h1>Getting started with spring-boot</h1>
+				<p>Add spring-boot-starter-web to your pom.xml and run the app.</p>
+				<a href="https://spring.io/projects/spring-boot">spring.io</a>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "Spring Boot" {
+		t.Errorf("expected no Spring Boot match for prose mentioning it, got %.2f confidence", result.Confidence)
+	}
+}

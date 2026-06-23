@@ -251,9 +251,9 @@ func (d *springBootDetector) Name() string { return "Spring Boot" }
 
 func (d *springBootDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "spring-boot", Weight: 0.5},
-		{Pattern: "actuator", Weight: 0.3},
-		{Pattern: "whitelabel", Weight: 0.2},
+		{Pattern: "Whitelabel Error Page", Weight: 0.5},
+		{Pattern: "This application has no explicit mapping for /error", Weight: 0.4},
+		{Pattern: "There was an unexpected error (type=", Weight: 0.3},
 	}
 }
 
