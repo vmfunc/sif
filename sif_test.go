@@ -18,9 +18,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dropalldatabases/sif/internal/config"
-	"github.com/dropalldatabases/sif/internal/finding"
-	"github.com/dropalldatabases/sif/internal/store"
+	"github.com/vmfunc/sif/internal/config"
+	"github.com/vmfunc/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/store"
 )
 
 // TestMain neutralizes the stdin seam for the whole package so tests that build

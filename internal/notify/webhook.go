@@ -16,7 +16,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/dropalldatabases/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/finding"
 )
 
 // webhookProvider posts a structured json payload to an arbitrary endpoint. unlike

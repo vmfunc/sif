@@ -21,15 +21,15 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/dnsx"
-	"github.com/dropalldatabases/sif/internal/httpx"
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/output"
-	"github.com/dropalldatabases/sif/internal/pool"
+	"github.com/vmfunc/sif/internal/dnsx"
+	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/output"
+	"github.com/vmfunc/sif/internal/pool"
 )
 
 // dnsURL is a var so integration tests can repoint it at a fixture.
-var dnsURL = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/dnslist/"
+var dnsURL = "https://raw.githubusercontent.com/vmfunc/sif-runtime/main/dnslist/"
 
 // dnsTransport is a var so integration tests can route the per-host probes at a
 // local server instead of resolving real DNS. nil keeps http.DefaultTransport.

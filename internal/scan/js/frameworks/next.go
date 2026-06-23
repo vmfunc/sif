@@ -30,7 +30,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dropalldatabases/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/httpx"
 	urlutil "github.com/projectdiscovery/utils/url"
 )
 

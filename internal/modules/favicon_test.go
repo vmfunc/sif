@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dropalldatabases/sif/internal/fingerprint"
-	"github.com/dropalldatabases/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/fingerprint"
+	"github.com/vmfunc/sif/internal/httpx"
 )
 
 // faviconFixture hashes to a negative int32, so its signed and unsigned forms

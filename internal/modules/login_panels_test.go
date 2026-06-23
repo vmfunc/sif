@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/modules"
+	"github.com/vmfunc/sif/internal/modules"
 )
 
 func runLoginModule(t *testing.T, file string, status int, headers map[string]string, body string) *modules.Result {

@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/finding"
 )
 
 // sampleFindings returns a small mixed-severity batch for payload assertions.

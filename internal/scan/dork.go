@@ -25,15 +25,15 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/httpx"
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/output"
-	"github.com/dropalldatabases/sif/internal/pool"
+	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/output"
+	"github.com/vmfunc/sif/internal/pool"
 	googlesearch "github.com/rocketlaunchr/google-search"
 )
 
 const (
-	dorkURL  = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/dork/"
+	dorkURL  = "https://raw.githubusercontent.com/vmfunc/sif-runtime/main/dork/"
 	dorkFile = "dork.txt"
 )
 

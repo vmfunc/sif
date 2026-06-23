@@ -22,9 +22,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/finding"
-	"github.com/dropalldatabases/sif/internal/httpx"
-	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/vmfunc/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/output"
 )
 
 // Options carries the runtime knobs Send needs. Timeout bounds each provider's

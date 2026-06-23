@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/dropalldatabases/sif/internal/fingerprint"
+	"github.com/vmfunc/sif/internal/fingerprint"
 )
 
 // checkFaviconHash reports whether the body's shodan mmh3 hash matches any

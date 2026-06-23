@@ -12,7 +12,7 @@
 
 package builtin
 
-import "github.com/dropalldatabases/sif/internal/modules"
+import "github.com/vmfunc/sif/internal/modules"
 
 // Register registers all Go-based built-in scans as modules.
 // Allows complex Go scans to participate in the module system

@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/httpx"
 )
 
 // jwtRegex matches JWT tokens in JavaScript content.

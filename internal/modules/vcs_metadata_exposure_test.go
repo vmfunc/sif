@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/modules"
+	"github.com/vmfunc/sif/internal/modules"
 )
 
 func runVCSModule(t *testing.T, file string, status int, body string) *modules.Result {

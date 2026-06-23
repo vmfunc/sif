@@ -31,7 +31,7 @@ welcome to the sif documentation. sif is a modular pentesting toolkit designed t
 
 ```bash
 # install
-git clone https://github.com/dropalldatabases/sif.git && cd sif && make
+git clone https://github.com/vmfunc/sif.git && cd sif && make
 
 # basic scan
 ./sif -u https://example.com

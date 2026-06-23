@@ -23,10 +23,10 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/httpx"
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/pool"
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/pool"
+	"github.com/vmfunc/sif/internal/styles"
 )
 
 // SubdomainTakeoverResult represents the outcome of a subdomain takeover vulnerability check.

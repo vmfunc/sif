@@ -23,7 +23,7 @@ import (
 	"math"
 	"net/http"
 
-	fw "github.com/dropalldatabases/sif/internal/scan/frameworks"
+	fw "github.com/vmfunc/sif/internal/scan/frameworks"
 )
 
 func init() {

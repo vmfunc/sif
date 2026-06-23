@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/config"
-	"github.com/dropalldatabases/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/config"
+	"github.com/vmfunc/sif/internal/finding"
 )
 
 // notifyWebhookBody is the generic-webhook wire shape, mirrored here so the
