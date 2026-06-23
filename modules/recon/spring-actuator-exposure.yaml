@@ -1,0 +1,44 @@
+# Spring Boot Actuator Exposure Detection Module
+
+id: spring-actuator-exposure
+info:
+  name: Spring Boot Actuator Exposure
+  author: sif
+  severity: high
+  description: Detects exposed Spring Boot Actuator endpoints leaking internals
+  tags: [spring, actuator, exposure, misconfiguration, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/actuator"
+    - "{{BaseURL}}/actuator/env"
+    - "{{BaseURL}}/actuator/health"
+    - "{{BaseURL}}/actuator/metrics"
+    - "{{BaseURL}}/actuator/configprops"
+    - "{{BaseURL}}/env"
+    - "{{BaseURL}}/health"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      condition: or
+      regex:
+        - '"propertySources"\s*:\s*\['
+        - '"_links"(?s).*?"href"\s*:\s*"[^"]*/actuator"'
+        - '"components"\s*:\s*\{(?s).*?"status"\s*:\s*"(UP|DOWN)"'
+        - '"names"\s*:\s*\[(?s).*?"jvm\.'
+
+  extractors:
+    - type: regex
+      name: active_profiles
+      part: body
+      regex:
+        - '"activeProfiles"\s*:\s*\[\s*"([^"]+)"'
+      group: 1
