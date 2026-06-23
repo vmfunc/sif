@@ -1,0 +1,47 @@
+# Exposed Mercurial Repository Detection Module
+
+id: mercurial-exposure
+info:
+  name: Exposed Mercurial Repository
+  author: sif
+  severity: high
+  description: Detects an exposed .hg repository through its requires file that may leak source code
+  tags: [mercurial, hg, exposure, source-code, misconfiguration]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.hg/requires"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "revlogv1"
+        - "dotencode"
+        - "fncache"
+        - "generaldelta"
+        - "sparserevlog"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<html"
+
+  extractors:
+    - type: regex
+      name: hg_requirement
+      part: body
+      regex:
+        - '(revlogv1|dotencode|fncache|generaldelta|sparserevlog|store|treemanifest)'
+      group: 1

@@ -1,0 +1,41 @@
+# Exposed Subversion Repository Detection Module
+
+id: svn-exposure
+info:
+  name: Exposed Subversion Repository
+  author: sif
+  severity: high
+  description: Detects an exposed .svn working copy database that may leak source code
+  tags: [svn, subversion, exposure, source-code, misconfiguration]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.svn/wc.db"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '^SQLite format 3\x00'
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "WCROOT"
+        - "PRISTINE"
+
+  extractors:
+    - type: regex
+      name: svn_repository
+      part: body
+      regex:
+        - '((?:svn\+ssh|svn|https?|file)://[^\x00\s"]+)'
+      group: 1
