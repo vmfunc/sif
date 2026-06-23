@@ -53,15 +53,16 @@ type YAMLModuleInfo struct {
 
 // HTTPConfig defines HTTP module settings
 type HTTPConfig struct {
-	Method     string            `yaml:"method"`
-	Paths      []string          `yaml:"paths"`
-	Payloads   []string          `yaml:"payloads,omitempty"`
-	Headers    map[string]string `yaml:"headers,omitempty"`
-	Body       string            `yaml:"body,omitempty"`
-	Attack     string            `yaml:"attack,omitempty"` // clusterbomb (default), pitchfork
-	Threads    int               `yaml:"threads,omitempty"`
-	Matchers   []Matcher         `yaml:"matchers"`
-	Extractors []Extractor       `yaml:"extractors,omitempty"`
+	Method            string            `yaml:"method"`
+	Paths             []string          `yaml:"paths"`
+	Payloads          []string          `yaml:"payloads,omitempty"`
+	Headers           map[string]string `yaml:"headers,omitempty"`
+	Body              string            `yaml:"body,omitempty"`
+	Attack            string            `yaml:"attack,omitempty"` // clusterbomb (default), pitchfork
+	Threads           int               `yaml:"threads,omitempty"`
+	Matchers          []Matcher         `yaml:"matchers"`
+	MatchersCondition string            `yaml:"matchers-condition,omitempty"` // and (default), or
+	Extractors        []Extractor       `yaml:"extractors,omitempty"`
 }
 
 // DNSConfig defines DNS module settings
@@ -102,6 +103,9 @@ func ParseYAMLModule(path string) (*YAMLModule, error) {
 
 	if ym.HTTP != nil {
 		if err := validateAttack(ym.HTTP.Attack); err != nil {
+			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
+		}
+		if err := validateMatchersCondition(ym.HTTP.MatchersCondition); err != nil {
 			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
 		}
 	}

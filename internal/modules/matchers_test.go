@@ -184,7 +184,7 @@ func TestCheckMatchers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := checkMatchers(tt.matchers, resp, body); got != tt.expect {
+			if got := checkMatchers(tt.matchers, "", resp, body); got != tt.expect {
 				t.Errorf("checkMatchers = %v, want %v", got, tt.expect)
 			}
 		})
