@@ -1,0 +1,53 @@
+# MySQL Client Config Exposure Detection Module
+
+id: mysql-client-config-exposure
+info:
+  name: MySQL Client Config Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed .my.cnf file that leaks the mysql client password in cleartext
+  tags: [mysql, my-cnf, credentials, secrets, recon, exposure]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.my.cnf"
+    - "{{BaseURL}}/my.cnf"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "[client]"
+        - "[mysql]"
+        - "[mysqldump]"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "password="
+        - "password ="
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<html"
+
+  extractors:
+    - type: regex
+      name: mysql_user
+      part: body
+      regex:
+        - 'user\s*=\s*(\S+)'
+      group: 1
