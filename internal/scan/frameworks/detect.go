@@ -40,8 +40,14 @@ type detectionResult struct {
 	version    string
 }
 
+// loadCustomOnce loads the user signature directory the first time a scan runs,
+// so config-defined detectors join the registry without a per-target re-read.
+var loadCustomOnce sync.Once
+
 // DetectFramework runs all registered detectors against the target URL.
 func DetectFramework(url string, timeout time.Duration, logdir string) (*FrameworkResult, error) {
+	loadCustomOnce.Do(loadCustomDetectors)
+
 	log := output.Module("FRAMEWORK")
 	log.Start()
 

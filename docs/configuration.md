@@ -98,6 +98,38 @@ info:
   # ...
 ```
 
+## custom signatures
+
+framework detection (`-framework`) also loads user-defined detectors from yaml
+files, so a framework sif does not ship can be detected without rebuilding:
+
+- linux/macos: `~/.config/sif/signatures/`
+- windows: `%LOCALAPPDATA%\sif\signatures\`
+
+each file defines one detector; place them directly in the directory, as
+subdirectories are not scanned. `header: true` matches a response header name or
+value (case-insensitive) instead of the body; the optional `version` block pulls
+a version out of the body.
+
+```yaml
+# ~/.config/sif/signatures/ghost.yaml
+name: Ghost
+signatures:
+  - pattern: 'content="Ghost'
+    weight: 0.6
+  - pattern: 'X-Ghost-Cache'
+    weight: 0.4
+    header: true
+version:
+  regex: 'content="Ghost ([0-9.]+)'
+  group: 1
+```
+
+a detector reports a match once its matched signature weights sum past half, so
+weight your signatures to total about `1.0`. a name matching a built-in detector
+overrides it and inherits that built-in's version patterns and known cves, the
+same as user modules.
+
 ## performance tuning
 
 ### fast scans
