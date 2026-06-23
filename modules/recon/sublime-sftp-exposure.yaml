@@ -1,0 +1,57 @@
+# Sublime SFTP Deploy Config Exposure Detection Module
+
+id: sublime-sftp-exposure
+info:
+  name: Sublime SFTP Deploy Config Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Sublime SFTP config that leaks deploy host and credentials
+  tags: [sublime, sftp, deploy, credentials, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/sftp-config.json"
+    - "{{BaseURL}}/sftp-config-alt1.json"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - '"upload_on_save"'
+        - '"sync_down_on_open"'
+        - '"save_before_upload"'
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - '"password"'
+        - '"user"'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: remote_host
+      part: body
+      regex:
+        - '"host"\s*:\s*"([^"]+)"'
+      group: 1
