@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/modules"
+	"github.com/vmfunc/sif/internal/modules"
 )
 
 // runOpsModule runs a shipped module end to end against a server that returns

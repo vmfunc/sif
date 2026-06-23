@@ -20,8 +20,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dropalldatabases/sif/internal/finding"
-	"github.com/dropalldatabases/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/httpx"
 )
 
 // contentTypeJSON is the body type every provider POSTs; all four speak json.

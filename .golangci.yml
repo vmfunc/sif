@@ -36,7 +36,7 @@ linters:
       check-blank: false
       exclude-functions:
         # log writes are best-effort
-        - github.com/dropalldatabases/sif/internal/logger.Write
+        - github.com/vmfunc/sif/internal/logger.Write
         # Close on io.Closer is idiomatic best-effort
         - (io.Closer).Close
         - (*os.File).Close

@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dropalldatabases/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/finding"
 )
 
 // snapshotFileMode is applied to written snapshot files: owner read/write only.

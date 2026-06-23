@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/modules"
+	"github.com/vmfunc/sif/internal/modules"
 )
 
 // runEnvModule runs the env exposure module end to end against a server that

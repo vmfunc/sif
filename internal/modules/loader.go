@@ -19,7 +19,7 @@ import (
 	"runtime"
 
 	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/vmfunc/sif/internal/output"
 )
 
 // Loader handles module discovery and loading.

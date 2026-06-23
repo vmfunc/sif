@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/httpx"
 )
 
 const testTimeout = 5 * time.Second

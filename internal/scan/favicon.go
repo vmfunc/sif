@@ -21,10 +21,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dropalldatabases/sif/internal/fingerprint"
-	"github.com/dropalldatabases/sif/internal/httpx"
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/vmfunc/sif/internal/fingerprint"
+	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/output"
 )
 
 // FaviconResult is the computed shodan-style favicon hash plus the pivot query

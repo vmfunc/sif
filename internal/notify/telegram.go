@@ -16,7 +16,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/dropalldatabases/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/finding"
 )
 
 // telegramAPIBase is the bot api root. it's a var so tests can repoint it at an

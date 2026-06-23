@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dropalldatabases/sif/internal/modules"
+	"github.com/vmfunc/sif/internal/modules"
 )
 
 // favicon demo modules must reference a hash from faviconHashes that names the

@@ -23,7 +23,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dropalldatabases/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/httpx"
 )
 
 func reqURLs(reqs []*httpRequest) []string {

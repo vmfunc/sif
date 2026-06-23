@@ -30,7 +30,7 @@ import (
 	"strings"
 
 	charmlog "github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/vmfunc/sif/internal/output"
 	"gopkg.in/yaml.v3"
 )
 

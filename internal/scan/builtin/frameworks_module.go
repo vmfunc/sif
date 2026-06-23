@@ -17,8 +17,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dropalldatabases/sif/internal/modules"
-	"github.com/dropalldatabases/sif/internal/scan/frameworks"
+	"github.com/vmfunc/sif/internal/modules"
+	"github.com/vmfunc/sif/internal/scan/frameworks"
 )
 
 type FrameworksModule struct{}

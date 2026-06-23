@@ -15,8 +15,8 @@ package builtin
 import (
 	"context"
 
-	"github.com/dropalldatabases/sif/internal/modules"
-	"github.com/dropalldatabases/sif/internal/scan"
+	"github.com/vmfunc/sif/internal/modules"
+	"github.com/vmfunc/sif/internal/scan"
 )
 
 type WhoisModule struct{}

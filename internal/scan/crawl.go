@@ -21,9 +21,9 @@ import (
 
 	"github.com/gocolly/colly/v2"
 
-	"github.com/dropalldatabases/sif/internal/httpx"
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/output"
+	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/output"
 )
 
 // CrawlResult holds the deduped set of urls discovered by the spider.

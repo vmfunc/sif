@@ -16,7 +16,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/dropalldatabases/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/finding"
 )
 
 // discordProvider posts to a discord webhook. discord's incoming-webhook body

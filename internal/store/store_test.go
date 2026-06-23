@@ -19,7 +19,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/dropalldatabases/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/finding"
 )
 
 // sampleFindings is a small, stable set of findings reused across the round-trip

@@ -17,13 +17,13 @@ import (
 	"os"
 
 	"github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif"
-	"github.com/dropalldatabases/sif/internal/config"
-	"github.com/dropalldatabases/sif/internal/patchnotes"
-	ver "github.com/dropalldatabases/sif/internal/version"
+	"github.com/vmfunc/sif"
+	"github.com/vmfunc/sif/internal/config"
+	"github.com/vmfunc/sif/internal/patchnotes"
+	ver "github.com/vmfunc/sif/internal/version"
 
 	// Register framework detectors
-	_ "github.com/dropalldatabases/sif/internal/scan/frameworks/detectors"
+	_ "github.com/vmfunc/sif/internal/scan/frameworks/detectors"
 )
 
 // version is stamped at release time via -ldflags "-X main.version=...";

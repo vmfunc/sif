@@ -11,7 +11,7 @@ setting up a development environment for sif.
 ## clone and build
 
 ```bash
-git clone https://github.com/dropalldatabases/sif.git
+git clone https://github.com/vmfunc/sif.git
 cd sif
 make
 ```

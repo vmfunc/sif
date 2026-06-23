@@ -13,7 +13,7 @@
 package format
 
 import (
-	"github.com/dropalldatabases/sif/internal/styles"
+	"github.com/vmfunc/sif/internal/styles"
 	nucleiout "github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
 

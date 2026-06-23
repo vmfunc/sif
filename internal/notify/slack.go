@@ -16,7 +16,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/dropalldatabases/sif/internal/finding"
+	"github.com/vmfunc/sif/internal/finding"
 )
 
 // slackProvider posts to a slack incoming webhook. the webhook url already pins

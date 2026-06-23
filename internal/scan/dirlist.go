@@ -26,14 +26,14 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/httpx"
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/output"
-	"github.com/dropalldatabases/sif/internal/pool"
+	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/output"
+	"github.com/vmfunc/sif/internal/pool"
 )
 
 // directoryURL is a var so integration tests can repoint it at a fixture.
-var directoryURL = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/dirlist/"
+var directoryURL = "https://raw.githubusercontent.com/vmfunc/sif-runtime/main/dirlist/"
 
 const (
 	smallFile  = "directory-list-2.3-small.txt"

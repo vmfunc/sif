@@ -23,14 +23,14 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
-	"github.com/dropalldatabases/sif/internal/httpx"
-	"github.com/dropalldatabases/sif/internal/logger"
-	"github.com/dropalldatabases/sif/internal/output"
-	"github.com/dropalldatabases/sif/internal/pool"
+	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/output"
+	"github.com/vmfunc/sif/internal/pool"
 )
 
 // commonPorts is a var so integration tests can repoint it at a fixture.
-var commonPorts = "https://raw.githubusercontent.com/dropalldatabases/sif-runtime/main/ports/top-ports.txt"
+var commonPorts = "https://raw.githubusercontent.com/vmfunc/sif-runtime/main/ports/top-ports.txt"
 
 func Ports(ctx context.Context, scope string, url string, timeout time.Duration, threads int, logdir string) ([]string, error) {
 	log := output.Module("PORTS")
