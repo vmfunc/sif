@@ -351,7 +351,6 @@ func (d *ginDetector) Name() string { return "Gin" }
 func (d *ginDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: "gin-gonic", Weight: 0.4},
-		{Pattern: "gin", Weight: 0.2, HeaderOnly: true},
 	}
 }
 
@@ -400,7 +399,6 @@ func (d *strapiDetector) Name() string { return "Strapi" }
 func (d *strapiDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: "strapi", Weight: 0.4},
-		{Pattern: "/api/", Weight: 0.2},
 	}
 }
 
@@ -447,7 +445,7 @@ func (d *cakephpDetector) Name() string { return "CakePHP" }
 func (d *cakephpDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: "cakephp", Weight: 0.4},
-		{Pattern: "cake", Weight: 0.2},
+		{Pattern: "CAKEPHP", Weight: 0.4, HeaderOnly: true},
 	}
 }
 

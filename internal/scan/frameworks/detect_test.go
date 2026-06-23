@@ -186,9 +186,6 @@ func TestDetectFramework_ASPNET(t *testing.T) {
 	}
 }
 
-// the dead "X-Powered-By: ASP.NET" signature only inflated the total weight
-// (containsHeader never builds a "name: value" string to match it against), so a
-// genuine asp.net response scored just under the threshold until it was removed.
 func TestDetectFramework_ASPNETPoweredByHeader(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-AspNetMvc-Version", "5.2")
@@ -468,9 +465,6 @@ func TestDetectFramework_AdonisJS(t *testing.T) {
 	}
 }
 
-// a cosmetics brand page that merely contains "adonis" in its markup (CSS
-// classes, asset paths, links) must not be fingerprinted as AdonisJS, as the
-// old bare "adonis" substring signature did.
 func TestDetectFramework_AdonisFalsePositive(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -528,8 +522,6 @@ func TestDetectFramework_Phoenix(t *testing.T) {
 	}
 }
 
-// a Phoenix, Arizona business page using "phx-" CSS class prefixes must not be
-// fingerprinted as the Phoenix framework, as the old bare "phx-" signature did.
 func TestDetectFramework_PhoenixFalsePositive(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -619,7 +611,6 @@ func TestDetectFramework_Ghost(t *testing.T) {
 	}
 }
 
-// ghost-button is a common generic CSS class and must not read as Ghost CMS.
 func TestDetectFramework_GhostButtonNoMatch(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -643,8 +634,6 @@ func TestDetectFramework_GhostButtonNoMatch(t *testing.T) {
 	}
 }
 
-// the /ghost/api/ path is the only Ghost marker left for pages without the
-// generator meta, so guard that it still detects on its own.
 func TestDetectFramework_GhostAPIPath(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -778,5 +767,226 @@ func TestDetectFramework_Htmx(t *testing.T) {
 	}
 	if result.Version != "1.9.10" {
 		t.Errorf("expected version '1.9.10', got '%s'", result.Version)
+	}
+}
+
+func TestDetectFramework_GinFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body>Welcome</body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "Gin" {
+		t.Errorf("false positive: detected Gin (confidence %.2f) on a CORS header", result.Confidence)
+	}
+}
+
+func TestDetectFramework_Gin(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`404 page not found - powered by gin-gonic`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || result.Name != "Gin" {
+		t.Errorf("expected framework 'Gin', got '%v'", result)
+	}
+}
+
+func TestDetectFramework_MeteorFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body><p>a meteor shower lit the sky while
+		meteorology students tracked the meteorite.</p></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "Meteor" {
+		t.Errorf("false positive: detected Meteor (confidence %.2f) on prose about meteors", result.Confidence)
+	}
+}
+
+func TestDetectFramework_Meteor(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><head>
+		<script>__meteor_runtime_config__ = JSON.parse(decodeURIComponent("%7B%7D"));</script>
+		</head><body><div id="app"></div></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || result.Name != "Meteor" {
+		t.Errorf("expected framework 'Meteor', got '%v'", result)
+	}
+}
+
+func TestDetectFramework_BackboneFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body><p>our team is the backbone of the
+		company, the backbone network that keeps everything running.</p></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "Backbone.js" {
+		t.Errorf("false positive: detected Backbone.js (confidence %.2f) on prose about backbones", result.Confidence)
+	}
+}
+
+func TestDetectFramework_Backbone(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><head><script src="/js/backbone.js"></script></head>
+		<body><script>var AppView = Backbone.View.extend({});</script></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || result.Name != "Backbone.js" {
+		t.Errorf("expected framework 'Backbone.js', got '%v'", result)
+	}
+}
+
+func TestDetectFramework_CakePHPFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body><p>our cupcake and cheesecake recipes,
+		plus the best pancake stack in town.</p></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "CakePHP" {
+		t.Errorf("false positive: detected CakePHP (confidence %.2f) on prose about cakes", result.Confidence)
+	}
+}
+
+func TestDetectFramework_CakePHP(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Set-Cookie", "CAKEPHP=abc123; path=/")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body>Home</body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || result.Name != "CakePHP" {
+		t.Errorf("expected framework 'CakePHP', got '%v'", result)
+	}
+}
+
+func TestDetectFramework_SvelteFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body><p>the model cut a svelte figure on
+		the runway.</p></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "Svelte" {
+		t.Errorf("false positive: detected Svelte (confidence %.2f) on prose with 'svelte'", result.Confidence)
+	}
+}
+
+func TestDetectFramework_StrapiFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body><script>fetch("/api/v1/users")</script></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "Strapi" {
+		t.Errorf("false positive: detected Strapi (confidence %.2f) on a plain /api/ path", result.Confidence)
+	}
+}
+
+func TestDetectFramework_Strapi(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body><div>powered by strapi</div></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || result.Name != "Strapi" {
+		t.Errorf("expected framework 'Strapi', got '%v'", result)
+	}
+}
+
+func TestDetectFramework_Ember(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><head><title>Ember App</title></head>
+		<body class="ember-application"><div id="ember123" class="ember-view">Content</div>
+		<script src="/assets/vendor.js"></script></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || result.Name != "Ember.js" {
+		t.Errorf("expected framework 'Ember.js', got '%v'", result)
+	}
+}
+
+func TestDetectFramework_EmberFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><head><title>Day of the Dead</title></head>
+		<body><p>a celebratory holiday to remember the dead; families remember departed
+		members every November and September.</p></body></html>`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "Ember.js" {
+		t.Errorf("false positive: detected Ember.js (confidence %.2f) on prose with 'remember'", result.Confidence)
 	}
 }

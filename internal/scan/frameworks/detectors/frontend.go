@@ -129,9 +129,9 @@ func (d *svelteDetector) Name() string { return "Svelte" }
 
 func (d *svelteDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "svelte", Weight: 0.4},
 		{Pattern: "__svelte", Weight: 0.5},
-		{Pattern: "svelte-", Weight: 0.3},
+		{Pattern: "svelte-", Weight: 0.4},
+		{Pattern: "svelte/internal", Weight: 0.4},
 	}
 }
 
@@ -154,9 +154,12 @@ func (d *emberDetector) Name() string { return "Ember.js" }
 
 func (d *emberDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "ember", Weight: 0.4},
-		{Pattern: "ember-cli", Weight: 0.4},
-		{Pattern: "data-ember", Weight: 0.3},
+		{Pattern: "ember-application", Weight: 0.5},
+		{Pattern: "ember-view", Weight: 0.4},
+		{Pattern: "ember.js", Weight: 0.4},
+		{Pattern: "ember.min.js", Weight: 0.4},
+		{Pattern: "ember-cli", Weight: 0.3},
+		{Pattern: `id="ember`, Weight: 0.4},
 	}
 }
 
@@ -179,8 +182,11 @@ func (d *backboneDetector) Name() string { return "Backbone.js" }
 
 func (d *backboneDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "backbone", Weight: 0.4},
-		{Pattern: "Backbone.", Weight: 0.4},
+		{Pattern: "Backbone.Model", Weight: 0.4},
+		{Pattern: "Backbone.View", Weight: 0.4},
+		{Pattern: "Backbone.Router", Weight: 0.4},
+		{Pattern: "backbone.js", Weight: 0.4},
+		{Pattern: "backbone-min.js", Weight: 0.4},
 	}
 }
 
@@ -231,8 +237,9 @@ func (d *meteorDetector) Name() string { return "Meteor" }
 
 func (d *meteorDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "__meteor_runtime_config__", Weight: 0.5},
-		{Pattern: "meteor", Weight: 0.3},
+		{Pattern: "__meteor_runtime_config__", Weight: 0.6},
+		{Pattern: "Meteor.startup", Weight: 0.3},
+		{Pattern: "/packages/meteor", Weight: 0.3},
 	}
 }
 
