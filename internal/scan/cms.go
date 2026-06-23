@@ -128,12 +128,23 @@ func detectWordPress(url string, client *http.Client, bodyString string) bool {
 		if err != nil {
 			continue
 		}
-		resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
-		if err == nil {
-			found := resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound
-			// status only; drain so the conn returns to the pool.
-			httpx.DrainClose(resp)
-			if found {
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+		resp.Body.Close()
+		if err != nil {
+			continue
+		}
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusFound {
+			continue
+		}
+		// the client follows redirects, so soft-404 and catch-all sites also land
+		// here with a 200; require an actual WordPress marker in the body.
+		probeBody := string(body)
+		for _, indicator := range wpIndicators {
+			if strings.Contains(probeBody, indicator) {
 				return true
 			}
 		}
