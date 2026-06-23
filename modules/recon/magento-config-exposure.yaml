@@ -1,0 +1,54 @@
+# Magento env.php Backup Exposure Detection Module
+
+id: magento-config-exposure
+info:
+  name: Magento env.php Backup Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Magento app/etc/env.php backup that leaks the crypt key and database password
+  tags: [magento, cms, config, credentials, recon, exposure]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/app/etc/env.php.bak"
+    - "{{BaseURL}}/app/etc/env.php~"
+    - "{{BaseURL}}/app/etc/env.php.old"
+    - "{{BaseURL}}/app/etc/env.php.save"
+    - "{{BaseURL}}/app/etc/env.php.orig"
+    - "{{BaseURL}}/app/etc/env.php.txt"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "'crypt'"
+        - "MAGE_MODE"
+
+    - type: regex
+      part: body
+      regex:
+        - "'(?:password|key)'\\s*=>\\s*'[^'#][^']*'"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<html"
+
+  extractors:
+    - type: regex
+      name: magento_crypt_key
+      part: body
+      regex:
+        - "'key'\\s*=>\\s*'([^'#][^']*)'"
+      group: 1

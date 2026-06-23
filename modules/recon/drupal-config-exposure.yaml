@@ -1,0 +1,52 @@
+# Drupal Settings Backup Exposure Detection Module
+
+id: drupal-config-exposure
+info:
+  name: Drupal Settings Backup Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Drupal settings.php backup that leaks the database password
+  tags: [drupal, cms, config, credentials, recon, exposure]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/sites/default/settings.php.bak"
+    - "{{BaseURL}}/sites/default/settings.php~"
+    - "{{BaseURL}}/sites/default/settings.php.old"
+    - "{{BaseURL}}/sites/default/settings.php.save"
+    - "{{BaseURL}}/sites/default/settings.php.orig"
+    - "{{BaseURL}}/sites/default/settings.php.txt"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "$databases"
+
+    - type: regex
+      part: body
+      regex:
+        - "'password'\\s*=>\\s*'[^']+'"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<html"
+
+  extractors:
+    - type: regex
+      name: drupal_password
+      part: body
+      regex:
+        - "'password'\\s*=>\\s*'([^']+)'"
+      group: 1
