@@ -990,3 +990,56 @@ func TestDetectFramework_EmberFalsePositive(t *testing.T) {
 		t.Errorf("false positive: detected Ember.js (confidence %.2f) on prose with 'remember'", result.Confidence)
 	}
 }
+
+func TestDetectFramework_Shopify(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Powered-By", "Shopify")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head><link rel="stylesheet" href="https://cdn.shopify.com/s/files/1/theme.css"></head>
+			<body>
+				<div id="shopify-section-header" class="shopify-section">Store</div>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "Shopify" {
+		t.Errorf("expected framework 'Shopify', got '%s'", result.Name)
+	}
+}
+
+func TestDetectFramework_ShopifyFalsePositive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html>
+			<head><title>10 Best Shopify Alternatives in 2026</title></head>
+			<body>
+				<h1>Is Shopify Right For You?</h1>
+				<p>We compare Shopify with other e-commerce platforms.</p>
+			</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
+	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil && result.Name == "Shopify" {
+		t.Errorf("false positive: article mentioning Shopify detected as Shopify (%.2f)", result.Confidence)
+	}
+}
