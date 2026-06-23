@@ -14,6 +14,7 @@ require (
 	github.com/projectdiscovery/retryabledns v1.0.115
 	github.com/projectdiscovery/utils v0.11.1
 	github.com/rocketlaunchr/google-search v1.1.6
+	github.com/tidwall/gjson v1.18.0
 	github.com/twmb/murmur3 v1.1.8
 	golang.org/x/net v0.56.0
 	golang.org/x/time v0.15.0
@@ -330,7 +331,6 @@ require (
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/tidwall/btree v1.8.1 // indirect
 	github.com/tidwall/buntdb v1.3.2 // indirect
-	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/grect v0.1.4 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect

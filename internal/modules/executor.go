@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tidwall/gjson"
 )
 
 // MaxBodySize limits response body to prevent memory exhaustion.
@@ -415,6 +417,14 @@ func runExtractors(extractors []Extractor, resp *http.Response, body string) map
 					key = e.Name + "." + k
 				}
 				result[key] = strings.Join(v, ", ")
+			}
+		case "json":
+			part := getPart(e.Part, resp, body)
+			for _, path := range e.JSON {
+				if r := gjson.Get(part, path); r.Exists() {
+					result[e.Name] = r.String()
+					break
+				}
 			}
 		}
 	}

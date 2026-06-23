@@ -271,6 +271,21 @@ extractors:
     part: header
 ```
 
+### json extractor
+
+extract values from a json body by gjson path (github.com/tidwall/gjson); the
+first path that exists is stored under name.
+
+```yaml
+extractors:
+  - type: json
+    name: version
+    part: body
+    json:
+      - "version"
+      - "data.version"
+```
+
 ## examples
 
 ### exposed git repository
