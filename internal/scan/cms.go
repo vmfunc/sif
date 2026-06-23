@@ -102,12 +102,12 @@ func CMS(url string, timeout time.Duration, logdir string) (*CMSResult, error) {
 }
 
 func detectWordPress(url string, client *http.Client, bodyString string) bool {
-	// Check for common WordPress indicators in the HTML
+	// wordpress asset paths only; the bare word "wordpress" matched pages that
+	// merely mention it (wp-hosting marketing), so it is dropped.
 	wpIndicators := []string{
 		"wp-content",
 		"wp-includes",
 		"wp-json",
-		"wordpress",
 	}
 
 	for _, indicator := range wpIndicators {
