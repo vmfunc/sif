@@ -1,0 +1,46 @@
+# Appsettings Exposure Detection Module
+
+id: appsettings-exposure
+info:
+  name: Appsettings Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed ASP.NET Core appsettings.json that leaks connection strings
+  tags: [aspnet, dotnet, appsettings, connection-string, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/appsettings.json"
+    - "{{BaseURL}}/appsettings.Production.json"
+    - "{{BaseURL}}/appsettings.Development.json"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"ConnectionStrings\""
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "Password="
+        - "password="
+        - "Pwd="
+        - "pwd="
+        - "AccountKey="
+
+  extractors:
+    - type: regex
+      name: connection_string
+      part: body
+      regex:
+        - '((?:Server|Data Source|Host)=[^"]+)'
+      group: 1
