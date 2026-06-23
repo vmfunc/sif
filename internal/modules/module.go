@@ -103,5 +103,6 @@ type Extractor struct {
 	Name  string   `yaml:"name"`
 	Part  string   `yaml:"part"`
 	Regex []string `yaml:"regex,omitempty"`
+	JSON  []string `yaml:"json,omitempty"`
 	Group int      `yaml:"group"`
 }
