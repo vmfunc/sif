@@ -92,10 +92,10 @@ type openapiInfo struct {
 	Version string `json:"version" yaml:"version"`
 }
 
-// rawOps captures just the per-operation security block so we can tell whether
-// an operation requires auth. the rest of the operation object is irrelevant.
+// rawOps captures the per-operation security block. a pointer so an absent block
+// (inherit global) is distinct from an explicit empty one (security: [] = public).
 type rawOps struct {
-	Security []map[string][]string `json:"security" yaml:"security"`
+	Security *[]map[string][]string `json:"security" yaml:"security"`
 }
 
 // OpenAPI probes the candidate spec paths concurrently and, on the first hit,
@@ -252,11 +252,26 @@ func parseOpenAPISpec(body []byte) (*openapiSpec, bool) {
 	return &spec, true
 }
 
+// securityAllowsAnonymous reports whether a security requirement list lets a
+// caller through without credentials: an empty list (security: []) or an empty
+// requirement object ({}) inside it both permit anonymous access.
+func securityAllowsAnonymous(reqs []map[string][]string) bool {
+	if len(reqs) == 0 {
+		return true
+	}
+	for _, req := range reqs {
+		if len(req) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // specToResult flattens the parsed spec into enumerated endpoints and ranks the
-// exposure. an operation with no security requirement (and no top-level default)
-// is flagged unauthenticated, which bumps the overall severity to high.
+// exposure. an operation is flagged unauthenticated when its effective security
+// permits anonymous access, which bumps the overall severity to high.
 func specToResult(spec *openapiSpec) *OpenAPIResult {
-	hasGlobalSecurity := len(spec.Security) > 0
+	globalAllowsAnon := securityAllowsAnonymous(spec.Security)
 
 	endpoints := make([]OpenAPIEndpoint, 0, len(spec.Paths))
 	anyUnauth := false
@@ -277,9 +292,13 @@ func specToResult(spec *openapiSpec) *OpenAPIResult {
 			if !ok {
 				continue
 			}
-			// an operation is unauth when neither it nor the global default
-			// declares a security requirement.
-			unauth := len(op.Security) == 0 && !hasGlobalSecurity
+			// an explicit block decides on its own; an absent one inherits global.
+			var unauth bool
+			if op.Security != nil {
+				unauth = securityAllowsAnonymous(*op.Security)
+			} else {
+				unauth = globalAllowsAnon
+			}
 			if unauth {
 				anyUnauth = true
 			}

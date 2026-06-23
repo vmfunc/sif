@@ -56,6 +56,35 @@ paths:
       summary: health
 `
 
+// a globally-secured spec mixing public opt-outs (security: [] and security: [{}])
+// with operations that inherit or declare their own requirement.
+const openapiJSONPublicOverride = `{
+  "openapi": "3.0.1",
+  "info": {"title": "Override API", "version": "1.0"},
+  "security": [{"bearerAuth": []}],
+  "paths": {
+    "/me":       {"get": {"summary": "authed, inherits global"}},
+    "/admin":    {"get": {"summary": "authed, explicit non-empty", "security": [{"bearerAuth": []}]}},
+    "/login":    {"post": {"summary": "public override", "security": []}},
+    "/optional": {"get": {"summary": "anonymous allowed", "security": [{}]}}
+  }
+}`
+
+// a yaml spec with global auth and an operation that opts out via security: [],
+// to lock the empty-vs-absent distinction on the yaml decode path too.
+const openapiYAMLPublicOverride = `openapi: "3.0.1"
+info:
+  title: YAML Override API
+  version: "1.0"
+security:
+  - bearerAuth: []
+paths:
+  /token:
+    post:
+      summary: public
+      security: []
+`
+
 // hasEndpoint reports whether the result enumerated the given path+method.
 func hasEndpoint(r *OpenAPIResult, path, method string) (OpenAPIEndpoint, bool) {
 	for i := 0; i < len(r.Endpoints); i++ {
@@ -138,6 +167,81 @@ func TestOpenAPI_SecuredSpecIsMedium(t *testing.T) {
 	}
 	if result.Severity != openapiSevMedium {
 		t.Errorf("expected medium severity for a secured spec, got %q", result.Severity)
+	}
+}
+
+// TestOpenAPI_PublicOverridesAreUnauth checks that operations allowing anonymous
+// access (security: [] or security: [{}]) are flagged unauthenticated, while ones
+// that inherit the enforced global default or declare their own requirement stay authed.
+func TestOpenAPI_PublicOverridesAreUnauth(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/openapi.json" {
+			_, _ = w.Write([]byte(openapiJSONPublicOverride))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	result, err := OpenAPI(srv.URL, 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("OpenAPI: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected a result, got nil")
+	}
+
+	for _, want := range []struct {
+		path, method string
+		unauth       bool
+		why          string
+	}{
+		{"/login", http.MethodPost, true, "security: [] removes the global requirement"},
+		{"/optional", http.MethodGet, true, "security: [{}] permits anonymous access"},
+		{"/me", http.MethodGet, false, "inherits the enforced global requirement"},
+		{"/admin", http.MethodGet, false, "declares its own non-empty requirement"},
+	} {
+		ep, ok := hasEndpoint(result, want.path, want.method)
+		if !ok {
+			t.Fatalf("expected %s %s to be enumerated", want.method, want.path)
+		}
+		if ep.Unauth != want.unauth {
+			t.Errorf("%s %s unauth=%v, want %v (%s)", want.method, want.path, ep.Unauth, want.unauth, want.why)
+		}
+	}
+
+	if result.Severity != openapiSevHigh {
+		t.Errorf("an unauthenticated operation should rank the exposure high, got %q", result.Severity)
+	}
+}
+
+// TestOpenAPI_YAMLPublicOverrideIsUnauth locks the empty-vs-absent distinction on
+// the yaml decode path: yaml.v3 must preserve security: [] as a non-nil empty
+// block, or the whole fix silently regresses on yaml specs.
+func TestOpenAPI_YAMLPublicOverrideIsUnauth(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v3/api-docs" {
+			w.Header().Set("Content-Type", "application/yaml")
+			_, _ = w.Write([]byte(openapiYAMLPublicOverride))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	result, err := OpenAPI(srv.URL, 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("OpenAPI: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected a yaml result, got nil")
+	}
+	ep, ok := hasEndpoint(result, "/token", http.MethodPost)
+	if !ok {
+		t.Fatal("expected /token POST to be enumerated")
+	}
+	if !ep.Unauth {
+		t.Error("yaml security: [] should be flagged unauthenticated; yaml.v3 must keep it non-nil")
 	}
 }
 
