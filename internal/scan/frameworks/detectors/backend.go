@@ -177,7 +177,6 @@ func (d *aspnetDetector) Signatures() []fw.Signature {
 		{Pattern: ".ashx", Weight: 0.2},
 		{Pattern: ".asmx", Weight: 0.2},
 		{Pattern: "asp.net_sessionid", Weight: 0.4, HeaderOnly: true},
-		{Pattern: "X-Powered-By: ASP.NET", Weight: 0.4, HeaderOnly: true},
 	}
 }
 
