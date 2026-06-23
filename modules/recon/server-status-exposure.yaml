@@ -1,0 +1,44 @@
+# Server Status Page Exposure Detection Module
+
+id: server-status-exposure
+info:
+  name: Server Status Page Exposure
+  author: sif
+  severity: medium
+  description: Detects exposed Apache mod_status, mod_info and nginx stub_status pages
+  tags: [apache, nginx, status, exposure, misconfiguration, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/server-status"
+    - "{{BaseURL}}/server-status?auto"
+    - "{{BaseURL}}/server-info"
+    - "{{BaseURL}}/nginx_status"
+    - "{{BaseURL}}/stub_status"
+    - "{{BaseURL}}/status"
+    - "{{BaseURL}}/basic_status"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '<h1>Apache Server Status for'
+        - '<h1>Apache Server Information'
+        - '(?m)^Scoreboard: [._SRWKDCGLI]'
+        - '(?s)Active connections: [0-9].{0,40}server accepts handled requests'
+      condition: or
+
+  extractors:
+    - type: regex
+      name: server_version
+      part: body
+      regex:
+        - 'Server ?Version: (Apache/[0-9.]+)'
+      group: 1
