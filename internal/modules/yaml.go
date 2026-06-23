@@ -58,7 +58,7 @@ type HTTPConfig struct {
 	Payloads   []string          `yaml:"payloads,omitempty"`
 	Headers    map[string]string `yaml:"headers,omitempty"`
 	Body       string            `yaml:"body,omitempty"`
-	Attack     string            `yaml:"attack,omitempty"` // sniper, pitchfork, clusterbomb
+	Attack     string            `yaml:"attack,omitempty"` // clusterbomb (default), pitchfork
 	Threads    int               `yaml:"threads,omitempty"`
 	Matchers   []Matcher         `yaml:"matchers"`
 	Extractors []Extractor       `yaml:"extractors,omitempty"`
@@ -98,6 +98,12 @@ func ParseYAMLModule(path string) (*YAMLModule, error) {
 
 	if ym.Type == "" {
 		return nil, fmt.Errorf("module missing required field: type")
+	}
+
+	if ym.HTTP != nil {
+		if err := validateAttack(ym.HTTP.Attack); err != nil {
+			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
+		}
 	}
 
 	return &ym, nil
