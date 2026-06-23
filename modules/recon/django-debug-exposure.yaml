@@ -1,0 +1,39 @@
+# Django Debug Page Exposure Detection Module
+
+id: django-debug-exposure
+info:
+  name: Django Debug Page Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Django DEBUG=True page leaking internals
+  tags: [django, debug, exposure, misconfiguration, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/sif-probe-nonexistent"
+
+  matchers:
+    - type: status
+      status:
+        - 400
+        - 403
+        - 404
+        - 500
+
+    - type: regex
+      part: body
+      regex:
+        - 'seeing this error because you have <code>DEBUG = True</code>'
+        - '(Request Method:|Django Version:|Using the URLconf defined in)'
+      condition: and
+
+  extractors:
+    - type: regex
+      name: django_version
+      part: body
+      regex:
+        - 'Django Version:[^0-9]{0,30}([0-9]+(?:\.[0-9]+)+)'
+      group: 1
