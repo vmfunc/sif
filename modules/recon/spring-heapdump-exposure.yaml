@@ -1,0 +1,35 @@
+# Spring Boot Heap Dump Exposure Detection Module
+
+id: spring-heapdump-exposure
+info:
+  name: Spring Boot Heap Dump Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Spring Boot actuator heap dump that leaks application memory and secrets
+  tags: [spring, actuator, heapdump, exposure, secrets, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/actuator/heapdump"
+    - "{{BaseURL}}/heapdump"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '^JAVA PROFILE 1\.0'
+
+  extractors:
+    - type: regex
+      name: hprof_version
+      part: body
+      regex:
+        - '^JAVA PROFILE (1\.0\.\d)'
+      group: 1

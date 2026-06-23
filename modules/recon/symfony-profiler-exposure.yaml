@@ -1,0 +1,38 @@
+# Symfony Profiler Exposure Detection Module
+
+id: symfony-profiler-exposure
+info:
+  name: Symfony Profiler Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Symfony web profiler that leaks requests, configuration and environment
+  tags: [symfony, profiler, debug, exposure, info-disclosure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/_profiler"
+    - "{{BaseURL}}/app_dev.php/_profiler"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "Symfony Profiler"
+        - "sf-profiler"
+        - "sf-toolbar"
+
+  extractors:
+    - type: regex
+      name: profiler_token
+      part: body
+      regex:
+        - '/_profiler/([0-9a-f]{6,})'
+      group: 1
