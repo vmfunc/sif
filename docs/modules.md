@@ -223,6 +223,30 @@ matchers:
       - 1337
 ```
 
+### favicon matcher
+
+match the shodan-style mmh3 hash of the response body. point the module at a
+favicon and list the hashes of the tech you want to fingerprint.
+
+```yaml
+http:
+  paths:
+    - "{{BaseURL}}/favicon.ico"
+  matchers:
+    - type: status
+      status:
+        - 200
+    - type: favicon
+      hash:
+        - -235701012   # jenkins
+        - 1278322581   # grafana
+```
+
+the hash is shodan's `http.favicon.hash` value. paste it signed or unsigned;
+both 32-bit forms are accepted, so values from shodan or any favicon-hash tool
+drop in without conversion. pair it with a `status: 200` matcher so an error
+page served for `/favicon.ico` is not hashed. a finding fires when the body
+hashes to any listed value.
 ### combining matchers
 
 multiple matchers are combined with AND logic by default.

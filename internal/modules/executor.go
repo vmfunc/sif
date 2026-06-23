@@ -246,10 +246,16 @@ func executeHTTPRequest(ctx context.Context, client *http.Client, r *httpRequest
 	// Extract data
 	extracted := runExtractors(cfg.Extractors, resp, bodyStr)
 
+	// favicon-only matches fire on binary icon bytes; report the hash, not the body.
+	evidence := truncateEvidence(bodyStr)
+	if fav, ok := faviconEvidence(cfg.Matchers, bodyStr); ok {
+		evidence = fav
+	}
+
 	return Finding{
 		URL:       r.URL,
 		Severity:  severity,
-		Evidence:  truncateEvidence(bodyStr),
+		Evidence:  evidence,
 		Extracted: extracted,
 	}, true
 }
@@ -276,8 +282,6 @@ func checkMatchers(matchers []Matcher, resp *http.Response, body string) bool {
 
 // checkMatcher evaluates a single matcher.
 func checkMatcher(m *Matcher, resp *http.Response, body string) bool {
-	part := getPart(m.Part, resp, body)
-
 	switch m.Type {
 	case "status":
 		for _, status := range m.Status {
@@ -288,10 +292,13 @@ func checkMatcher(m *Matcher, resp *http.Response, body string) bool {
 		return false
 
 	case "word":
-		return checkWords(part, m.Words, m.Condition)
+		return checkWords(getPart(m.Part, resp, body), m.Words, m.Condition)
 
 	case "regex":
-		return checkRegex(part, m.Regex, m.Condition)
+		return checkRegex(getPart(m.Part, resp, body), m.Regex, m.Condition)
+
+	case "favicon":
+		return checkFaviconHash(body, m.Hash)
 
 	case "size":
 		// size matches the response body length against any listed value.
