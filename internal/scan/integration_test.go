@@ -181,7 +181,7 @@ func TestIntegrationSQL(t *testing.T) {
 	srv := newVulnApp()
 	defer srv.Close()
 
-	result, err := SQL(srv.URL, 5*time.Second, 5, "")
+	result, err := SQL(srv.URL, 5*time.Second, 5, "", false)
 	if err != nil {
 		t.Fatalf("SQL: %v", err)
 	}
