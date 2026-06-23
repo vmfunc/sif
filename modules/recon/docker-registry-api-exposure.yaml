@@ -1,0 +1,34 @@
+# Docker Registry API Exposure Detection Module
+
+id: docker-registry-api-exposure
+info:
+  name: Docker Registry API Exposure
+  author: sif
+  severity: high
+  description: Detects a Docker registry reachable anonymously through its v2 api base
+  tags: [docker, registry, container, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v2/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: header
+      regex:
+        - 'Docker-Distribution-Api-Version:\s*registry/2\.0'
+
+  extractors:
+    - type: regex
+      name: docker_registry_api_version
+      part: header
+      regex:
+        - 'Docker-Distribution-Api-Version:\s*(\S+)'
+      group: 1
