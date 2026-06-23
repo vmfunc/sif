@@ -1,0 +1,46 @@
+# Private Key Exposure Detection Module
+
+id: private-key-exposure
+info:
+  name: Private Key Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed PEM private key that grants ssh or tls access
+  tags: [ssh, tls, private-key, secret, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.ssh/id_rsa"
+    - "{{BaseURL}}/id_rsa"
+    - "{{BaseURL}}/id_ecdsa"
+    - "{{BaseURL}}/id_ed25519"
+    - "{{BaseURL}}/server.key"
+    - "{{BaseURL}}/private.key"
+    - "{{BaseURL}}/privkey.pem"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "-----BEGIN RSA PRIVATE KEY-----"
+        - "-----BEGIN OPENSSH PRIVATE KEY-----"
+        - "-----BEGIN EC PRIVATE KEY-----"
+        - "-----BEGIN DSA PRIVATE KEY-----"
+        - "-----BEGIN PRIVATE KEY-----"
+        - "-----BEGIN ENCRYPTED PRIVATE KEY-----"
+
+  extractors:
+    - type: regex
+      name: key_type
+      part: body
+      regex:
+        - '-----BEGIN ([A-Z0-9 ]+?) PRIVATE KEY-----'
+      group: 1
