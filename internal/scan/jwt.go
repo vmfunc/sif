@@ -16,9 +16,11 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
 	"regexp"
@@ -233,7 +235,7 @@ func analyzeJWT(source, raw string) (JWTToken, bool) {
 	// only bother cracking when the alg is actually hmac; an asymmetric token
 	// has no shared secret to guess.
 	if isHMACAlg(alg) {
-		if secret, ok := crackHMAC(raw); ok {
+		if secret, ok := crackHMAC(raw, alg); ok {
 			token.WeakKey = secret
 			token.Issues = append(token.Issues, JWTIssue{
 				Kind:     "weak hmac secret",
@@ -309,11 +311,15 @@ func jwtClaimIssues(payload map[string]any) []JWTIssue {
 	return issues
 }
 
-// crackHMAC tries every bundled weak secret against the token's HS256 signature
-// offline. a verifying secret means the token is forgeable by anyone who knows
-// it. only HS256 is attempted; the wordlist exists to catch lazy defaults, not
-// to be a real cracker.
-func crackHMAC(raw string) (string, bool) {
+// crackHMAC tries every bundled weak secret against the token's signature offline,
+// using the hash that matches alg (HS256/HS384/HS512). a verifying secret means the
+// token is forgeable; the wordlist catches lazy defaults, it is not a real cracker.
+func crackHMAC(raw, alg string) (string, bool) {
+	newHash, ok := hmacHash(alg)
+	if !ok {
+		return "", false
+	}
+
 	parts := strings.Split(raw, ".")
 	if len(parts) != 3 {
 		return "", false
@@ -326,13 +332,29 @@ func crackHMAC(raw string) (string, bool) {
 
 	for i := 0; i < len(jwtWeakSecrets); i++ {
 		secret := jwtWeakSecrets[i]
-		mac := hmac.New(sha256.New, []byte(secret))
+		mac := hmac.New(newHash, []byte(secret))
 		mac.Write([]byte(signingInput))
 		if hmac.Equal(mac.Sum(nil), want) {
 			return secret, true
 		}
 	}
 	return "", false
+}
+
+// hmacHash maps an HMAC jwt alg to its hash constructor; ok is false for any
+// non-HMAC or unknown alg. it is stricter than isHMACAlg: the confusion-surface
+// finding fires on any HS* alg, but cracking needs a computable digest width.
+func hmacHash(alg string) (func() hash.Hash, bool) {
+	switch strings.ToUpper(alg) {
+	case "HS256":
+		return sha256.New, true
+	case "HS384":
+		return sha512.New384, true
+	case "HS512":
+		return sha512.New, true
+	default:
+		return nil, false
+	}
 }
 
 // decodeJWTSegment base64url-decodes one jwt segment into a claims map. jwt uses
