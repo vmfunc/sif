@@ -1,0 +1,36 @@
+# Elasticsearch Exposure Detection Module
+
+id: elasticsearch-exposure
+info:
+  name: Elasticsearch Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed unauthenticated Elasticsearch HTTP API
+  tags: [elasticsearch, datastore, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"tagline"\s*:\s*"You Know, for Search"'
+        - '"lucene_version"\s*:\s*"[0-9]'
+      condition: and
+
+  extractors:
+    - type: regex
+      name: elasticsearch_version
+      part: body
+      regex:
+        - '"number"\s*:\s*"([0-9]+(?:\.[0-9]+)+)'
+      group: 1
