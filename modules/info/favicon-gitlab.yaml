@@ -1,0 +1,23 @@
+# GitLab favicon fingerprint
+
+id: favicon-gitlab
+info:
+  name: GitLab Favicon Fingerprint
+  author: sif
+  severity: info
+  description: Detects GitLab by its default favicon hash
+  tags: [favicon, fingerprint, gitlab, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/favicon.ico"
+
+  matchers:
+    - type: status
+      status: [200]
+    - type: favicon
+      hash:
+        - -1255347784 # GitLab default favicon
