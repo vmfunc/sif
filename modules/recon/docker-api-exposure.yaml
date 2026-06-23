@@ -1,0 +1,39 @@
+# Docker Engine API Exposure Detection Module
+
+id: docker-api-exposure
+info:
+  name: Docker Engine API Exposure
+  author: sif
+  severity: critical
+  description: Detects an unauthenticated Docker Engine api that grants control of the host
+  tags: [docker, container, api, rce, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"ApiVersion\""
+
+    - type: word
+      part: body
+      words:
+        - "\"MinAPIVersion\""
+
+  extractors:
+    - type: regex
+      name: docker_version
+      part: body
+      regex:
+        - '"Engine"[^}]*?"Version"\s*:\s*"([^"]+)"'
+      group: 1

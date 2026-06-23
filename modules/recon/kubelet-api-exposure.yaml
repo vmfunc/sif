@@ -1,0 +1,40 @@
+# Kubelet API Exposure Detection Module
+
+id: kubelet-api-exposure
+info:
+  name: Kubelet API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed kubelet api whose pod list leaks the cluster workload
+  tags: [kubernetes, kubelet, k8s, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/pods"
+    - "{{BaseURL}}/runningpods/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"kind"\s*:\s*"PodList"'
+
+    - type: word
+      part: body
+      words:
+        - "\"apiVersion\""
+
+  extractors:
+    - type: regex
+      name: kubelet_namespace
+      part: body
+      regex:
+        - '"namespace"\s*:\s*"([^"]+)"'
+      group: 1
