@@ -14,6 +14,8 @@ package modules
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -413,7 +415,10 @@ func TestGenerateHTTPRequests(t *testing.T) {
 			Paths: []string{"{{BaseURL}}/a", "{{BaseURL}}/b"},
 		}
 		// trailing slash on the target must be trimmed before substitution.
-		got := generateHTTPRequests("http://h/", cfg)
+		got, err := generateHTTPRequests("http://h/", cfg)
+		if err != nil {
+			t.Fatalf("generate: %v", err)
+		}
 		if len(got) != 2 {
 			t.Fatalf("got %d requests, want 2", len(got))
 		}
@@ -432,7 +437,10 @@ func TestGenerateHTTPRequests(t *testing.T) {
 			Payloads: []string{"1", "2", "3"},
 			Body:     "data={{payload}}",
 		}
-		got := generateHTTPRequests("http://h", cfg)
+		got, err := generateHTTPRequests("http://h", cfg)
+		if err != nil {
+			t.Fatalf("generate: %v", err)
+		}
 		if len(got) != 3 {
 			t.Fatalf("got %d requests, want 3", len(got))
 		}
@@ -457,9 +465,67 @@ func TestGenerateHTTPRequests(t *testing.T) {
 			Paths:    []string{"{{BaseURL}}/a", "{{BaseURL}}/b"},
 			Payloads: []string{"x", "y"},
 		}
-		got := generateHTTPRequests("http://h", cfg)
+		got, err := generateHTTPRequests("http://h", cfg)
+		if err != nil {
+			t.Fatalf("generate: %v", err)
+		}
 		if len(got) != 4 {
 			t.Fatalf("got %d requests, want 4 (2 paths x 2 payloads)", len(got))
+		}
+	})
+
+	t.Run("wordlist expands {{word}} paths", func(t *testing.T) {
+		list := filepath.Join(t.TempDir(), "words.txt")
+		if err := os.WriteFile(list, []byte("admin\n\nconfig\nbackup\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		cfg := &HTTPConfig{
+			Paths:    []string{"{{BaseURL}}/{{word}}", "{{BaseURL}}/.git/HEAD"},
+			Wordlist: list,
+		}
+		got, err := generateHTTPRequests("http://h", cfg)
+		if err != nil {
+			t.Fatalf("generate: %v", err)
+		}
+		// 3 words (the blank line is skipped) fuzz the templated path, then the
+		// literal path passes through untouched.
+		want := []string{"http://h/admin", "http://h/config", "http://h/backup", "http://h/.git/HEAD"}
+		if len(got) != len(want) {
+			t.Fatalf("got %d requests, want %d", len(got), len(want))
+		}
+		for i, w := range want {
+			if got[i].URL != w {
+				t.Errorf("req %d url = %q, want %q", i, got[i].URL, w)
+			}
+		}
+	})
+
+	t.Run("wordlist crosses with payloads", func(t *testing.T) {
+		list := filepath.Join(t.TempDir(), "words.txt")
+		if err := os.WriteFile(list, []byte("a\nb\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		cfg := &HTTPConfig{
+			Paths:    []string{"{{BaseURL}}/{{word}}?q={{payload}}"},
+			Wordlist: list,
+			Payloads: []string{"1", "2", "3"},
+		}
+		got, err := generateHTTPRequests("http://h", cfg)
+		if err != nil {
+			t.Fatalf("generate: %v", err)
+		}
+		if len(got) != 6 {
+			t.Fatalf("got %d requests, want 6 (2 words x 3 payloads)", len(got))
+		}
+	})
+
+	t.Run("missing wordlist errors", func(t *testing.T) {
+		cfg := &HTTPConfig{
+			Paths:    []string{"{{BaseURL}}/{{word}}"},
+			Wordlist: filepath.Join(t.TempDir(), "nope.txt"),
+		}
+		if _, err := generateHTTPRequests("http://h", cfg); err == nil {
+			t.Fatal("want error for missing wordlist, got nil")
 		}
 	})
 }

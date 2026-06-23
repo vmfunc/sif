@@ -17,6 +17,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -320,6 +322,48 @@ func TestWrapperExecuteRoutesByType(t *testing.T) {
 			t.Fatal("expected error for unknown module type")
 		}
 	})
+}
+
+// TestExecuteHTTPModuleWordlist proves a {{word}} path templated against a local
+// wordlist drives one real request per word, and only the path that exists fires.
+func TestExecuteHTTPModuleWordlist(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/admin" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	list := filepath.Join(t.TempDir(), "words.txt")
+	if err := os.WriteFile(list, []byte("login\nadmin\nbackup\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	def := &YAMLModule{
+		ID:   "test-wordlist",
+		Type: TypeHTTP,
+		Info: YAMLModuleInfo{Severity: "low"},
+		HTTP: &HTTPConfig{
+			Method:   "GET",
+			Wordlist: list,
+			Paths:    []string{"{{BaseURL}}/{{word}}"},
+			Matchers: []Matcher{{Type: "status", Status: []int{200}}},
+		},
+	}
+
+	opts := Options{Timeout: testTimeout, Client: httpx.Client(testTimeout)}
+	res, err := ExecuteHTTPModule(context.Background(), srv.URL, def, opts)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(res.Findings) != 1 {
+		t.Fatalf("got %d findings, want 1 (only /admin exists)", len(res.Findings))
+	}
+	if got := res.Findings[0].URL; got != srv.URL+"/admin" {
+		t.Errorf("finding url = %q, want %q", got, srv.URL+"/admin")
+	}
 }
 
 func TestTruncateEvidence(t *testing.T) {

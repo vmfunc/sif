@@ -127,6 +127,17 @@ http:
 - `clusterbomb` (default) - every path is tried with every payload
 - `pitchfork` - path and payload are paired by index, stopping at the shorter list
 
+#### wordlist
+
+a local file whose non-empty lines fuzz the `{{word}}` placeholder, one request
+per word. paths without `{{word}}` are still requested as-is.
+
+```yaml
+http:
+  wordlist: /usr/share/wordlists/dirs.txt
+  paths:
+    - "{{BaseURL}}/{{word}}"
+```
 #### headers
 
 custom headers to send.
