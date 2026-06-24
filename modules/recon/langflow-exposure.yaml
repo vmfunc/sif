@@ -1,0 +1,39 @@
+# Langflow Exposure Detection Module
+
+id: langflow-exposure
+info:
+  name: Langflow Exposure
+  author: sif
+  severity: medium
+  description: Fingerprints a reachable Langflow low-code agent builder via its version api. The version endpoint is unauthenticated by design, so this confirms the instance is present, not that its auth is missing; Langflow has a history of unauthenticated rce, so a reachable instance warrants review
+  tags: [langflow, llm, ai, agent, fingerprint, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"package"\s*:\s*"Langflow'
+
+    - type: word
+      part: body
+      words:
+        - "\"main_version\""
+
+  extractors:
+    - type: regex
+      name: langflow_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

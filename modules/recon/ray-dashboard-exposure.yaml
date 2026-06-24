@@ -1,0 +1,39 @@
+# Ray Dashboard Exposure Detection Module
+
+id: ray-dashboard-exposure
+info:
+  name: Ray Dashboard Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Ray dashboard whose version api confirms an unauthenticated cluster that also serves the job submission api
+  tags: [ray, ai, ml, cluster, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"ray_version\""
+
+    - type: word
+      part: body
+      words:
+        - "\"ray_commit\""
+
+  extractors:
+    - type: regex
+      name: ray_version
+      part: body
+      regex:
+        - '"ray_version"\s*:\s*"([^"]+)"'
+      group: 1
