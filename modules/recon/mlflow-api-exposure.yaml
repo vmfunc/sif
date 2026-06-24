@@ -1,0 +1,44 @@
+# MLflow Tracking Server Exposure Detection Module
+
+id: mlflow-api-exposure
+info:
+  name: MLflow Tracking Server Exposure
+  author: sif
+  severity: high
+  description: Detects an MLflow tracking server reachable without auth, disclosing experiments and the artifact store over its rest api; exposed servers have historically allowed arbitrary file read through artifact paths
+  tags: [mlflow, ai, ml, mlops, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/2.0/mlflow/experiments/get-by-name?experiment_name=Default"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"artifact_location\""
+
+    - type: word
+      part: body
+      words:
+        - "\"lifecycle_stage\""
+
+    - type: word
+      part: body
+      words:
+        - "\"experiment_id\""
+
+  extractors:
+    - type: regex
+      name: mlflow_artifact_location
+      part: body
+      regex:
+        - '"artifact_location"\s*:\s*"([^"]+)"'
+      group: 1

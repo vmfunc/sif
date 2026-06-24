@@ -1,0 +1,51 @@
+# TensorBoard Exposure Detection Module
+
+id: tensorboard-exposure
+info:
+  name: TensorBoard Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed TensorBoard instance; its unauthenticated data api discloses the training run source path and server version, and serves all logged scalars, graphs, images, and embeddings
+  tags: [tensorboard, ai, ml, mlops, training, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/data/environment"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"data_location\""
+
+    - type: word
+      part: body
+      words:
+        - "\"window_title\""
+
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+
+  extractors:
+    - type: regex
+      name: tensorboard_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
+
+    - type: regex
+      name: tensorboard_data_location
+      part: body
+      regex:
+        - '"data_location"\s*:\s*"([^"]+)"'
+      group: 1
