@@ -1,0 +1,44 @@
+# IOPaint API Exposure Detection Module
+
+id: iopaint-api-exposure
+info:
+  name: IOPaint API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed IOPaint inpainting server reachable without authentication; its server-config endpoint discloses the installed models and plugins, and the open api accepts unauthenticated inpainting, plugin execution, model switching, and media file-manager access
+  tags: [iopaint, lama-cleaner, stable-diffusion, ai, image, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1/server-config"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"interactiveSegModel\""
+
+    - type: word
+      part: body
+      words:
+        - "\"enableFileManager\""
+
+    - type: word
+      part: body
+      words:
+        - "\"disableModelSwitch\""
+
+  extractors:
+    - type: regex
+      name: iopaint_file_manager
+      part: body
+      regex:
+        - '"enableFileManager"\s*:\s*(true|false)'
+      group: 1
