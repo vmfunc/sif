@@ -1,0 +1,44 @@
+# NextChat (ChatGPT-Next-Web) Config Exposure Detection Module
+
+id: nextchat-config-exposure
+info:
+  name: NextChat Config Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed NextChat (ChatGPT-Next-Web) deployment whose config endpoint reports no access code set, meaning the proxy relays to provider apis using the operator's keys without any gate
+  tags: [nextchat, chatgpt-next-web, llm, ai, chat, ui, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/config"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"needCode"\s*:\s*false'
+
+    - type: word
+      part: body
+      words:
+        - "\"hideUserApiKey\""
+
+    - type: word
+      part: body
+      words:
+        - "\"hideBalanceQuery\""
+
+  extractors:
+    - type: regex
+      name: nextchat_needcode
+      part: body
+      regex:
+        - '"needCode"\s*:\s*(true|false)'
+      group: 1
