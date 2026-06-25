@@ -1,0 +1,39 @@
+# Ollama API Exposure Detection Module
+
+id: ollama-api-exposure
+info:
+  name: Ollama API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Ollama server whose api lists local models and accepts unauthenticated inference and model-management requests
+  tags: [ollama, llm, ai, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/tags"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"models\""
+
+    - type: word
+      part: body
+      words:
+        - "\"quantization_level\""
+
+  extractors:
+    - type: regex
+      name: ollama_model
+      part: body
+      regex:
+        - '"name"\s*:\s*"([^"]+)"'
+      group: 1

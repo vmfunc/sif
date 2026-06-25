@@ -1,0 +1,39 @@
+# Text Generation WebUI (oobabooga) API Exposure Detection Module
+
+id: oobabooga-api-exposure
+info:
+  name: Text Generation WebUI (oobabooga) API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Text Generation WebUI (oobabooga) OpenAI-compatible api reachable without authentication; the api key is unset by default, so its internal model-info endpoint discloses the loaded model and loras and the open api accepts unauthenticated text generation
+  tags: [oobabooga, text-generation-webui, llm, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v1/internal/model/info"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"model_name\""
+
+    - type: word
+      part: body
+      words:
+        - "\"lora_names\""
+
+  extractors:
+    - type: regex
+      name: oobabooga_model
+      part: body
+      regex:
+        - '"model_name"\s*:\s*"([^"]+)"'
+      group: 1
