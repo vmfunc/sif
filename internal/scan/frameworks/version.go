@@ -34,7 +34,6 @@ type compiledVersionPattern struct {
 }
 
 // frameworkVersionPatterns maps framework names to their pre-compiled version patterns.
-// Patterns are compiled once at package initialization for optimal performance.
 var frameworkVersionPatterns map[string][]compiledVersionPattern
 
 func init() {

@@ -429,7 +429,6 @@ func (d *cakephpDetector) Name() string { return "CakePHP" }
 
 func (d *cakephpDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "cakephp", Weight: 0.4},
 		{Pattern: "CAKEPHP", Weight: 0.4, HeaderOnly: true},
 	}
 }
