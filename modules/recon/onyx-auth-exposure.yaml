@@ -1,0 +1,44 @@
+# Onyx (Danswer) Auth Config Exposure Detection Module
+
+id: onyx-auth-exposure
+info:
+  name: Onyx Auth Config Exposure
+  author: sif
+  severity: low
+  description: Detects an exposed Onyx (formerly Danswer) rag platform; its unauthenticated auth-type endpoint discloses the authentication configuration, including whether anonymous access is enabled and whether any users have been created
+  tags: [onyx, danswer, llm, ai, rag, search, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/auth/type"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"requires_verification\""
+
+    - type: word
+      part: body
+      words:
+        - "\"anonymous_user_enabled\""
+
+    - type: word
+      part: body
+      words:
+        - "\"password_min_length\""
+
+  extractors:
+    - type: regex
+      name: onyx_auth_type
+      part: body
+      regex:
+        - '"auth_type"\s*:\s*"([^"]+)"'
+      group: 1

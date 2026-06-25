@@ -1,0 +1,44 @@
+# FastGPT Init Data Exposure Detection Module
+
+id: fastgpt-init-exposure
+info:
+  name: FastGPT Init Data Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed FastGPT knowledge-base chat platform; its init endpoint discloses the public system config, feature flags, and the configured model providers without authentication
+  tags: [fastgpt, llm, ai, rag, chat, ui, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/common/system/getInitData"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"feConfigs\""
+
+    - type: word
+      part: body
+      words:
+        - "\"modelProviders\""
+
+    - type: word
+      part: body
+      words:
+        - "\"aiproxyChannels\""
+
+  extractors:
+    - type: regex
+      name: fastgpt_title
+      part: body
+      regex:
+        - '"systemTitle"\s*:\s*"([^"]+)"'
+      group: 1
