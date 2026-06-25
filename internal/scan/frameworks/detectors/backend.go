@@ -468,6 +468,7 @@ func (d *codeigniterDetector) Detect(body string, headers http.Header) (float32,
 	}
 	return confidence, version
 }
+
 // tornadoDetector detects the Tornado Python web framework.
 type tornadoDetector struct{}
 
@@ -475,7 +476,7 @@ func (d *tornadoDetector) Name() string { return "Tornado" }
 
 func (d *tornadoDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "TornadoServer", Weight: 0.6, HeaderOnly: true},
+		{Pattern: "TornadoServer", Weight: 0.6, HeaderOnly: true, Header: "Server"},
 	}
 }
 

@@ -84,6 +84,7 @@ func TestWebFrameworkDetectors_Negative(t *testing.T) {
 		{"Express checkout cookie", &expressDetector{}, "", hdr("Set-Cookie", "express_checkout=1; path=/")},
 		{"Flask werkzeug docs link", &flaskDetector{}, "", hdr("Link", "<https://werkzeug.palletsprojects.com>; rel=help")},
 		{"CherryPy domain link", &cherrypyDetector{}, "", hdr("Link", "<https://cherrypy.dev>; rel=help")},
+		{"Tornado via header", &tornadoDetector{}, "", hdr("Via", "1.1 proxy-fronting-tornadoserver")},
 		{"Symfony domain link", &symfonyDetector{}, "", hdr("Link", "<https://symfony.com/x>; rel=help")},
 		{"Spring Boot tutorial prose", &springBootDetector{}, `<article>To fix the Whitelabel Error Page in Spring Boot, add a controller.</article>`, http.Header{}},
 		{"plain page Tornado", &tornadoDetector{}, "<html><body>hello</body></html>", hdr("Server", "nginx/1.25.3")},
