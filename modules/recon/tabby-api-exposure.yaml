@@ -1,0 +1,44 @@
+# Tabby Coding Assistant API Exposure Detection Module
+
+id: tabby-api-exposure
+info:
+  name: Tabby API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Tabby self-hosted coding assistant whose health endpoint discloses its model, hardware, and version; an instance without token auth serves code completion without a key
+  tags: [tabby, llm, ai, code-assistant, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v1/health"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"cpu_info\""
+
+    - type: word
+      part: body
+      words:
+        - "\"cuda_devices\""
+
+    - type: word
+      part: body
+      words:
+        - "\"git_describe\""
+
+  extractors:
+    - type: regex
+      name: tabby_model
+      part: body
+      regex:
+        - '"model"\s*:\s*"([^"]+)"'
+      group: 1

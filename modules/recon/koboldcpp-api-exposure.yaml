@@ -1,0 +1,51 @@
+# KoboldCpp API Exposure Detection Module
+
+id: koboldcpp-api-exposure
+info:
+  name: KoboldCpp API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed KoboldCpp instance over its unauthenticated capabilities probe; an instance with no password set serves text, image, and audio generation without a key
+  tags: [koboldcpp, llm, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/extra/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"result"\s*:\s*"KoboldCpp"'
+
+    - type: word
+      part: body
+      words:
+        - "\"protected\""
+
+    - type: word
+      part: body
+      words:
+        - "\"txt2img\""
+
+  extractors:
+    - type: regex
+      name: koboldcpp_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
+
+    - type: regex
+      name: koboldcpp_protected
+      part: body
+      regex:
+        - '"protected"\s*:\s*(true|false)'
+      group: 1
