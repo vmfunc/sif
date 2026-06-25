@@ -22,10 +22,10 @@ import (
 
 	"github.com/antchfx/htmlquery"
 	charmlog "github.com/charmbracelet/log"
+	urlutil "github.com/projectdiscovery/utils/url"
 	"github.com/vmfunc/sif/internal/httpx"
 	"github.com/vmfunc/sif/internal/output"
 	"github.com/vmfunc/sif/internal/scan/js/frameworks"
-	urlutil "github.com/projectdiscovery/utils/url"
 )
 
 type JavascriptScanResult struct {

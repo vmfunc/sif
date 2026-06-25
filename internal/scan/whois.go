@@ -14,9 +14,9 @@ package scan
 
 import (
 	"github.com/charmbracelet/log"
+	"github.com/likexian/whois"
 	"github.com/vmfunc/sif/internal/logger"
 	"github.com/vmfunc/sif/internal/output"
-	"github.com/likexian/whois"
 )
 
 func Whois(url string, logdir string) {

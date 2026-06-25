@@ -25,11 +25,11 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	googlesearch "github.com/rocketlaunchr/google-search"
 	"github.com/vmfunc/sif/internal/httpx"
 	"github.com/vmfunc/sif/internal/logger"
 	"github.com/vmfunc/sif/internal/output"
 	"github.com/vmfunc/sif/internal/pool"
-	googlesearch "github.com/rocketlaunchr/google-search"
 )
 
 const (

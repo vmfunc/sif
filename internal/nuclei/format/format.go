@@ -13,8 +13,8 @@
 package format
 
 import (
-	"github.com/vmfunc/sif/internal/styles"
 	nucleiout "github.com/projectdiscovery/nuclei/v3/pkg/output"
+	"github.com/vmfunc/sif/internal/styles"
 )
 
 func FormatLine(event *nucleiout.ResultEvent) string {

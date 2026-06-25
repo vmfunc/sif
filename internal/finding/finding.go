@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 	"github.com/vmfunc/sif/internal/modules"
 	"github.com/vmfunc/sif/internal/scan"
 	"github.com/vmfunc/sif/internal/scan/frameworks"
 	"github.com/vmfunc/sif/internal/scan/js"
-	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
 
 // Finding is the normalized shape every scanner result collapses to. one

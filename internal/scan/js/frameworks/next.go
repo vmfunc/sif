@@ -30,8 +30,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/vmfunc/sif/internal/httpx"
 	urlutil "github.com/projectdiscovery/utils/url"
+	"github.com/vmfunc/sif/internal/httpx"
 )
 
 // nextPagesRegex matches JavaScript file references in Next.js build manifest.
