@@ -1,0 +1,39 @@
+# Text Embeddings Inference API Exposure Detection Module
+
+id: tei-api-exposure
+info:
+  name: Text Embeddings Inference API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Hugging Face Text Embeddings Inference server that serves model info and embedding requests without authentication
+  tags: [tei, embeddings, llm, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/info"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"model_type\""
+
+    - type: word
+      part: body
+      words:
+        - "\"max_batch_tokens\""
+
+  extractors:
+    - type: regex
+      name: tei_model
+      part: body
+      regex:
+        - '"model_id"\s*:\s*"([^"]+)"'
+      group: 1
