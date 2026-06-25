@@ -1,0 +1,44 @@
+# H2O Cluster Exposure Detection Module
+
+id: h2o-cluster-exposure
+info:
+  name: H2O Cluster Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed H2O machine learning cluster (H2O Flow) reachable without authentication; H2O permits arbitrary code execution, so a reachable node allows takeover of the cluster
+  tags: [h2o, ai, ml, automl, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/3/Cloud"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"cloud_name\""
+
+    - type: word
+      part: body
+      words:
+        - "\"cloud_uptime_millis\""
+
+    - type: word
+      part: body
+      words:
+        - "\"build_too_old\""
+
+  extractors:
+    - type: regex
+      name: h2o_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

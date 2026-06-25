@@ -1,0 +1,44 @@
+# MindsDB API Exposure Detection Module
+
+id: mindsdb-api-exposure
+info:
+  name: MindsDB API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed MindsDB server; with http auth disabled by default its sql and model api is reachable without a key, and the unauthenticated status endpoint discloses the version and whether auth is required
+  tags: [mindsdb, ai, ml, database, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/status"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"mindsdb_version\""
+
+    - type: word
+      part: body
+      words:
+        - "\"environment\""
+
+    - type: word
+      part: body
+      words:
+        - "\"provider\""
+
+  extractors:
+    - type: regex
+      name: mindsdb_version
+      part: body
+      regex:
+        - '"mindsdb_version"\s*:\s*"([^"]+)"'
+      group: 1
