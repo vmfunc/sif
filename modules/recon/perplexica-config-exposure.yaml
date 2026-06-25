@@ -1,0 +1,44 @@
+# Perplexica Config Exposure Detection Module
+
+id: perplexica-config-exposure
+info:
+  name: Perplexica Config Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Perplexica answer engine; its config endpoint is reachable without authentication and returns the full deployment configuration, including the model-provider settings and the api keys stored in them
+  tags: [perplexica, llm, ai, rag, search, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/config"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"searxngURL\""
+
+    - type: word
+      part: body
+      words:
+        - "\"measureUnit\""
+
+    - type: word
+      part: body
+      words:
+        - "\"autoMediaSearch\""
+
+  extractors:
+    - type: regex
+      name: perplexica_searxng
+      part: body
+      regex:
+        - '"searxngURL"\s*:\s*"([^"]+)"'
+      group: 1
