@@ -1,0 +1,45 @@
+# Infinity Embedding Server API Exposure Detection Module
+
+id: infinity-embedding-api-exposure
+info:
+  name: Infinity Embedding Server API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Infinity embedding and reranking server reachable without authentication; its model list leaks the served models and the server accepts embedding requests without a key
+  tags: [infinity, embeddings, llm, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/models"
+    - "{{BaseURL}}/v1/models"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"backend\""
+
+    - type: word
+      part: body
+      words:
+        - "\"capabilities\""
+
+    - type: regex
+      part: body
+      regex:
+        - '"owned_by"\s*:\s*"infinity"'
+
+  extractors:
+    - type: regex
+      name: infinity_model
+      part: body
+      regex:
+        - '"id"\s*:\s*"([^"]+)"'
+      group: 1
