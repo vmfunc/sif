@@ -1,0 +1,38 @@
+# HashiCorp Nomad Agent API Exposure Detection Module
+
+id: nomad-agent-exposure
+info:
+  name: HashiCorp Nomad Agent API Exposure
+  author: sif
+  severity: high
+  description: Detects a HashiCorp Nomad agent with ACLs disabled that dumps its configuration and accepts tokenless job submission
+  tags: [nomad, hashicorp, orchestration, scheduler, controlplane, api, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v1/agent/self"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"config\""
+        - "\"member\""
+        - "\"stats\""
+        - "\"Tags\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: nomad_version
+      part: body
+      regex:
+        - '"build"\s*:\s*"([0-9][^"]*)"'
+      group: 1
