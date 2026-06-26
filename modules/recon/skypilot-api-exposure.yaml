@@ -1,0 +1,51 @@
+# SkyPilot API Server Exposure Detection Module
+
+id: skypilot-api-exposure
+info:
+  name: SkyPilot API Server Exposure
+  author: sif
+  severity: high
+  description: Detects an open SkyPilot api server with basic auth disabled; it provisions and controls cloud and kubernetes clusters and holds the cloud credentials, so an unauthenticated server allows job submission and credential access. The health endpoint is served even when auth is enabled, so the module requires basic_auth_enabled to be false to confirm the server is open
+  tags: [skypilot, ai, ml, compute, orchestration, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/health"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"version_on_disk\""
+
+    - type: word
+      part: body
+      words:
+        - "\"commit\""
+
+    - type: regex
+      part: body
+      regex:
+        - '"basic_auth_enabled"\s*:\s*false'
+
+  extractors:
+    - type: regex
+      name: skypilot_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
+
+    - type: regex
+      name: skypilot_basic_auth
+      part: body
+      regex:
+        - '"basic_auth_enabled"\s*:\s*(true|false)'
+      group: 1

@@ -1,0 +1,49 @@
+# Dify Console Exposure Detection Module
+
+id: dify-console-exposure
+info:
+  name: Dify Console Exposure
+  author: sif
+  severity: medium
+  description: Detects a Dify console with open registration enabled; its unauthenticated system-features endpoint reports is_allow_register true, so anyone can create an account on the llm app platform
+  tags: [dify, llm, ai, agent, platform, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/console/api/system-features"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"sso_enforced_for_signin\""
+
+    - type: word
+      part: body
+      words:
+        - "\"enable_email_password_login\""
+
+    - type: word
+      part: body
+      words:
+        - "\"is_allow_create_workspace\""
+
+    - type: regex
+      part: body
+      regex:
+        - '"is_allow_register"\s*:\s*true'
+
+  extractors:
+    - type: regex
+      name: dify_allow_register
+      part: body
+      regex:
+        - '"is_allow_register"\s*:\s*(true|false)'
+      group: 1
