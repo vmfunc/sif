@@ -33,6 +33,16 @@ func init() {
 	fw.Register(&gatsbyDetector{})
 	fw.Register(&remixDetector{})
 	fw.Register(&astroDetector{})
+	fw.Register(&hugoDetector{})
+	fw.Register(&jekyllDetector{})
+	fw.Register(&docusaurusDetector{})
+	fw.Register(&mkdocsDetector{})
+	fw.Register(&eleventyDetector{})
+	fw.Register(&hexoDetector{})
+	fw.Register(&vuepressDetector{})
+	fw.Register(&sphinxDetector{})
+	fw.Register(&nikolaDetector{})
+	fw.Register(&publiiDetector{})
 }
 
 // nextjsDetector detects Next.js framework.
@@ -181,6 +191,244 @@ func (d *astroDetector) Signatures() []fw.Signature {
 }
 
 func (d *astroDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// The generator detectors below anchor on the content="<brand> value: real
+// sites minify and reorder the meta, dropping the name="generator" prefix.
+
+// hugoDetector detects the Hugo static site generator.
+type hugoDetector struct{}
+
+func (d *hugoDetector) Name() string { return "Hugo" }
+
+func (d *hugoDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `content="Hugo 0.`, Weight: 0.6},
+	}
+}
+
+func (d *hugoDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// jekyllDetector detects the Jekyll static site generator.
+type jekyllDetector struct{}
+
+func (d *jekyllDetector) Name() string { return "Jekyll" }
+
+func (d *jekyllDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `content="Jekyll v`, Weight: 0.6},
+	}
+}
+
+func (d *jekyllDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// docusaurusDetector detects the Docusaurus documentation site generator.
+type docusaurusDetector struct{}
+
+func (d *docusaurusDetector) Name() string { return "Docusaurus" }
+
+func (d *docusaurusDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `content="Docusaurus v`, Weight: 0.6},
+	}
+}
+
+func (d *docusaurusDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// mkdocsDetector detects MkDocs (including the Material theme).
+type mkdocsDetector struct{}
+
+func (d *mkdocsDetector) Name() string { return "MkDocs" }
+
+func (d *mkdocsDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `content="mkdocs-`, Weight: 0.6},
+	}
+}
+
+func (d *mkdocsDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// The generator detectors below anchor on the generator-attribute prefix
+// (generator" content="<brand>) rather than a bare brand value.
+
+// eleventyDetector detects the Eleventy (11ty) static site generator.
+type eleventyDetector struct{}
+
+func (d *eleventyDetector) Name() string { return "Eleventy" }
+
+func (d *eleventyDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `generator" content="Eleventy`, Weight: 0.6},
+	}
+}
+
+func (d *eleventyDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// hexoDetector detects the Hexo static site generator.
+type hexoDetector struct{}
+
+func (d *hexoDetector) Name() string { return "Hexo" }
+
+func (d *hexoDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `generator" content="Hexo`, Weight: 0.6},
+	}
+}
+
+func (d *hexoDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// vuepressDetector detects VuePress.
+type vuepressDetector struct{}
+
+func (d *vuepressDetector) Name() string { return "VuePress" }
+
+func (d *vuepressDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `generator" content="VuePress`, Weight: 0.6},
+	}
+}
+
+func (d *vuepressDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// sphinxDetector detects the Sphinx documentation generator.
+type sphinxDetector struct{}
+
+func (d *sphinxDetector) Name() string { return "Sphinx" }
+
+func (d *sphinxDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "_static/documentation_options.js", Weight: 0.6},
+		{Pattern: "sphinx-doc.org", Weight: 0.3},
+		{Pattern: "_static/doctools.js", Weight: 0.3},
+	}
+}
+
+func (d *sphinxDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// nikolaDetector detects the Nikola static site generator.
+type nikolaDetector struct{}
+
+func (d *nikolaDetector) Name() string { return "Nikola" }
+
+func (d *nikolaDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `generator" content="Nikola`, Weight: 0.6},
+	}
+}
+
+func (d *nikolaDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// publiiDetector detects the Publii static-site CMS.
+type publiiDetector struct{}
+
+func (d *publiiDetector) Name() string { return "Publii" }
+
+func (d *publiiDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `generator" content="Publii`, Weight: 0.6},
+	}
+}
+
+func (d *publiiDetector) Detect(body string, headers http.Header) (float32, string) {
 	base := fw.NewBaseDetector(d.Name(), d.Signatures())
 	score := base.MatchSignatures(body, headers)
 	confidence := sigmoidConfidence(score)
