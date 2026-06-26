@@ -1,0 +1,44 @@
+# one-api / new-api LLM Gateway Exposure Detection Module
+
+id: oneapi-status-exposure
+info:
+  name: one-api / new-api Gateway Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed one-api or new-api llm gateway over its unauthenticated status endpoint, which discloses the version, uptime, configured oauth providers, and quota settings of a credential-handling proxy
+  tags: [oneapi, newapi, llm, ai, gateway, proxy, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/status"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"system_name\""
+
+    - type: word
+      part: body
+      words:
+        - "\"start_time\""
+
+    - type: word
+      part: body
+      words:
+        - "\"quota_per_unit\""
+
+  extractors:
+    - type: regex
+      name: oneapi_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
