@@ -1,0 +1,44 @@
+# Speaches Speech Server API Exposure Detection Module
+
+id: speaches-api-exposure
+info:
+  name: Speaches Speech Server API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Speaches speech server (the successor to faster-whisper-server) reachable without authentication; api keys are disabled by default, so its model list leaks the loaded speech-to-text and text-to-speech models and the open api accepts unauthenticated transcription and synthesis
+  tags: [speaches, faster-whisper, whisper, speech, stt, tts, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v1/models"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"object"\s*:\s*"list"'
+
+    - type: word
+      part: body
+      words:
+        - "\"owned_by\""
+
+    - type: regex
+      part: body
+      regex:
+        - '"task"\s*:\s*"(automatic-speech-recognition|text-to-speech|speaker-embedding|voice-activity-detection|speaker-diarization)"'
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: speaches_model
+      part: body
+      regex:
+        - '"id"\s*:\s*"([^"]+)"'
+      group: 1

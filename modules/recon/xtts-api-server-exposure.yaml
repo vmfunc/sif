@@ -1,0 +1,44 @@
+# XTTS API Server Exposure Detection Module
+
+id: xtts-api-server-exposure
+info:
+  name: XTTS API Server Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed xtts-api-server text-to-speech server reachable without authentication; its get-folders endpoint discloses the server's local speaker, model, and output filesystem paths, and the open api accepts unauthenticated voice cloning, model switching, and speaker and output folder changes
+  tags: [xtts, coqui, tts, voice-cloning, speech, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/get_folders"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"speaker_folder\""
+
+    - type: word
+      part: body
+      words:
+        - "\"model_folder\""
+
+    - type: word
+      part: body
+      words:
+        - "\"output_folder\""
+
+  extractors:
+    - type: regex
+      name: xtts_model_folder
+      part: body
+      regex:
+        - '"model_folder"\s*:\s*"([^"]+)"'
+      group: 1
