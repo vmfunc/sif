@@ -1,0 +1,39 @@
+# Triton Inference Server API Exposure Detection Module
+
+id: triton-api-exposure
+info:
+  name: Triton Inference Server API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed NVIDIA Triton Inference Server whose metadata api confirms unauthenticated model serving and model-repository control
+  tags: [triton, nvidia, ai, ml, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v2"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"name"\s*:\s*"triton"'
+
+    - type: word
+      part: body
+      words:
+        - "\"extensions\""
+
+  extractors:
+    - type: regex
+      name: triton_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

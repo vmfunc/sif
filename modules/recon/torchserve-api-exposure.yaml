@@ -1,0 +1,39 @@
+# TorchServe Management API Exposure Detection Module
+
+id: torchserve-api-exposure
+info:
+  name: TorchServe Management API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed TorchServe management api that lists models and accepts registration of arbitrary model archives without authentication
+  tags: [torchserve, pytorch, ai, ml, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/models"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"nextPageToken\""
+
+    - type: word
+      part: body
+      words:
+        - "\"modelUrl\""
+
+  extractors:
+    - type: regex
+      name: torchserve_model
+      part: body
+      regex:
+        - '"modelName"\s*:\s*"([^"]+)"'
+      group: 1
