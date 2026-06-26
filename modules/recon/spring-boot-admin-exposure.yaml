@@ -1,0 +1,37 @@
+# Spring Boot Admin Exposure Detection Module
+
+id: spring-boot-admin-exposure
+info:
+  name: Spring Boot Admin Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Spring Boot Admin server that leaks every registered app's internal management and health urls and metadata
+  tags: [spring-boot-admin, spring, actuator, monitoring, registry, information-disclosure, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/instances"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"registration\""
+        - "\"healthUrl\""
+        - "\"statusInfo\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: sba_health_url
+      part: body
+      regex:
+        - '"healthUrl"\s*:\s*"([^"]+)"'
+      group: 1
