@@ -26,10 +26,8 @@ import (
 	"time"
 
 	"github.com/tidwall/gjson"
+	"github.com/vmfunc/sif/internal/httpx"
 )
-
-// MaxBodySize limits response body to prevent memory exhaustion.
-const MaxBodySize = 5 * 1024 * 1024
 
 // ErrUnsupportedModuleType signals an executor for a module type that is not
 // yet implemented. Returning it (rather than an empty result) keeps callers
@@ -309,7 +307,7 @@ func executeHTTPRequest(ctx context.Context, client *http.Client, r *httpRequest
 	defer resp.Body.Close()
 
 	// Read body with limit
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, MaxBodySize))
+	respBody, err := httpx.ReadCappedBody(resp)
 	if err != nil {
 		return Finding{}, false
 	}

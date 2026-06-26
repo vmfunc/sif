@@ -68,6 +68,11 @@ const (
 // conn, so we cap the read and let the conn be discarded instead.
 const drainCap = 16 << 10
 
+// MaxBodySize is the shared ceiling on how much of a response body the scanners
+// read into memory, so a hostile or accidental multi-gigabyte response can't
+// exhaust the process.
+const MaxBodySize = 5 << 20
+
 // Options carries the runtime knobs that apply to every outbound request.
 // RateLimit is requests/sec (0 = unlimited); Headers are "Key: Value" strings.
 type Options struct {
@@ -211,6 +216,13 @@ func DrainClose(resp *http.Response) {
 	// about to close it, so a copy error changes nothing we can act on.
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, drainCap))
 	resp.Body.Close()
+}
+
+// ReadCappedBody reads resp.Body up to MaxBodySize, the shared cap every scanner
+// uses so one runaway response can't exhaust memory. It does not close the body;
+// pair it with DrainClose or an explicit Close.
+func ReadCappedBody(resp *http.Response) ([]byte, error) {
+	return io.ReadAll(io.LimitReader(resp.Body, MaxBodySize))
 }
 
 // parseHeaders splits each "Key: Value" entry on the first ": ". Entries
