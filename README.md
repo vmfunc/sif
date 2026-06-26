@@ -375,7 +375,7 @@ go test ./...
 
 join our discord for support, feature discussions, and pentesting tips:
 
-[![discord](https://img.shields.io/badge/join%20our%20discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/sifcli)
+[![discord](https://img.shields.io/badge/join%20our%20discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Yksy9J2BvE)
 
 ## contributors
 
