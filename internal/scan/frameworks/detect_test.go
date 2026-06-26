@@ -709,8 +709,25 @@ func TestDetectorRegistry(t *testing.T) {
 		t.Fatal("expected registered detectors, got none")
 	}
 
-	// Check that some expected detectors are registered
-	expectedDetectors := []string{"Laravel", "Django", "React", "Vue.js", "Angular", "Next.js", "WordPress", "Astro"}
+	// Check that expected detectors are registered: a spot-check of the
+	// originals plus every detector added to the backend, cms, and meta sets.
+	expectedDetectors := []string{
+		"Laravel", "Django", "React", "Vue.js", "Angular", "Next.js", "WordPress", "Astro",
+		"Tornado", "CherryPy", "Play Framework", "Sails.js", "Beego",
+		"JavaServer Faces", "Google Web Toolkit", "Vaadin", "ColdFusion",
+		"TYPO3", "Contao", "Wix", "Webflow", "HubSpot", "PrestaShop",
+		"Sitecore", "OpenCart", "DotNetNuke", "Liferay",
+		"Hugo", "Jekyll", "Docusaurus", "MkDocs",
+		"Alpine.js", "Qwik", "jQuery",
+		"Squarespace", "WooCommerce", "Craft CMS", "Concrete CMS", "Bitrix", "Blogger",
+		"Eleventy", "Hexo", "VuePress", "Sphinx",
+		"MediaWiki", "Discourse", "XenForo", "Moodle", "Plone", "Grav",
+		"Textpattern", "October CMS", "Statamic", "Livewire",
+		"Stimulus", "Turbo", "Knockout.js", "Unpoly", "Flarum", "NodeBB",
+		"XWiki", "Bolt CMS", "Nikola", "Publii", "ExpressionEngine",
+		"Vercel", "Netlify", "GitHub Pages", "Cloudflare",
+		"Amazon CloudFront", "Akamai", "Fly.io", "Amazon S3",
+	}
 	for _, name := range expectedDetectors {
 		if _, ok := frameworks.GetDetector(name); !ok {
 			t.Errorf("expected detector %q to be registered", name)
