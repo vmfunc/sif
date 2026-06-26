@@ -1,0 +1,36 @@
+# Portainer Status Endpoint Exposure Detection Module
+
+id: portainer-status-exposure
+info:
+  name: Portainer Status Exposure
+  author: sif
+  severity: medium
+  description: Detects a Portainer instance that discloses its version and instance id over the unauthenticated pre-login status endpoint
+  tags: [portainer, docker, container, management, fingerprint, status, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/status"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"Version\""
+        - "\"InstanceID\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: portainer_instance_id
+      part: body
+      regex:
+        - '"InstanceID"\s*:\s*"([^"]+)"'
+      group: 1
