@@ -22,6 +22,7 @@ package detectors
 import (
 	"math"
 	"net/http"
+	"strings"
 
 	fw "github.com/vmfunc/sif/internal/scan/frameworks"
 )
@@ -43,6 +44,15 @@ func init() {
 	fw.Register(&adonisDetector{})
 	fw.Register(&cakephpDetector{})
 	fw.Register(&codeigniterDetector{})
+	fw.Register(&tornadoDetector{})
+	fw.Register(&cherrypyDetector{})
+	fw.Register(&playDetector{})
+	fw.Register(&sailsDetector{})
+	fw.Register(&beegoDetector{})
+	fw.Register(&jsfDetector{})
+	fw.Register(&gwtDetector{})
+	fw.Register(&vaadinDetector{})
+	fw.Register(&coldfusionDetector{})
 }
 
 // sigmoidConfidence maps the matched-weight fraction to a 0-1 confidence,
@@ -50,6 +60,22 @@ func init() {
 // detection threshold (it used to: sigmoid(0) was 0.5, so any match "detected").
 func sigmoidConfidence(score float32) float32 {
 	return float32(1.0 / (1.0 + math.Exp(-(float64(score)-0.3)*10.0)))
+}
+
+// serverVersion pulls the trailing version out of a "<product>/<version>" Server
+// header, e.g. "TornadoServer/6.4.1" -> "6.4.1".
+func serverVersion(headers http.Header, product string) string {
+	server := headers.Get("Server")
+	i := strings.Index(server, product+"/")
+	if i < 0 {
+		return ""
+	}
+	rest := server[i+len(product)+1:]
+	end := 0
+	for end < len(rest) && (rest[end] == '.' || (rest[end] >= '0' && rest[end] <= '9')) {
+		end++
+	}
+	return rest[:end]
 }
 
 // laravelDetector detects Laravel framework.
@@ -357,7 +383,7 @@ func (d *strapiDetector) Name() string { return "Strapi" }
 
 func (d *strapiDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "strapi", Weight: 0.4},
+		{Pattern: "Strapi", Weight: 0.4, HeaderOnly: true, Header: "X-Powered-By"},
 	}
 }
 
@@ -432,6 +458,221 @@ func (d *codeigniterDetector) Signatures() []fw.Signature {
 }
 
 func (d *codeigniterDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+// tornadoDetector detects the Tornado Python web framework.
+type tornadoDetector struct{}
+
+func (d *tornadoDetector) Name() string { return "Tornado" }
+
+func (d *tornadoDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "TornadoServer", Weight: 0.6, HeaderOnly: true},
+	}
+}
+
+func (d *tornadoDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = serverVersion(headers, "TornadoServer")
+	}
+	return confidence, version
+}
+
+// cherrypyDetector detects the CherryPy Python web framework.
+type cherrypyDetector struct{}
+
+func (d *cherrypyDetector) Name() string { return "CherryPy" }
+
+func (d *cherrypyDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "CherryPy", Weight: 0.6, HeaderOnly: true, Header: "Server"},
+	}
+}
+
+func (d *cherrypyDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = serverVersion(headers, "CherryPy")
+	}
+	return confidence, version
+}
+
+// playDetector detects the Play Framework (Scala/Java).
+type playDetector struct{}
+
+func (d *playDetector) Name() string { return "Play Framework" }
+
+func (d *playDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "PLAY_SESSION", Weight: 0.5, HeaderOnly: true},
+		{Pattern: "PLAY_FLASH", Weight: 0.3, HeaderOnly: true},
+		{Pattern: "PLAY_LANG", Weight: 0.3, HeaderOnly: true},
+	}
+}
+
+func (d *playDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// sailsDetector detects the Sails.js Node framework.
+type sailsDetector struct{}
+
+func (d *sailsDetector) Name() string { return "Sails.js" }
+
+func (d *sailsDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "sails.sid", Weight: 0.5, HeaderOnly: true},
+	}
+}
+
+func (d *sailsDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// beegoDetector detects the Beego Go web framework.
+type beegoDetector struct{}
+
+func (d *beegoDetector) Name() string { return "Beego" }
+
+func (d *beegoDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "beegosessionID", Weight: 0.5, HeaderOnly: true},
+	}
+}
+
+func (d *beegoDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// jsfDetector detects JavaServer Faces / Jakarta Faces.
+type jsfDetector struct{}
+
+func (d *jsfDetector) Name() string { return "JavaServer Faces" }
+
+func (d *jsfDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `javax.faces.ViewState"`, Weight: 0.5},
+		{Pattern: `jakarta.faces.ViewState"`, Weight: 0.5},
+	}
+}
+
+func (d *jsfDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// gwtDetector detects Google Web Toolkit.
+type gwtDetector struct{}
+
+func (d *gwtDetector) Name() string { return "Google Web Toolkit" }
+
+func (d *gwtDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `.nocache.js"`, Weight: 0.4},
+		{Pattern: "gwt:", Weight: 0.3},
+		{Pattern: "__gwt_", Weight: 0.3},
+	}
+}
+
+func (d *gwtDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// vaadinDetector detects the Vaadin Java framework.
+type vaadinDetector struct{}
+
+func (d *vaadinDetector) Name() string { return "Vaadin" }
+
+func (d *vaadinDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: `"Vaadin-Security-Key"`, Weight: 0.5},
+		{Pattern: "window.Vaadin", Weight: 0.3},
+		{Pattern: "/VAADIN/", Weight: 0.3},
+	}
+}
+
+func (d *vaadinDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// coldfusionDetector detects Adobe ColdFusion / Lucee (CFML).
+type coldfusionDetector struct{}
+
+func (d *coldfusionDetector) Name() string { return "ColdFusion" }
+
+func (d *coldfusionDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "CFTOKEN", Weight: 0.4, HeaderOnly: true},
+		{Pattern: "CFID", Weight: 0.3, HeaderOnly: true},
+		{Pattern: "CFAUTHORIZATION", Weight: 0.3, HeaderOnly: true},
+	}
+}
+
+func (d *coldfusionDetector) Detect(body string, headers http.Header) (float32, string) {
 	base := fw.NewBaseDetector(d.Name(), d.Signatures())
 	score := base.MatchSignatures(body, headers)
 	confidence := sigmoidConfidence(score)
