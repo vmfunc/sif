@@ -1,0 +1,39 @@
+# Woodpecker CI Version Endpoint Exposure Detection Module
+
+id: woodpecker-version-exposure
+info:
+  name: Woodpecker CI Version Exposure
+  author: sif
+  severity: medium
+  description: Detects a Woodpecker CI server that discloses its version and source repository over the unauthenticated version endpoint
+  tags: [woodpecker, ci, cd, pipeline, build, fingerprint, version, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/version"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"source"\s*:\s*"[^"]*woodpecker'
+
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: woodpecker_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

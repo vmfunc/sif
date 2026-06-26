@@ -1,0 +1,44 @@
+# GoCD Version Endpoint Exposure Detection Module
+
+id: gocd-version-exposure
+info:
+  name: GoCD Version Exposure
+  author: sif
+  severity: medium
+  description: Detects a GoCD server that discloses its version, build number and git sha over the unauthenticated version api
+  tags: [gocd, ci, cd, pipeline, build, fingerprint, version, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/go/api/version"
+
+  headers:
+    Accept: "application/vnd.go.cd+json"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"full_version\""
+        - "\"commit_url\""
+      condition: and
+
+    - type: regex
+      part: body
+      regex:
+        - '"commit_url"\s*:\s*"https://github.com/gocd/gocd'
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: gocd_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
