@@ -148,6 +148,51 @@ func init() {
 			{`Astro[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
 			{`"astro":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
 		},
+		"Hugo": {
+			{`content="Hugo (\d+\.\d+(?:\.\d+)?)`, 0.95, "generator meta"},
+		},
+		"Jekyll": {
+			{`content="Jekyll v(\d+\.\d+(?:\.\d+)?)`, 0.95, "generator meta"},
+		},
+		"Docusaurus": {
+			{`content="Docusaurus v(\d+\.\d+(?:\.\d+)?)`, 0.95, "generator meta"},
+		},
+		"MkDocs": {
+			{`content="mkdocs-(\d+\.\d+(?:\.\d+)?)`, 0.9, "generator meta"},
+		},
+		"TYPO3": {
+			{`content="TYPO3 (\d+\.\d+(?:\.\d+)?)`, 0.9, "generator meta"},
+		},
+		"Eleventy": {
+			{`content="Eleventy[^"]*?v(\d+\.\d+(?:\.\d+)?)`, 0.9, "generator meta"},
+		},
+		"Hexo": {
+			{`content="Hexo (\d+\.\d+(?:\.\d+)?)`, 0.9, "generator meta"},
+		},
+		"VuePress": {
+			{`content="VuePress (\d+\.\d+(?:\.\d+)?)`, 0.9, "generator meta"},
+		},
+		"jQuery": {
+			{`jquery-(\d+\.\d+(?:\.\d+)?)(?:\.min)?\.js`, 0.9, "script filename"},
+			{`jquery@(\d+\.\d+(?:\.\d+)?)`, 0.85, "CDN reference"},
+			{`/jquery/(\d+\.\d+(?:\.\d+)?)/`, 0.85, "CDN path"},
+			{`jQuery v(\d+\.\d+(?:\.\d+)?)`, 0.9, "library banner"},
+		},
+		"Alpine.js": {
+			{`alpinejs@(\d+\.\d+(?:\.\d+)?)`, 0.85, "CDN reference"},
+		},
+		"Qwik": {
+			{`q:version="(\d+\.\d+(?:\.\d+)?)"`, 0.9, "container attribute"},
+		},
+		"MediaWiki": {
+			{`content="MediaWiki (\d+\.\d+(?:\.\d+)?)`, 0.9, "generator meta"},
+		},
+		"Discourse": {
+			{`content="Discourse (\d+\.\d+(?:\.\d+)?)`, 0.9, "generator meta"},
+		},
+		"Knockout.js": {
+			{`knockout-(\d+\.\d+(?:\.\d+)?)`, 0.9, "script filename"},
+		},
 	}
 
 	// Compile all patterns
@@ -224,6 +269,8 @@ func extractVersion(text string, framework string) VersionMatch {
 	return bestMatch
 }
 
+// isValidVersionString checks if a version string is digits and dots only, with
+// at most three dots.
 func isValidVersionString(v string) bool {
 	if v == "" || len(v) > 20 {
 		return false

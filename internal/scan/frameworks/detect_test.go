@@ -725,11 +725,8 @@ func TestDetectorRegistry(t *testing.T) {
 		"Textpattern", "October CMS", "Statamic", "Livewire",
 		"Stimulus", "Turbo", "Knockout.js", "Unpoly", "Flarum", "NodeBB",
 		"XWiki", "Bolt CMS", "Nikola", "Publii", "ExpressionEngine",
-<<<<<<< HEAD
 		"Vercel", "Netlify", "GitHub Pages", "Cloudflare",
 		"Amazon CloudFront", "Akamai", "Fly.io", "Amazon S3",
-=======
->>>>>>> 579e7158 (feat(frameworks): add 5 framework detectors)
 	}
 	for _, name := range expectedDetectors {
 		if _, ok := frameworks.GetDetector(name); !ok {

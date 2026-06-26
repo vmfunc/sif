@@ -819,6 +819,10 @@ func (d *flarumDetector) Name() string { return "Flarum" }
 func (d *flarumDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: `id="flarum-`, Weight: 0.6},
+<<<<<<< HEAD
+=======
+		{Pattern: "/assets/forum-", Weight: 0.4},
+>>>>>>> ba041df1 (feat(frameworks): add 6 framework detectors)
 	}
 }
 
@@ -856,6 +860,7 @@ func (d *nodebbDetector) Detect(body string, headers http.Header) (float32, stri
 	}
 	return confidence, version
 }
+<<<<<<< HEAD
 
 // xwikiDetector detects the XWiki platform.
 type xwikiDetector struct{}
@@ -928,3 +933,5 @@ func (d *expressionengineDetector) Detect(body string, headers http.Header) (flo
 	}
 	return confidence, version
 }
+=======
+>>>>>>> ba041df1 (feat(frameworks): add 6 framework detectors)

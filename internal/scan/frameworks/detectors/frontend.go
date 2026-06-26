@@ -353,7 +353,11 @@ func (d *stimulusDetector) Name() string { return "Stimulus" }
 func (d *stimulusDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: "data-controller=", Weight: 0.5},
+<<<<<<< HEAD
 		{Pattern: "data-action=", Weight: 0.3},
+=======
+		{Pattern: "data-action=", Weight: 0.4},
+>>>>>>> ba041df1 (feat(frameworks): add 6 framework detectors)
 		{Pattern: "@hotwired/stimulus", Weight: 0.4},
 	}
 }
@@ -378,8 +382,13 @@ func (d *turboDetector) Name() string { return "Turbo" }
 func (d *turboDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: "<turbo-frame", Weight: 0.5},
+<<<<<<< HEAD
 		{Pattern: "data-turbo-", Weight: 0.5},
 		{Pattern: "@hotwired/turbo", Weight: 0.5},
+=======
+		{Pattern: "data-turbo", Weight: 0.4},
+		{Pattern: "@hotwired/turbo", Weight: 0.4},
+>>>>>>> ba041df1 (feat(frameworks): add 6 framework detectors)
 	}
 }
 
