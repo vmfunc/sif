@@ -44,15 +44,12 @@ func init() {
 	}{
 		"Laravel": {
 			{`Laravel\s+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`laravel/framework.*?(\d+\.\d+(?:\.\d+)?)`, 0.8, "composer.json"},
 		},
 		"Django": {
 			{`Django[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`django.*?(\d+\.\d+(?:\.\d+)?)`, 0.7, "package reference"},
 		},
 		"Ruby on Rails": {
 			{`Rails[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`rails.*?(\d+\.\d+(?:\.\d+)?)`, 0.7, "gem reference"},
 		},
 		"Express.js": {
 			{`Express[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
@@ -68,10 +65,6 @@ func init() {
 		},
 		"Spring": {
 			{`Spring[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`spring-core.*?(\d+\.\d+(?:\.\d+)?)`, 0.8, "maven"},
-		},
-		"Spring Boot": {
-			{`spring-boot.*?(\d+\.\d+(?:\.\d+)?)`, 0.9, "maven"},
 		},
 		"Flask": {
 			{`Flask[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
@@ -126,17 +119,8 @@ func init() {
 		"Magento": {
 			{`Magento[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
 		},
-		"Shopify": {
-			{`Shopify\.theme.*?(\d+\.\d+(?:\.\d+)?)`, 0.7, "theme version"},
-		},
 		"Symfony": {
 			{`Symfony[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"FastAPI": {
-			{`FastAPI[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-		},
-		"Gin": {
-			{`Gin[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
 		},
 		"Phoenix": {
 			{`Phoenix[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
@@ -204,22 +188,25 @@ func ExtractVersionOptimized(body string, framework string) VersionMatch {
 	return bestMatch
 }
 
-// isValidVersionString checks if a version string looks like a valid semver
 func isValidVersionString(v string) bool {
 	if v == "" || len(v) > 20 {
 		return false
 	}
 
 	dotCount := 0
+	digitCount := 0
 	for _, c := range v {
-		if c == '.' {
+		switch {
+		case c == '.':
 			dotCount++
 			if dotCount > 3 {
 				return false
 			}
-		} else if !unicode.IsDigit(c) {
+		case unicode.IsDigit(c):
+			digitCount++
+		default:
 			return false
 		}
 	}
-	return dotCount >= 1
+	return digitCount > 0
 }
