@@ -147,7 +147,7 @@ func (d *shopifyDetector) Name() string { return "Shopify" }
 
 func (d *shopifyDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "Shopify", Weight: 0.5, HeaderOnly: true},
+		{Pattern: "x-shopify", Weight: 0.5, HeaderOnly: true},
 		{Pattern: "cdn.shopify.com", Weight: 0.4},
 		{Pattern: "shopify-section", Weight: 0.4},
 		{Pattern: "myshopify.com", Weight: 0.3},

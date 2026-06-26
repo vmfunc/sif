@@ -38,8 +38,6 @@ func init() {
 	fw.Register(&springBootDetector{})
 	fw.Register(&flaskDetector{})
 	fw.Register(&symfonyDetector{})
-	fw.Register(&fastapiDetector{})
-	fw.Register(&ginDetector{})
 	fw.Register(&phoenixDetector{})
 	fw.Register(&strapiDetector{})
 	fw.Register(&adonisDetector{})
@@ -143,7 +141,7 @@ func (d *expressDetector) Name() string { return "Express.js" }
 
 func (d *expressDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "Express", Weight: 0.5, HeaderOnly: true},
+		{Pattern: "Express", Weight: 0.5, HeaderOnly: true, Header: "X-Powered-By"},
 		{Pattern: "connect.sid", Weight: 0.3, HeaderOnly: true},
 	}
 }
@@ -251,8 +249,8 @@ func (d *springBootDetector) Name() string { return "Spring Boot" }
 
 func (d *springBootDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "Whitelabel Error Page", Weight: 0.5},
-		{Pattern: "This application has no explicit mapping for /error", Weight: 0.4},
+		{Pattern: ">Whitelabel Error Page<", Weight: 0.5},
+		{Pattern: "This application has no explicit mapping for /error", Weight: 0.3},
 		{Pattern: "There was an unexpected error (type=", Weight: 0.3},
 	}
 }
@@ -276,7 +274,7 @@ func (d *flaskDetector) Name() string { return "Flask" }
 
 func (d *flaskDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "Werkzeug", Weight: 0.4, HeaderOnly: true},
+		{Pattern: "Werkzeug", Weight: 0.4, HeaderOnly: true, Header: "Server"},
 		{Pattern: "flask", Weight: 0.3, HeaderOnly: true},
 		{Pattern: "jinja2", Weight: 0.3},
 	}
@@ -301,60 +299,13 @@ func (d *symfonyDetector) Name() string { return "Symfony" }
 
 func (d *symfonyDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "symfony", Weight: 0.4, HeaderOnly: true},
+		{Pattern: "X-Debug-Token", Weight: 0.4, HeaderOnly: true},
 		{Pattern: "sf_", Weight: 0.3, HeaderOnly: true},
 		{Pattern: "_sf2_", Weight: 0.3, HeaderOnly: true},
 	}
 }
 
 func (d *symfonyDetector) Detect(body string, headers http.Header) (float32, string) {
-	base := fw.NewBaseDetector(d.Name(), d.Signatures())
-	score := base.MatchSignatures(body, headers)
-	confidence := sigmoidConfidence(score)
-
-	var version string
-	if confidence > 0.5 {
-		version = fw.ExtractVersionOptimized(body, d.Name()).Version
-	}
-	return confidence, version
-}
-
-// fastapiDetector detects FastAPI framework.
-type fastapiDetector struct{}
-
-func (d *fastapiDetector) Name() string { return "FastAPI" }
-
-func (d *fastapiDetector) Signatures() []fw.Signature {
-	return []fw.Signature{
-		{Pattern: "fastapi", Weight: 0.4, HeaderOnly: true},
-		{Pattern: "starlette", Weight: 0.3, HeaderOnly: true},
-	}
-}
-
-func (d *fastapiDetector) Detect(body string, headers http.Header) (float32, string) {
-	base := fw.NewBaseDetector(d.Name(), d.Signatures())
-	score := base.MatchSignatures(body, headers)
-	confidence := sigmoidConfidence(score)
-
-	var version string
-	if confidence > 0.5 {
-		version = fw.ExtractVersionOptimized(body, d.Name()).Version
-	}
-	return confidence, version
-}
-
-// ginDetector detects Gin framework.
-type ginDetector struct{}
-
-func (d *ginDetector) Name() string { return "Gin" }
-
-func (d *ginDetector) Signatures() []fw.Signature {
-	return []fw.Signature{
-		{Pattern: "gin-gonic", Weight: 0.4},
-	}
-}
-
-func (d *ginDetector) Detect(body string, headers http.Header) (float32, string) {
 	base := fw.NewBaseDetector(d.Name(), d.Signatures())
 	score := base.MatchSignatures(body, headers)
 	confidence := sigmoidConfidence(score)

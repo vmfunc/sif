@@ -770,39 +770,6 @@ func TestDetectFramework_Htmx(t *testing.T) {
 	}
 }
 
-func TestDetectFramework_GinFalsePositive(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<!DOCTYPE html><html><body>Welcome</body></html>`))
-	}))
-	defer server.Close()
-
-	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result != nil && result.Name == "Gin" {
-		t.Errorf("false positive: detected Gin (confidence %.2f) on a CORS header", result.Confidence)
-	}
-}
-
-func TestDetectFramework_Gin(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`404 page not found - powered by gin-gonic`))
-	}))
-	defer server.Close()
-
-	result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result == nil || result.Name != "Gin" {
-		t.Errorf("expected framework 'Gin', got '%v'", result)
-	}
-}
-
 func TestDetectFramework_MeteorFalsePositive(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
