@@ -1,0 +1,41 @@
+# Dgraph Alpha API Exposure Detection Module
+
+id: dgraph-api-exposure
+info:
+  name: Dgraph Alpha API Exposure
+  author: sif
+  severity: medium
+  description: Detects a Dgraph Alpha whose unauthenticated health api leaks the cluster members and versions and serves read and admin apis
+  tags: [dgraph, graph-database, database, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/health"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"instance"\s*:\s*"alpha"'
+
+    - type: word
+      part: body
+      words:
+        - "\"max_assigned\""
+        - "\"lastEcho\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: dgraph_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
