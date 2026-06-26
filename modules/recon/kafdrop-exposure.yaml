@@ -1,0 +1,40 @@
+# Kafdrop Exposure Detection Module
+
+id: kafdrop-exposure
+info:
+  name: Kafdrop Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Kafdrop ui that leaks brokers, topics and the cluster summary and can browse topic messages without authentication
+  tags: [kafka, kafdrop, streaming, dashboard, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  headers:
+    Accept: application/json
+  paths:
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"summary\""
+        - "\"preferredReplicaPercent\""
+        - "\"brokers\""
+        - "\"topics\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: kafka_broker
+      part: body
+      regex:
+        - '"host"\s*:\s*"([^"]+)"'
+      group: 1
