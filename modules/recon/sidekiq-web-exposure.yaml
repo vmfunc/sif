@@ -1,0 +1,37 @@
+# Sidekiq Web Dashboard Exposure Detection Module
+
+id: sidekiq-web-exposure
+info:
+  name: Sidekiq Web Dashboard Exposure
+  author: sif
+  severity: high
+  description: Detects an unauthenticated Sidekiq Web dashboard that leaks Redis internals and the job queue and allows killing and retrying jobs
+  tags: [sidekiq, redis, background-jobs, ruby, rails, dashboard, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/sidekiq/stats"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"default_latency\""
+        - "\"redis_version\""
+        - "\"server_utc_time\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: redis_version
+      part: body
+      regex:
+        - '"redis_version"\s*:\s*"([^"]+)"'
+      group: 1
