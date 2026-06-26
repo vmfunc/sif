@@ -1,0 +1,37 @@
+# Mage Data Pipeline Status Exposure Detection Module
+
+id: mage-status-exposure
+info:
+  name: Mage Data Pipeline Status Exposure
+  author: sif
+  severity: medium
+  description: Detects a Mage data-pipeline server with auth disabled that leaks the scheduler status and the server-side repository path
+  tags: [mage, mage-ai, data-orchestration, pipeline, mlops, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/status"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"statuses\""
+        - "\"scheduler_status\""
+        - "\"repo_path\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: mage_repo_path
+      part: body
+      regex:
+        - '"repo_path"\s*:\s*"([^"]+)"'
+      group: 1
