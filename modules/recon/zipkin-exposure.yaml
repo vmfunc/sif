@@ -1,0 +1,37 @@
+# Zipkin Tracing Server Exposure Detection Module
+
+id: zipkin-exposure
+info:
+  name: Zipkin Tracing Server Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Zipkin server that leaks the internal service topology and trace data over its unauthenticated api
+  tags: [zipkin, tracing, distributed-tracing, observability, topology, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/zipkin/config.json"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"queryLimit\""
+        - "\"defaultLookback\""
+        - "\"searchEnabled\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: zipkin_environment
+      part: body
+      regex:
+        - '"environment"\s*:\s*"([^"]*)"'
+      group: 1

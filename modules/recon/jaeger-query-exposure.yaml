@@ -1,0 +1,43 @@
+# Jaeger Query Service Exposure Detection Module
+
+id: jaeger-query-exposure
+info:
+  name: Jaeger Query Service Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Jaeger query service that leaks the internal service topology and trace data over its unauthenticated api
+  tags: [jaeger, tracing, distributed-tracing, observability, topology, exposure, unauth, api, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/services"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"data"\s*:\s*\['
+
+    - type: word
+      part: body
+      words:
+        - "\"total\""
+        - "\"limit\""
+        - "\"offset\""
+        - "\"errors\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: jaeger_service
+      part: body
+      regex:
+        - '"data"\s*:\s*\[\s*"([^"]+)"'
+      group: 1
