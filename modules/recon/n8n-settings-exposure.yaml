@@ -1,0 +1,37 @@
+# n8n Settings Exposure Detection Module
+
+id: n8n-settings-exposure
+info:
+  name: n8n Settings Exposure
+  author: sif
+  severity: medium
+  description: Detects an n8n instance that leaks its instance id, auth method and owner-setup state over the unauthenticated settings endpoint
+  tags: [n8n, workflow, automation, low-code, information-disclosure, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/rest/settings"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"endpointWebhook\""
+        - "\"versionCli\""
+        - "\"instanceId\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: n8n_version
+      part: body
+      regex:
+        - '"versionCli"\s*:\s*"([^"]+)"'
+      group: 1
