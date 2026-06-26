@@ -1,0 +1,41 @@
+# Envoy Proxy Admin Interface Exposure Detection Module
+
+id: envoy-admin-exposure
+info:
+  name: Envoy Admin Interface Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Envoy admin interface that leaks build and config details and exposes runtime shutdown and modification
+  tags: [envoy, proxy, service-mesh, admin, controlplane, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/server_info"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"hot_restart_version\""
+        - "\"command_line_options\""
+      condition: and
+
+    - type: regex
+      part: body
+      regex:
+        - '"state"\s*:\s*"(LIVE|PRE_INITIALIZING|INITIALIZING|DRAINING)"'
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: envoy_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
