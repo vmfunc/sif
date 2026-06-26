@@ -1,0 +1,36 @@
+# Dagster Webserver Exposure Detection Module
+
+id: dagster-webserver-exposure
+info:
+  name: Dagster Webserver Exposure
+  author: sif
+  severity: medium
+  description: Detects a Dagster webserver that discloses its version and exposes a run-launching graphql api without authentication
+  tags: [dagster, dagit, data-orchestration, pipeline, mlops, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/server_info"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"dagster_webserver_version\""
+        - "\"dagster_version\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: dagster_version
+      part: body
+      regex:
+        - '"dagster_version"\s*:\s*"([^"]+)"'
+      group: 1
