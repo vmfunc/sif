@@ -1,0 +1,37 @@
+# Concourse CI Info Endpoint Exposure Detection Module
+
+id: concourse-info-exposure
+info:
+  name: Concourse CI Info Exposure
+  author: sif
+  severity: medium
+  description: Detects a Concourse CI server that discloses its server and worker versions and external url over the unauthenticated info api
+  tags: [concourse, ci, cd, pipeline, build, fingerprint, version, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1/info"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+        - "\"worker_version\""
+        - "\"external_url\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: concourse_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
