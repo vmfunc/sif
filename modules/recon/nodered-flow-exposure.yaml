@@ -1,0 +1,39 @@
+# Node-RED Flow API Exposure Detection Module
+
+id: nodered-flow-exposure
+info:
+  name: Node-RED Flow API Exposure
+  author: sif
+  severity: high
+  description: Detects a Node-RED instance with adminAuth unset whose flows api leaks the full flow config and accepts code-executing deploys
+  tags: [node-red, nodered, low-code, automation, iot, flow, rce, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/flows"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"type"\s*:\s*"tab"'
+
+    - type: word
+      part: body
+      words:
+        - "\"wires\""
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: nodered_flow_label
+      part: body
+      regex:
+        - '"label"\s*:\s*"([^"]*)"'
+      group: 1
