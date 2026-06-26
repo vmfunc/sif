@@ -93,7 +93,7 @@ type Matcher struct {
 	Status    []int    `yaml:"status,omitempty"`
 	Size      []int    `yaml:"size,omitempty"`
 	Hash      []int64  `yaml:"hash,omitempty"` // favicon: shodan mmh3 hashes (signed or unsigned)
-	Condition string   `yaml:"condition"` // and, or
+	Condition string   `yaml:"condition"`      // and, or
 	Negative  bool     `yaml:"negative"`
 }
 

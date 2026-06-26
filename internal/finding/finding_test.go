@@ -16,13 +16,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/projectdiscovery/nuclei/v3/pkg/model"
+	"github.com/projectdiscovery/nuclei/v3/pkg/model/types/severity"
+	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 	"github.com/vmfunc/sif/internal/modules"
 	"github.com/vmfunc/sif/internal/scan"
 	"github.com/vmfunc/sif/internal/scan/frameworks"
 	"github.com/vmfunc/sif/internal/scan/js"
-	"github.com/projectdiscovery/nuclei/v3/pkg/model"
-	"github.com/projectdiscovery/nuclei/v3/pkg/model/types/severity"
-	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
 
 // scanResultType mirrors the minimal interface the scan packages implement; the

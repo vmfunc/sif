@@ -19,11 +19,11 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	nuclei "github.com/projectdiscovery/nuclei/v3/lib"
+	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 	"github.com/vmfunc/sif/internal/nuclei/format"
 	"github.com/vmfunc/sif/internal/nuclei/templates"
 	sifoutput "github.com/vmfunc/sif/internal/output"
-	nuclei "github.com/projectdiscovery/nuclei/v3/lib"
-	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
 
 func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]output.ResultEvent, error) {
