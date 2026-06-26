@@ -278,11 +278,12 @@ func (app *App) Run() error {
 	// before any scanner runs. a bad proxy/header shouldn't kill the run -
 	// scanners fall back to a plain client if this fails.
 	if err := httpx.Configure(httpx.Options{
-		Proxy:     app.settings.Proxy,
-		Headers:   app.settings.Header,
-		Cookie:    app.settings.Cookie,
-		RateLimit: app.settings.RateLimit,
-		Threads:   app.settings.Threads,
+		Proxy:      app.settings.Proxy,
+		Headers:    app.settings.Header,
+		Cookie:     app.settings.Cookie,
+		RateLimit:  app.settings.RateLimit,
+		MaxRetries: app.settings.MaxRetries,
+		Threads:    app.settings.Threads,
 	}); err != nil {
 		log.Warnf("http client config failed, continuing with defaults: %v", err)
 	}
