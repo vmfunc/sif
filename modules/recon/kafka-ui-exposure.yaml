@@ -1,0 +1,41 @@
+# Kafka UI Exposure Detection Module
+
+id: kafka-ui-exposure
+info:
+  name: Kafka UI Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Kafka UI (provectus/kafbat) console that leaks cluster, broker and topic details and can browse and produce messages
+  tags: [kafka, kafka-ui, kafbat, provectus, streaming, management, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/clusters"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"defaultCluster\""
+        - "\"brokerCount\""
+      condition: and
+
+    - type: regex
+      part: body
+      regex:
+        - '"status"\s*:\s*"(online|offline|initializing)"'
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: kafka_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
