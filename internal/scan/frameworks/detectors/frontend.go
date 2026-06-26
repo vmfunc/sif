@@ -35,6 +35,14 @@ func init() {
 	fw.Register(&backboneDetector{})
 	fw.Register(&meteorDetector{})
 	fw.Register(&htmxDetector{})
+	fw.Register(&alpineDetector{})
+	fw.Register(&jqueryDetector{})
+	fw.Register(&knockoutDetector{})
+	fw.Register(&livewireDetector{})
+	fw.Register(&qwikDetector{})
+	fw.Register(&stimulusDetector{})
+	fw.Register(&turboDetector{})
+	fw.Register(&unpolyDetector{})
 }
 
 // reactDetector detects React framework.
@@ -223,6 +231,209 @@ func (d *htmxDetector) Signatures() []fw.Signature {
 }
 
 func (d *htmxDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// alpineDetector detects Alpine.js.
+type alpineDetector struct{}
+
+func (d *alpineDetector) Name() string { return "Alpine.js" }
+
+func (d *alpineDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: " x-data", Weight: 0.6},
+		{Pattern: "alpinejs", Weight: 0.5},
+		{Pattern: "x-cloak", Weight: 0.4},
+		{Pattern: "x-transition", Weight: 0.4},
+	}
+}
+
+func (d *alpineDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// qwikDetector detects the Qwik framework.
+type qwikDetector struct{}
+
+func (d *qwikDetector) Name() string { return "Qwik" }
+
+func (d *qwikDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "q:container", Weight: 0.5},
+		{Pattern: "q:version", Weight: 0.4},
+		{Pattern: "q:base", Weight: 0.3},
+		{Pattern: "qwikloader", Weight: 0.3},
+	}
+}
+
+func (d *qwikDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// jqueryDetector detects the jQuery library.
+type jqueryDetector struct{}
+
+func (d *jqueryDetector) Name() string { return "jQuery" }
+
+func (d *jqueryDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "jquery.min.js", Weight: 0.5},
+		{Pattern: "jquery-", Weight: 0.5},
+		{Pattern: "jQuery.fn.jquery", Weight: 0.4},
+	}
+}
+
+func (d *jqueryDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// livewireDetector detects Laravel Livewire.
+type livewireDetector struct{}
+
+func (d *livewireDetector) Name() string { return "Livewire" }
+
+func (d *livewireDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "wire:id", Weight: 0.5},
+		{Pattern: "wire:snapshot", Weight: 0.4},
+		{Pattern: "wire:model", Weight: 0.4},
+		{Pattern: "wire:click", Weight: 0.4},
+	}
+}
+
+func (d *livewireDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// stimulusDetector detects the Stimulus controller framework (part of Hotwire, the Rails 7 default).
+type stimulusDetector struct{}
+
+func (d *stimulusDetector) Name() string { return "Stimulus" }
+
+func (d *stimulusDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "data-controller=", Weight: 0.5},
+		{Pattern: "data-action=", Weight: 0.3},
+		{Pattern: "@hotwired/stimulus", Weight: 0.4},
+	}
+}
+
+func (d *stimulusDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// turboDetector detects Turbo (part of Hotwire, the Rails 7 default).
+type turboDetector struct{}
+
+func (d *turboDetector) Name() string { return "Turbo" }
+
+func (d *turboDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "<turbo-frame", Weight: 0.5},
+		{Pattern: "data-turbo-", Weight: 0.5},
+		{Pattern: "@hotwired/turbo", Weight: 0.5},
+	}
+}
+
+func (d *turboDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// knockoutDetector detects Knockout.js.
+type knockoutDetector struct{}
+
+func (d *knockoutDetector) Name() string { return "Knockout.js" }
+
+func (d *knockoutDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "data-bind=", Weight: 0.5},
+		{Pattern: "ko.applyBindings", Weight: 0.5},
+		{Pattern: "knockout-", Weight: 0.4},
+	}
+}
+
+func (d *knockoutDetector) Detect(body string, headers http.Header) (float32, string) {
+	base := fw.NewBaseDetector(d.Name(), d.Signatures())
+	score := base.MatchSignatures(body, headers)
+	confidence := sigmoidConfidence(score)
+
+	var version string
+	if confidence > 0.5 {
+		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+	}
+	return confidence, version
+}
+
+// unpolyDetector detects the Unpoly library.
+type unpolyDetector struct{}
+
+func (d *unpolyDetector) Name() string { return "Unpoly" }
+
+func (d *unpolyDetector) Signatures() []fw.Signature {
+	return []fw.Signature{
+		{Pattern: "unpoly.min.js", Weight: 0.5},
+		{Pattern: "unpoly.js", Weight: 0.4},
+		{Pattern: "unpoly@", Weight: 0.4},
+	}
+}
+
+func (d *unpolyDetector) Detect(body string, headers http.Header) (float32, string) {
 	base := fw.NewBaseDetector(d.Name(), d.Signatures())
 	score := base.MatchSignatures(body, headers)
 	confidence := sigmoidConfidence(score)
