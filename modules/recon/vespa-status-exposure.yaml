@@ -1,0 +1,44 @@
+# Vespa Container Exposure Detection Module
+
+id: vespa-status-exposure
+info:
+  name: Vespa Container Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Vespa container reachable without authentication; Vespa defaults to no auth, allowing unauthenticated reads and writes to the indexed data, and its status endpoint leaks the application topology and version
+  tags: [vespa, vector, ai, ml, search, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/ApplicationStatus"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"abstractComponents\""
+
+    - type: word
+      part: body
+      words:
+        - "\"processingChains\""
+
+    - type: word
+      part: body
+      words:
+        - "\"httpRequestFilters\""
+
+  extractors:
+    - type: regex
+      name: vespa_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([0-9][^"]*)"'
+      group: 1
