@@ -1,0 +1,39 @@
+# Fooocus-API Exposure Detection Module
+
+id: fooocus-api-exposure
+info:
+  name: Fooocus-API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Fooocus-API image generation server reachable without authentication; with no api key set it lists the installed base and lora models and accepts unauthenticated image generation
+  tags: [fooocus, stable-diffusion, ai, image, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v1/engines/all-models"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"model_filenames\""
+
+    - type: word
+      part: body
+      words:
+        - "\"lora_filenames\""
+
+  extractors:
+    - type: regex
+      name: fooocus_model
+      part: body
+      regex:
+        - '"model_filenames"\s*:\s*\[\s*"([^"]+)"'
+      group: 1

@@ -1,0 +1,39 @@
+# ComfyUI API Exposure Detection Module
+
+id: comfyui-api-exposure
+info:
+  name: ComfyUI API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed ComfyUI instance whose system api leaks host details and accepts unauthenticated workflow and custom-node execution
+  tags: [comfyui, ai, image, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/system_stats"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"comfyui_version\""
+
+    - type: word
+      part: body
+      words:
+        - "\"torch_vram_total\""
+
+  extractors:
+    - type: regex
+      name: comfyui_version
+      part: body
+      regex:
+        - '"comfyui_version"\s*:\s*"([^"]+)"'
+      group: 1

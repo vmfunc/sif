@@ -1,0 +1,44 @@
+# AUTOMATIC1111 Stable Diffusion WebUI API Exposure Detection Module
+
+id: automatic1111-api-exposure
+info:
+  name: AUTOMATIC1111 API Exposure
+  author: sif
+  severity: medium
+  description: Detects an AUTOMATIC1111 stable-diffusion-webui whose api is mounted without auth, allowing unauthenticated image generation and disclosing local model files
+  tags: [automatic1111, stable-diffusion, ai, image, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/sdapi/v1/sd-models"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"model_name\""
+
+    - type: word
+      part: body
+      words:
+        - "\"filename\""
+
+    - type: word
+      part: body
+      words:
+        - "\"title\""
+
+  extractors:
+    - type: regex
+      name: sd_model_name
+      part: body
+      regex:
+        - '"model_name"\s*:\s*"([^"]+)"'
+      group: 1
