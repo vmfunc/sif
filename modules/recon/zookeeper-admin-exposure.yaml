@@ -1,0 +1,39 @@
+# ZooKeeper AdminServer Exposure Detection Module
+
+id: zookeeper-admin-exposure
+info:
+  name: ZooKeeper AdminServer Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Apache ZooKeeper AdminServer whose monitor command leaks the version, ensemble role and znode and watch counts
+  tags: [zookeeper, apache, coordination, adminserver, information-disclosure, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/commands/monitor"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"command"\s*:\s*"monitor"'
+
+    - type: word
+      part: body
+      words:
+        - "\"server_state\""
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: zookeeper_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
