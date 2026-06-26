@@ -1,0 +1,39 @@
+# Jenkins API Exposure Detection Module
+
+id: jenkins-api-exposure
+info:
+  name: Jenkins API Exposure
+  author: sif
+  severity: high
+  description: Detects a Jenkins controller with anonymous read enabled that leaks every job, view and node over its json api
+  tags: [jenkins, hudson, ci, build, automation, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/json"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"_class"\s*:\s*"hudson\.model\.Hudson"'
+
+    - type: word
+      part: body
+      words:
+        - "\"jobs\""
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: jenkins_job
+      part: body
+      regex:
+        - '"jobs"\s*:\s*\[\s*\{[^}]*?"name"\s*:\s*"([^"]+)"'
+      group: 1

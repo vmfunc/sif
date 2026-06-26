@@ -1,0 +1,41 @@
+# Apache NiFi API Exposure Detection Module
+
+id: nifi-api-exposure
+info:
+  name: Apache NiFi API Exposure
+  author: sif
+  severity: high
+  description: Detects an unsecured Apache NiFi whose rest api leaks build details and grants full code-executing control of the dataflow
+  tags: [nifi, apache-nifi, dataflow, etl, automation, rce, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/nifi-api/flow/about"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"about\""
+        - "\"version\""
+      condition: and
+
+    - type: regex
+      part: body
+      regex:
+        - '"title"\s*:\s*"NiFi"'
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: nifi_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
