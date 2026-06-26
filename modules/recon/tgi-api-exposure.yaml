@@ -1,0 +1,39 @@
+# Text Generation Inference API Exposure Detection Module
+
+id: tgi-api-exposure
+info:
+  name: Text Generation Inference API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Hugging Face Text Generation Inference server that serves model info and inference without authentication
+  tags: [tgi, llm, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/info"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"router"\s*:\s*"text-generation-router"'
+
+    - type: word
+      part: body
+      words:
+        - "\"max_concurrent_requests\""
+
+  extractors:
+    - type: regex
+      name: tgi_model
+      part: body
+      regex:
+        - '"model_id"\s*:\s*"([^"]+)"'
+      group: 1
