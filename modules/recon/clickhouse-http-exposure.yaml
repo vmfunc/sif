@@ -1,0 +1,38 @@
+# ClickHouse HTTP Interface Exposure Detection Module
+
+id: clickhouse-http-exposure
+info:
+  name: ClickHouse HTTP Interface Exposure
+  author: sif
+  severity: high
+  description: Detects an unauthenticated ClickHouse http interface that executes arbitrary sql and reaches server-side files and internal urls
+  tags: [clickhouse, database, sql, olap, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?query=SELECT+version()+FORMAT+JSON"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"meta\""
+        - "\"statistics\""
+        - "\"rows_read\""
+        - "\"bytes_read\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: clickhouse_version
+      part: body
+      regex:
+        - '"version\(\)"\s*:\s*"([^"]+)"'
+      group: 1
