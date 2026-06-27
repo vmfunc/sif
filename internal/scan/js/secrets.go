@@ -41,9 +41,10 @@ const (
 // match when there's no group) is what gets reported; minEntropy gates the
 // generic high-entropy rules so we don't flag every short literal.
 var secretRules = []struct {
-	name       string
-	re         *regexp.Regexp
-	minEntropy float64
+	name         string
+	re           *regexp.Regexp
+	minEntropy   float64
+	requireDigit bool
 }{
 	{
 		// aws access key ids are fixed-shape and unmistakable.
@@ -54,8 +55,9 @@ var secretRules = []struct {
 	{
 		// aws secret keys are 40-char base64-ish blobs; gate on entropy since the
 		// shape alone matches plenty of innocent strings.
+		// no trailing \b: keys ending in / or + have no word boundary there.
 		name:       "aws secret access key",
-		re:         regexp.MustCompile(`\b((?:aws_secret_access_key|aws_secret|secret_key)["']?\s*[:=]\s*["']?)([A-Za-z0-9/+]{40})\b`),
+		re:         regexp.MustCompile(`\b((?:aws_secret_access_key|aws_secret|secret_key)["']?\s*[:=]\s*["']?)([A-Za-z0-9/+]{40})`),
 		minEntropy: awsSecretMinEntropy,
 	},
 	{
@@ -65,35 +67,45 @@ var secretRules = []struct {
 		minEntropy: noEntropyGate,
 	},
 	{
-		// slack bot/user/app/legacy tokens.
+		// github fine-grained personal access tokens: github_pat_ then 82 chars.
+		name:       "github fine-grained pat",
+		re:         regexp.MustCompile(`\b(github_pat_[0-9A-Za-z_]{82})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// slack bot/user/app/legacy tokens plus version-anchored xapp app tokens.
 		name:       "slack token",
-		re:         regexp.MustCompile(`\b(xox[baprs]-[0-9A-Za-z-]{10,})\b`),
+		re:         regexp.MustCompile(`\b(xox[baprs]-[0-9A-Za-z-]{10,}|xapp-[0-9]+-[0-9A-Za-z-]{10,})\b`),
 		minEntropy: noEntropyGate,
 	},
 	{
-		// stripe live secret and publishable keys (test keys are not findings).
-		name:       "stripe live key",
-		re:         regexp.MustCompile(`\b([sp]k_live_[0-9A-Za-z]{16,})\b`),
+		// stripe live secret and restricted keys; publishable pk_ keys are public
+		// by design and test keys are not findings.
+		name:       "stripe secret key",
+		re:         regexp.MustCompile(`\b((?:sk|rk)_live_[0-9A-Za-z]{16,})\b`),
 		minEntropy: noEntropyGate,
 	},
 	{
-		// google api keys are a fixed AIza-prefixed 39-char shape.
+		// google api keys are a fixed AIza-prefixed 39-char shape; no trailing \b
+		// since keys ending in - have no word boundary there.
 		name:       "google api key",
-		re:         regexp.MustCompile(`\b(AIza[0-9A-Za-z_-]{35})\b`),
+		re:         regexp.MustCompile(`\b(AIza[0-9A-Za-z_-]{35})`),
 		minEntropy: noEntropyGate,
 	},
 	{
 		// pem private key blocks; the header alone is the smoking gun.
 		name:       "private key",
-		re:         regexp.MustCompile(`-{5}BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-{5}`),
+		re:         regexp.MustCompile(`-{5}BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-{5}`),
 		minEntropy: noEntropyGate,
 	},
 	{
 		// generic apikey/secret/token = "<value>" assignments; the value is in
-		// group 2 and only reported if it looks random (entropy gate).
-		name:       "generic secret assignment",
-		re:         regexp.MustCompile(`(?i)\b(api[_-]?key|secret|token|password|passwd|auth)["']?\s*[:=]\s*["']([0-9A-Za-z\-._~+/]{16,})["']`),
-		minEntropy: genericMinEntropy,
+		// group 2 and only reported if it looks random (entropy gate) and carries
+		// a digit, which weeds out camelCase identifiers sitting just over the gate.
+		name:         "generic secret assignment",
+		re:           regexp.MustCompile(`(?i)\b(api[_-]?key|secret|token|password|passwd|auth)["']?\s*[:=]\s*["']([0-9A-Za-z\-._~+/]{16,})["']`),
+		minEntropy:   genericMinEntropy,
+		requireDigit: true,
 	},
 }
 
@@ -125,6 +137,10 @@ func ScanSecrets(content, srcURL string) []SecretMatch {
 				continue
 			}
 
+			if rule.requireDigit && !hasDigit(value) {
+				continue
+			}
+
 			// dedupe per source so a key referenced twice is one finding.
 			key := rule.name + "\x00" + value
 			if _, ok := seen[key]; ok {
@@ -146,6 +162,16 @@ func secretValue(groups []string) string {
 		return groups[valueGroupIndex]
 	}
 	return strings.TrimSpace(groups[wholeMatchIndex])
+}
+
+// hasDigit reports whether s contains at least one ascii digit.
+func hasDigit(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= '0' && s[i] <= '9' {
+			return true
+		}
+	}
+	return false
 }
 
 // shannonEntropy is the per-character shannon entropy (bits) of s, used to tell
