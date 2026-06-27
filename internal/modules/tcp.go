@@ -39,11 +39,14 @@ var newTCPConn = func(ctx context.Context, addr string, timeout time.Duration) (
 }
 
 // validateTCP rejects, at load time, a tcp config the executor cannot run: a
-// port outside 1-65535, or a matcher type other than word, regex, or size
-// (status and favicon are http only).
+// port outside 1-65535, an unknown matchers-condition, or a matcher type other
+// than word, regex, or size (status and favicon are http only).
 func validateTCP(cfg *TCPConfig) error {
 	if cfg.Port < 1 || cfg.Port > 65535 {
 		return fmt.Errorf("tcp port %d out of range (use 1-65535)", cfg.Port)
+	}
+	if err := validateMatchersCondition(cfg.MatchersCondition); err != nil {
+		return err
 	}
 	for i := range cfg.Matchers {
 		switch cfg.Matchers[i].Type {
@@ -109,7 +112,7 @@ func ExecuteTCPModule(ctx context.Context, target string, def *YAMLModule, opts 
 		return result, err
 	}
 
-	if !checkTCPMatchers(cfg.Matchers, data) {
+	if !checkTCPMatchers(cfg.Matchers, cfg.MatchersCondition, data) {
 		return result, nil
 	}
 
@@ -142,23 +145,29 @@ func readTCP(conn net.Conn, timeout time.Duration) string {
 	return string(out)
 }
 
-// checkTCPMatchers evaluates all matchers against the response with AND logic.
-func checkTCPMatchers(matchers []Matcher, data string) bool {
+// checkTCPMatchers evaluates all matchers against the response, combining them
+// with AND (default) or OR per the matchers-condition.
+func checkTCPMatchers(matchers []Matcher, condition string, data string) bool {
 	if len(matchers) == 0 {
 		return false
 	}
 
+	or := strings.EqualFold(condition, "or")
 	for i := range matchers {
 		matched := checkTCPMatcher(&matchers[i], data)
 		if matchers[i].Negative {
 			matched = !matched
 		}
-		if !matched {
-			return false // AND logic
+		if or && matched {
+			return true
+		}
+		if !or && !matched {
+			return false
 		}
 	}
 
-	return true
+	// and: all matched; or: none matched.
+	return !or
 }
 
 // checkTCPMatcher evaluates a single matcher against the response bytes. TCP

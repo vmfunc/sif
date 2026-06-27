@@ -161,8 +161,29 @@ func TestCheckTCPMatchers(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := checkTCPMatchers(tt.matchers, data); got != tt.want {
+			if got := checkTCPMatchers(tt.matchers, "", data); got != tt.want {
 				t.Errorf("checkTCPMatchers = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCheckTCPMatchersOr(t *testing.T) {
+	data := "SSH-2.0-OpenSSH_9.6 Ubuntu"
+
+	tests := []struct {
+		name     string
+		matchers []Matcher
+		want     bool
+	}{
+		{"one of two hits", []Matcher{tcpWord("Dropbear"), tcpWord("OpenSSH")}, true},
+		{"none hit", []Matcher{tcpWord("Dropbear"), tcpWord("Debian")}, false},
+		{"first hit short-circuits", []Matcher{tcpWord("OpenSSH"), tcpWord("Dropbear")}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := checkTCPMatchers(tt.matchers, "or", data); got != tt.want {
+				t.Errorf("checkTCPMatchers(or) = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -424,6 +445,9 @@ func TestValidateTCP(t *testing.T) {
 		{"port too high rejected", &TCPConfig{Port: 70000}, false},
 		{"status matcher rejected", &TCPConfig{Port: 22, Matchers: []Matcher{{Type: "status"}}}, false},
 		{"favicon matcher rejected", &TCPConfig{Port: 22, Matchers: []Matcher{{Type: "favicon"}}}, false},
+		{"or condition allowed", &TCPConfig{Port: 6379, MatchersCondition: "or"}, true},
+		{"and condition allowed", &TCPConfig{Port: 6379, MatchersCondition: "and"}, true},
+		{"unknown condition rejected", &TCPConfig{Port: 6379, MatchersCondition: "xor"}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -458,5 +482,10 @@ func TestParseTCPValidation(t *testing.T) {
 	badMatcher := write("badmatcher.yaml", "id: bm\ntype: tcp\ntcp:\n  port: 22\n  matchers:\n    - type: status\n      status: [0]\n")
 	if _, err := ParseYAMLModule(badMatcher); err == nil {
 		t.Fatal("status matcher on tcp accepted")
+	}
+
+	badCond := write("badcond.yaml", "id: bc\ntype: tcp\ntcp:\n  port: 6379\n  matchers-condition: xor\n  matchers:\n    - type: word\n      words: [PONG]\n")
+	if _, err := ParseYAMLModule(badCond); err == nil {
+		t.Fatal("invalid matchers-condition on tcp accepted")
 	}
 }
