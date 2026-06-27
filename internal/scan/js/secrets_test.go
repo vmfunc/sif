@@ -42,6 +42,16 @@ var (
 	fakeEncryptedPEM     = "-----BEGIN ENCRYPTED PRIVATE " + "KEY-----\nMIIFDjBA..."
 	fakeAWSSecretSlash   = fakeAWSSecret[:len(fakeAWSSecret)-1] + "/"
 	fakeGoogleDash       = fakeGoogle[:len(fakeGoogle)-1] + "-"
+
+	fakeGitLabPAT     = "glpat-" + "AbCdEf1234567890GhIj"
+	fakeAnthropic     = "sk-ant-api03-" + strings.Repeat("aB3", 31) + "AA"
+	fakeNPM           = "npm_" + strings.Repeat("a1B2c3", 6)
+	fakeGoogleOAuth   = "GOCSPX-" + strings.Repeat("aB3d", 7)
+	fakeStripeWebhook = "whsec_" + strings.Repeat("aB3d", 8)
+	fakeShopify       = "shpat_" + strings.Repeat("0a1b", 8)
+	fakeSendGrid      = "SG." + strings.Repeat("aB3", 7) + "a." + strings.Repeat("aB3", 14) + "a"
+	fakeSlackHook     = "hooks.slack.com/services/T00000000/B00000000/" + strings.Repeat("aB3", 8)
+	fakeAnthropicBad  = "sk-ant-api03-" + strings.Repeat("aB3", 31) + "XX"
 )
 
 func TestScanSecrets(t *testing.T) {
@@ -130,7 +140,7 @@ func TestScanSecrets(t *testing.T) {
 			wantRule: "aws secret access key",
 		},
 		{
-			// value ends in - so the old trailing \b dropped the match.
+			// same as above, dash-ending case.
 			name:     "google api key ending in dash",
 			content:  fmt.Sprintf(`apiKey: %q`, fakeGoogleDash),
 			wantRule: "google api key",
@@ -155,6 +165,58 @@ func TestScanSecrets(t *testing.T) {
 		{
 			name:     "digitless camelcase generic not flagged",
 			content:  `token = "getUserAccountSettings"`,
+			wantNone: true,
+		},
+		{
+			name:     "gitlab personal access token",
+			content:  fmt.Sprintf(`token: %q`, fakeGitLabPAT),
+			wantRule: "gitlab personal access token",
+		},
+		{
+			name:     "anthropic api key",
+			content:  fmt.Sprintf(`key = %q`, fakeAnthropic),
+			wantRule: "anthropic api key",
+		},
+		{
+			name:     "npm access token",
+			content:  fmt.Sprintf(`_authToken=%q`, fakeNPM),
+			wantRule: "npm access token",
+		},
+		{
+			name:     "google oauth client secret",
+			content:  fmt.Sprintf(`client_secret: %q`, fakeGoogleOAuth),
+			wantRule: "google oauth client secret",
+		},
+		{
+			name:     "stripe webhook secret",
+			content:  fmt.Sprintf(`endpointSecret = %q`, fakeStripeWebhook),
+			wantRule: "stripe webhook secret",
+		},
+		{
+			name:     "shopify access token",
+			content:  fmt.Sprintf(`shopify=%q`, fakeShopify),
+			wantRule: "shopify access token",
+		},
+		{
+			name:     "sendgrid api key",
+			content:  fmt.Sprintf(`SENDGRID_API_KEY=%q`, fakeSendGrid),
+			wantRule: "sendgrid api key",
+		},
+		{
+			name:     "slack webhook url",
+			content:  fmt.Sprintf(`url = "https://%s"`, fakeSlackHook),
+			wantRule: "slack webhook url",
+		},
+		{
+			// classic glpat tokens are 20 chars; a short stub is not a finding.
+			name:     "gitlab token too short not flagged",
+			content:  `pub = "glpat-abc"`,
+			wantNone: true,
+		},
+		{
+			// anthropic keys end in a fixed AA pad; a different tail is not a key.
+			name:     "anthropic key wrong pad not flagged",
+			content:  fmt.Sprintf(`k = %q`, fakeAnthropicBad),
 			wantNone: true,
 		},
 		{

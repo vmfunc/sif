@@ -67,13 +67,12 @@ var secretRules = []struct {
 		minEntropy: noEntropyGate,
 	},
 	{
-		// github fine-grained personal access tokens: github_pat_ then 82 chars.
 		name:       "github fine-grained pat",
 		re:         regexp.MustCompile(`\b(github_pat_[0-9A-Za-z_]{82})\b`),
 		minEntropy: noEntropyGate,
 	},
 	{
-		// slack bot/user/app/legacy tokens plus version-anchored xapp app tokens.
+		// slack bot/user/app/legacy tokens, plus xapp tokens.
 		name:       "slack token",
 		re:         regexp.MustCompile(`\b(xox[baprs]-[0-9A-Za-z-]{10,}|xapp-[0-9]+-[0-9A-Za-z-]{10,})\b`),
 		minEntropy: noEntropyGate,
@@ -86,8 +85,8 @@ var secretRules = []struct {
 		minEntropy: noEntropyGate,
 	},
 	{
-		// google api keys are a fixed AIza-prefixed 39-char shape; no trailing \b
-		// since keys ending in - have no word boundary there.
+		// google api keys are a fixed AIza-prefixed 39-char shape; same
+		// trailing-\b issue as above (dash-ending keys).
 		name:       "google api key",
 		re:         regexp.MustCompile(`\b(AIza[0-9A-Za-z_-]{35})`),
 		minEntropy: noEntropyGate,
@@ -96,6 +95,51 @@ var secretRules = []struct {
 		// pem private key blocks; the header alone is the smoking gun.
 		name:       "private key",
 		re:         regexp.MustCompile(`-{5}BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-{5}`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// gitlab personal access tokens; the glpat- prefix is unmistakable and
+		// covers both the classic 20-char and longer routable tokens.
+		name:       "gitlab personal access token",
+		re:         regexp.MustCompile(`\b(glpat-[0-9A-Za-z_-]{20,})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// anthropic api and admin keys end in a fixed AA pad after 93 chars.
+		name:       "anthropic api key",
+		re:         regexp.MustCompile(`\b(sk-ant-(?:api03|admin01)-[0-9A-Za-z_-]{93}AA)\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		name:       "npm access token",
+		re:         regexp.MustCompile(`\b(npm_[0-9A-Za-z]{36})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		name:       "google oauth client secret",
+		re:         regexp.MustCompile(`\b(GOCSPX-[0-9A-Za-z_-]{28})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		name:       "stripe webhook secret",
+		re:         regexp.MustCompile(`\b(whsec_[0-9A-Za-z]{32,})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// shopify admin/shared/private/custom app tokens, 32 hex after the prefix.
+		name:       "shopify access token",
+		re:         regexp.MustCompile(`\b(shp(?:at|ss|pa|ca)_[0-9a-fA-F]{32})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		name:       "sendgrid api key",
+		re:         regexp.MustCompile(`\b(SG\.[0-9A-Za-z_-]{22}\.[0-9A-Za-z_-]{43})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// slack incoming-webhook urls embed the secret in the path.
+		name:       "slack webhook url",
+		re:         regexp.MustCompile(`\b(hooks\.slack\.com/services/T[0-9A-Za-z_]+/B[0-9A-Za-z_]+/[0-9A-Za-z]{24})\b`),
 		minEntropy: noEntropyGate,
 	},
 	{
@@ -164,7 +208,6 @@ func secretValue(groups []string) string {
 	return strings.TrimSpace(groups[wholeMatchIndex])
 }
 
-// hasDigit reports whether s contains at least one ascii digit.
 func hasDigit(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= '0' && s[i] <= '9' {
