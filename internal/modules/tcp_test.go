@@ -125,6 +125,46 @@ func TestExecuteTCPModuleSendsProbe(t *testing.T) {
 	}
 }
 
+func TestExecuteTCPModuleDecodesProbeEscapes(t *testing.T) {
+	// data written with literal backslashes (a single-quoted or plain yaml scalar)
+	// is decoded to real control bytes before it goes on the wire.
+	s := withFakeTCP(t, "PONG\r\n")
+	def := tcpDef(&TCPConfig{Port: 6379, Data: `PING\r\n`, Matchers: []Matcher{tcpWord("PONG")}})
+
+	if _, err := ExecuteTCPModule(context.Background(), "example.com", def, Options{}); err != nil {
+		t.Fatalf("ExecuteTCPModule: %v", err)
+	}
+	if got := string(<-s.sent); got != "PING\r\n" {
+		t.Errorf("server received probe %q, want PING followed by CRLF", got)
+	}
+}
+
+func TestDecodeTCPData(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"no backslash is unchanged", "PING", "PING"},
+		{"crlf", `PING\r\n`, "PING\r\n"},
+		{"tab then null via hex", `a\tb\x00`, "a\tb\x00"},
+		{"hex pair", `\x41\x42`, "AB"},
+		{"escaped backslash", `a\\b`, `a\b`},
+		{"unknown escape kept verbatim", `a\zb`, `a\zb`},
+		{"trailing backslash kept", `abc\`, `abc\`},
+		{"malformed hex kept", `\xZZ`, `\xZZ`},
+		{"short hex kept", `\x4`, `\x4`},
+		{"every simple escape", `\a\b\f\n\r\t\v`, "\a\b\f\n\r\t\v"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := decodeTCPData(tt.in); got != tt.want {
+				t.Errorf("decodeTCPData(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestExecuteTCPModulePassiveBanner(t *testing.T) {
 	// no data probe: the service speaks first (ssh, ftp, smtp).
 	withFakeTCP(t, "SSH-2.0-OpenSSH_9.6\r\n")

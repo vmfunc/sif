@@ -101,8 +101,9 @@ func ExecuteTCPModule(ctx context.Context, target string, def *YAMLModule, opts 
 	}()
 
 	if cfg.Data != "" {
+		payload := decodeTCPData(cfg.Data)
 		_ = conn.SetWriteDeadline(time.Now().Add(timeout))
-		if _, err := conn.Write([]byte(cfg.Data)); err != nil {
+		if _, err := conn.Write([]byte(payload)); err != nil {
 			return nil, fmt.Errorf("tcp write %q: %w", addr, err)
 		}
 	}
@@ -143,6 +144,62 @@ func readTCP(conn net.Conn, timeout time.Duration) string {
 		}
 	}
 	return string(out)
+}
+
+// decodeTCPData interprets C-style escape sequences in a tcp data payload so a
+// module can put control bytes on the wire regardless of how the yaml scalar is
+// quoted. A double-quoted yaml string already turns \r\n into real bytes before
+// sif sees it, leaving no backslash for this to act on; a single-quoted or plain
+// scalar keeps the backslashes, and this decode gives both forms the same bytes.
+// Recognized escapes are \\ \a \b \f \n \r \t \v and \xHH; an unrecognized escape
+// is kept verbatim (the backslash plus its character) so nothing is silently lost.
+func decodeTCPData(s string) string {
+	if !strings.Contains(s, `\`) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\\' || i+1 >= len(s) {
+			b.WriteByte(s[i])
+			continue
+		}
+		i++
+		switch s[i] {
+		case '\\':
+			b.WriteByte('\\')
+		case 'a':
+			b.WriteByte('\a')
+		case 'b':
+			b.WriteByte('\b')
+		case 'f':
+			b.WriteByte('\f')
+		case 'n':
+			b.WriteByte('\n')
+		case 'r':
+			b.WriteByte('\r')
+		case 't':
+			b.WriteByte('\t')
+		case 'v':
+			b.WriteByte('\v')
+		case 'x':
+			if i+2 < len(s) {
+				if v, err := strconv.ParseUint(s[i+1:i+3], 16, 8); err == nil {
+					b.WriteByte(byte(v))
+					i += 2
+					continue
+				}
+			}
+			// malformed \xHH: keep it literal rather than drop bytes.
+			b.WriteByte('\\')
+			b.WriteByte('x')
+		default:
+			// unknown escape: preserve both bytes so data is never lost.
+			b.WriteByte('\\')
+			b.WriteByte(s[i])
+		}
+	}
+	return b.String()
 }
 
 // checkTCPMatchers evaluates all matchers against the response, combining them

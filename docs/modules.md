@@ -185,9 +185,10 @@ tcp:
 
 #### data
 
-an optional payload sent after connecting. use a double-quoted yaml string so
-escapes like `\r\n` are decoded before they go on the wire; a server that only
-banners (ssh, smtp) needs no data at all.
+an optional payload sent after connecting. sif decodes C-style escapes in the
+value, so `\r`, `\n`, `\t`, `\\` and `\xHH` reach the wire as the raw bytes no
+matter how the yaml scalar is quoted; an unrecognized escape is left verbatim. a
+server that only banners (ssh, smtp) needs no data at all.
 
 ```yaml
 tcp:
