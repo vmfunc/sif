@@ -1,0 +1,26 @@
+# SMTP Service Banner Detection Module
+
+id: smtp-banner-exposure
+info:
+  name: SMTP Service Banner Disclosure
+  author: sif
+  severity: info
+  description: Reads the 220 ESMTP greeting a mail server sends on connect (RFC 5321), disclosing the MTA and version (often Postfix, Exim, Sendmail, or Exchange) that an attacker can fingerprint for known issues
+  tags: [smtp, mail, banner, version, tcp, exposure, recon]
+
+type: tcp
+
+tcp:
+  port: 25
+
+  matchers:
+    - type: regex
+      regex:
+        - "(?i)^220[ -].*smtp"
+
+  extractors:
+    - type: regex
+      name: smtp_banner
+      regex:
+        - "^220[ -]([^\\r\\n]+)"
+      group: 1

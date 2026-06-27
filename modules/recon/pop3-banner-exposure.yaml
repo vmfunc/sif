@@ -1,0 +1,26 @@
+# POP3 Service Banner Detection Module
+
+id: pop3-banner-exposure
+info:
+  name: POP3 Service Banner Disclosure
+  author: sif
+  severity: info
+  description: Reads the +OK greeting a POP3 server sends on connect (RFC 1939), confirming a cleartext mail-retrieval service is reachable and disclosing the daemon banner before authentication
+  tags: [pop3, mail, banner, tcp, exposure, recon]
+
+type: tcp
+
+tcp:
+  port: 110
+
+  matchers:
+    - type: regex
+      regex:
+        - "^\\+OK"
+
+  extractors:
+    - type: regex
+      name: pop3_banner
+      regex:
+        - "^\\+OK ?([^\\r\\n]*)"
+      group: 1
