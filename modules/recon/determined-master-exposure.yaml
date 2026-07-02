@@ -1,0 +1,51 @@
+# Determined AI Master Exposure Detection Module
+
+id: determined-master-exposure
+info:
+  name: Determined AI Master Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Determined AI master over its unauthenticated info endpoint, disclosing the cluster id, version, and auth configuration; Determined ships a default admin account whose blank password permits job submission and code execution on the cluster
+  tags: [determined, ai, ml, mlops, training, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1/master"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"master_id\""
+
+    - type: word
+      part: body
+      words:
+        - "\"cluster_id\""
+
+    - type: word
+      part: body
+      words:
+        - "\"cluster_name\""
+
+  extractors:
+    - type: regex
+      name: determined_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
+
+    - type: regex
+      name: determined_cluster_id
+      part: body
+      regex:
+        - '"cluster_id"\s*:\s*"([^"]+)"'
+      group: 1

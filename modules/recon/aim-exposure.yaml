@@ -1,0 +1,44 @@
+# Aim Experiment Tracker Exposure Detection Module
+
+id: aim-exposure
+info:
+  name: Aim Experiment Tracker Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Aim experiment tracker; its unauthenticated project api discloses the tracking repo path and serves all logged metrics, params, images, and texts
+  tags: [aim, ai, ml, mlops, training, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/projects/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"telemetry_enabled\""
+
+    - type: word
+      part: body
+      words:
+        - "\"warn_index\""
+
+    - type: word
+      part: body
+      words:
+        - "\"warn_runs\""
+
+  extractors:
+    - type: regex
+      name: aim_project_path
+      part: body
+      regex:
+        - '"path"\s*:\s*"([^"]+)"'
+      group: 1
