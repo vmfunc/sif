@@ -1,0 +1,39 @@
+# Label Studio Exposure Detection Module
+
+id: label-studio-exposure
+info:
+  name: Label Studio Exposure
+  author: sif
+  severity: low
+  description: Detects an exposed Label Studio instance that discloses its release and build over the unauthenticated version api
+  tags: [label-studio, ai, ml, mlops, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/version/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"label-studio-os-package\""
+
+    - type: word
+      part: body
+      words:
+        - "\"label-studio-os-backend\""
+
+  extractors:
+    - type: regex
+      name: label_studio_release
+      part: body
+      regex:
+        - '"release"\s*:\s*"([^"]+)"'
+      group: 1

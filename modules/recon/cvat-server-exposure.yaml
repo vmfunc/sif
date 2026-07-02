@@ -1,0 +1,44 @@
+# CVAT Server Exposure Detection Module
+
+id: cvat-server-exposure
+info:
+  name: CVAT Server Exposure
+  author: sif
+  severity: low
+  description: Detects an exposed CVAT computer vision annotation platform over its unauthenticated about endpoint, which discloses the server version
+  tags: [cvat, ai, ml, annotation, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/server/about"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"name"\s*:\s*"Computer Vision Annotation Tool"'
+
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+
+    - type: word
+      part: body
+      words:
+        - "\"logo_url\""
+
+  extractors:
+    - type: regex
+      name: cvat_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
