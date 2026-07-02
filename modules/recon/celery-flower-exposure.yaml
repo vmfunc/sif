@@ -1,0 +1,37 @@
+# Celery Flower Worker API Exposure Detection Module
+
+id: celery-flower-exposure
+info:
+  name: Celery Flower Worker API Exposure
+  author: sif
+  severity: high
+  description: Detects a Celery Flower instance with its api opened that leaks worker broker config and registered tasks and can execute tasks
+  tags: [flower, celery, broker, python, background-jobs, dashboard, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/workers"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"active_queues\""
+        - "\"registered\""
+        - "\"conf\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: celery_version
+      part: body
+      regex:
+        - '"sw_ver"\s*:\s*"([^"]+)"'
+      group: 1

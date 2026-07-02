@@ -1,0 +1,37 @@
+# RQ Dashboard Exposure Detection Module
+
+id: rq-dashboard-exposure
+info:
+  name: RQ Dashboard Exposure
+  author: sif
+  severity: medium
+  description: Detects an unprotected RQ Dashboard that leaks Redis-backed queue names and job counts and allows requeuing and deleting jobs
+  tags: [rq, rq-dashboard, redis, python, background-jobs, dashboard, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/0/data/queues.json"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"queues\""
+        - "\"failed_job_registry_count\""
+        - "\"scheduled_job_registry_count\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: rq_queue_name
+      part: body
+      regex:
+        - '"name"\s*:\s*"([^"]+)"'
+      group: 1
