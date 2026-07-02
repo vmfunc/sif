@@ -1,0 +1,39 @@
+# LibreChat Open Registration Exposure Detection Module
+
+id: librechat-exposure
+info:
+  name: LibreChat Open Registration
+  author: sif
+  severity: low
+  description: Detects a LibreChat instance whose pre-login config advertises open registration, letting anyone create an account and use its configured model providers
+  tags: [librechat, llm, ai, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/config"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"emailLoginEnabled\""
+
+    - type: regex
+      part: body
+      regex:
+        - '"registrationEnabled"\s*:\s*true'
+
+  extractors:
+    - type: regex
+      name: librechat_title
+      part: body
+      regex:
+        - '"appTitle"\s*:\s*"([^"]+)"'
+      group: 1

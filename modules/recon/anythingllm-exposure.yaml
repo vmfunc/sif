@@ -1,0 +1,44 @@
+# AnythingLLM Exposure Detection Module
+
+id: anythingllm-exposure
+info:
+  name: AnythingLLM Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed AnythingLLM instance; its unauthenticated setup endpoint discloses the chosen llm provider and model, the vector database, the embedding engine, and whether multi-user auth is enabled
+  tags: [anythingllm, llm, ai, rag, chat, ui, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/setup-complete"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"LLMProvider\""
+
+    - type: word
+      part: body
+      words:
+        - "\"VectorDB\""
+
+    - type: word
+      part: body
+      words:
+        - "\"EmbeddingEngine\""
+
+  extractors:
+    - type: regex
+      name: anythingllm_model
+      part: body
+      regex:
+        - '"LLMModel"\s*:\s*"([^"]+)"'
+      group: 1

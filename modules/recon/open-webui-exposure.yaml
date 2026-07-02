@@ -1,0 +1,39 @@
+# Open WebUI Authentication Disabled Exposure Detection Module
+
+id: open-webui-exposure
+info:
+  name: Open WebUI Authentication Disabled
+  author: sif
+  severity: medium
+  description: Detects an Open WebUI instance running with authentication disabled, leaving the chat ui and its configured model connections open to anyone
+  tags: [open-webui, llm, ai, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/config"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"auth_trusted_header\""
+
+    - type: regex
+      part: body
+      regex:
+        - '"auth"\s*:\s*false'
+
+  extractors:
+    - type: regex
+      name: open_webui_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
