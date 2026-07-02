@@ -12,11 +12,15 @@ on:
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+    # OIDC tokens and repo secrets are withheld from pull_request runs that
+    # originate from forks or dependabot, so the action cannot authenticate
+    # there and the check fails for every external PR. Skip those cases (the
+    # job simply does not run) instead of failing. Same-repo branch PRs still
+    # get reviewed. To review fork PRs too, switch the trigger to
+    # pull_request_target (has a security trade-off) rather than loosening this.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
 
     runs-on: ubuntu-latest
     permissions:
