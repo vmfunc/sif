@@ -1,0 +1,38 @@
+# Netflix Eureka Service Registry Exposure Detection Module
+
+id: eureka-registry-exposure
+info:
+  name: Netflix Eureka Service Registry Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Netflix Eureka registry that leaks every service's internal hostname, ip and port and accepts rogue registrations
+  tags: [eureka, netflix, spring-cloud, service-registry, discovery, information-disclosure, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/eureka/apps"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "apps__hashcode"
+        - "versions__delta"
+        - "applications"
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: eureka_instance_ip
+      part: body
+      regex:
+        - '<ipAddr>([^<]+)</ipAddr>'
+        - '"ipAddr"\s*:\s*"([^"]+)"'
+      group: 1
