@@ -1,0 +1,41 @@
+# Hadoop HDFS NameNode Exposure Detection Module
+
+id: hadoop-namenode-exposure
+info:
+  name: Hadoop HDFS NameNode Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Hadoop HDFS NameNode jmx interface that leaks the version, capacity and every datanode's internal hostname
+  tags: [hadoop, hdfs, namenode, apache, big-data, jmx, information-disclosure, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/jmx?qry=Hadoop:service=NameNode,name=NameNodeInfo"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"name"\s*:\s*"Hadoop:service=NameNode,name=NameNodeInfo"'
+
+    - type: word
+      part: body
+      words:
+        - "\"LiveNodes\""
+        - "\"DeadNodes\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: hdfs_version
+      part: body
+      regex:
+        - '"SoftwareVersion"\s*:\s*"([^"]+)"'
+      group: 1
