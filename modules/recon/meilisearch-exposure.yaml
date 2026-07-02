@@ -1,0 +1,44 @@
+# Meilisearch Exposure Detection Module
+
+id: meilisearch-exposure
+info:
+  name: Meilisearch Exposure
+  author: sif
+  severity: high
+  description: Detects a Meilisearch instance running without a master key; a 200 from the version endpoint means every route is public, allowing unauthenticated read and write of all indexed data including its vector and semantic search store
+  tags: [meilisearch, vector, ai, search, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/version"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"commitSha\""
+
+    - type: word
+      part: body
+      words:
+        - "\"commitDate\""
+
+    - type: word
+      part: body
+      words:
+        - "\"pkgVersion\""
+
+  extractors:
+    - type: regex
+      name: meilisearch_version
+      part: body
+      regex:
+        - '"pkgVersion"\s*:\s*"([^"]+)"'
+      group: 1

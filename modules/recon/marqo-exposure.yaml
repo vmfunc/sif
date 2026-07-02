@@ -1,0 +1,39 @@
+# Marqo Vector Search Engine Exposure Detection Module
+
+id: marqo-exposure
+info:
+  name: Marqo Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Marqo vector search engine, which ships without authentication; a reachable instance exposes its full document and index api for unauthenticated read, write, and delete
+  tags: [marqo, vector, ai, ml, search, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"message"\s*:\s*"Welcome to Marqo"'
+
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+
+  extractors:
+    - type: regex
+      name: marqo_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
