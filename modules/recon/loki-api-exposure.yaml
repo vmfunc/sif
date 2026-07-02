@@ -1,0 +1,39 @@
+# Grafana Loki Log API Exposure Detection Module
+
+id: loki-api-exposure
+info:
+  name: Grafana Loki Log API Exposure
+  author: sif
+  severity: high
+  description: Detects a Grafana Loki deployment with auth_enabled disabled that serves log labels and content to anyone over its query api
+  tags: [loki, grafana, logs, log-aggregation, observability, exposure, unauth, api, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/loki/api/v1/labels"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"status"\s*:\s*"success"'
+
+    - type: word
+      part: body
+      words:
+        - "\"data\""
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: loki_label
+      part: body
+      regex:
+        - '"data"\s*:\s*\[\s*"([^"]+)"'
+      group: 1
