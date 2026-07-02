@@ -144,8 +144,6 @@ func (d *remixDetector) Name() string { return "Remix" }
 func (d *remixDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: "__remixContext", Weight: 0.5},
-		{Pattern: "remix", Weight: 0.3},
-		{Pattern: "_remix", Weight: 0.4},
 	}
 }
 

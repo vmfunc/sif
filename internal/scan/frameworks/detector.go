@@ -30,6 +30,9 @@ type Signature struct {
 	Pattern    string
 	Weight     float32
 	HeaderOnly bool
+	// Header, when set, scopes a HeaderOnly match to the named header's value
+	// (canonical form, e.g. "X-Powered-By"). Empty matches across all headers.
+	Header string
 }
 
 // Detector is the interface for framework detection plugins.
@@ -107,7 +110,13 @@ func (b BaseDetector) MatchSignatures(body string, headers http.Header) float32 
 		totalWeight += sig.Weight
 
 		if sig.HeaderOnly {
-			if containsHeader(headers, sig.Pattern) {
+			var matched bool
+			if sig.Header != "" {
+				matched = headerValueContains(headers, sig.Header, sig.Pattern)
+			} else {
+				matched = containsHeader(headers, sig.Pattern)
+			}
+			if matched {
 				weightedScore += sig.Weight
 			}
 		} else if strings.Contains(body, sig.Pattern) {
@@ -120,6 +129,17 @@ func (b BaseDetector) MatchSignatures(body string, headers http.Header) float32 
 	}
 
 	return weightedScore / totalWeight
+}
+
+// headerValueContains reports whether the named header's value contains the signature.
+func headerValueContains(headers http.Header, name, signature string) bool {
+	sigLower := strings.ToLower(signature)
+	for _, value := range headers.Values(name) {
+		if strings.Contains(strings.ToLower(value), sigLower) {
+			return true
+		}
+	}
+	return false
 }
 
 // containsHeader checks if a signature pattern exists in headers.
