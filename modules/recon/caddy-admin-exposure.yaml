@@ -1,0 +1,41 @@
+# Caddy Admin API Exposure Detection Module
+
+id: caddy-admin-exposure
+info:
+  name: Caddy Admin API Exposure
+  author: sif
+  severity: high
+  description: Detects a Caddy admin api bound to a routable address that leaks the running config and accepts config-replacing loads
+  tags: [caddy, reverse-proxy, web-server, admin, api, controlplane, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/config/"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"apps"\s*:\s*\{'
+
+    - type: word
+      part: body
+      words:
+        - "\"servers\""
+        - "\"handler\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: caddy_handler
+      part: body
+      regex:
+        - '"handler"\s*:\s*"([^"]+)"'
+      group: 1
