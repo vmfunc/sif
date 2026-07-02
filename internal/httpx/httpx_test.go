@@ -20,6 +20,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -488,4 +489,229 @@ func resetBench() {
 	mu.Lock()
 	configured = nil
 	mu.Unlock()
+}
+
+// retrySequenceServer serves codes[n] on the n-th hit, repeating the last once
+// the slice runs out; retryable codes carry Retry-After: 0 to keep tests fast.
+func retrySequenceServer(t *testing.T, hits *atomic.Int64, codes ...int) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		n := int(hits.Add(1)) - 1
+		code := codes[len(codes)-1]
+		if n < len(codes) {
+			code = codes[n]
+		}
+		if code == http.StatusTooManyRequests || code == http.StatusServiceUnavailable {
+			w.Header().Set("Retry-After", "0")
+		}
+		w.WriteHeader(code)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// getStatus performs a GET and returns the final status code the caller sees.
+func getStatus(t *testing.T, client *http.Client, url string) int {
+	t.Helper()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}
+
+func TestRetryRecoversAfter429(t *testing.T) {
+	resetConfig(t)
+
+	var hits atomic.Int64
+	srv := retrySequenceServer(t, &hits, http.StatusTooManyRequests, http.StatusOK)
+	if err := Configure(Options{MaxRetries: 2}); err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+
+	if code := getStatus(t, Client(5*time.Second), srv.URL); code != http.StatusOK {
+		t.Errorf("status = %d, want 200 after retry", code)
+	}
+	if got := hits.Load(); got != 2 {
+		t.Errorf("server hits = %d, want 2 (initial + one retry)", got)
+	}
+}
+
+func TestRetryRecoversAfter503(t *testing.T) {
+	resetConfig(t)
+
+	var hits atomic.Int64
+	srv := retrySequenceServer(t, &hits, http.StatusServiceUnavailable, http.StatusOK)
+	if err := Configure(Options{MaxRetries: 2}); err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+
+	if code := getStatus(t, Client(5*time.Second), srv.URL); code != http.StatusOK {
+		t.Errorf("status = %d, want 200 after retry", code)
+	}
+	if got := hits.Load(); got != 2 {
+		t.Errorf("server hits = %d, want 2", got)
+	}
+}
+
+func TestRetryDisabled(t *testing.T) {
+	resetConfig(t)
+
+	var hits atomic.Int64
+	srv := retrySequenceServer(t, &hits, http.StatusTooManyRequests, http.StatusOK)
+	if err := Configure(Options{MaxRetries: 0}); err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+
+	if code := getStatus(t, Client(5*time.Second), srv.URL); code != http.StatusTooManyRequests {
+		t.Errorf("status = %d, want 429 with retries off", code)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Errorf("server hits = %d, want 1 (no retry)", got)
+	}
+}
+
+func TestRetryExhausted(t *testing.T) {
+	resetConfig(t)
+
+	var hits atomic.Int64
+	srv := retrySequenceServer(t, &hits, http.StatusTooManyRequests) // always 429
+	if err := Configure(Options{MaxRetries: 2}); err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+
+	if code := getStatus(t, Client(5*time.Second), srv.URL); code != http.StatusTooManyRequests {
+		t.Errorf("status = %d, want 429 after exhausting retries", code)
+	}
+	if got := hits.Load(); got != 3 {
+		t.Errorf("server hits = %d, want 3 (initial + 2 retries)", got)
+	}
+}
+
+func TestRetryIgnoresNonRetryableStatus(t *testing.T) {
+	resetConfig(t)
+
+	var hits atomic.Int64
+	srv := retrySequenceServer(t, &hits, http.StatusInternalServerError, http.StatusOK)
+	if err := Configure(Options{MaxRetries: 2}); err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+
+	if code := getStatus(t, Client(5*time.Second), srv.URL); code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500 (not retried)", code)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Errorf("server hits = %d, want 1 (500 not retried)", got)
+	}
+}
+
+func TestRetryReplaysRequestBody(t *testing.T) {
+	resetConfig(t)
+
+	var hits atomic.Int64
+	var bmu sync.Mutex
+	var bodies []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		bmu.Lock()
+		bodies = append(bodies, string(body))
+		bmu.Unlock()
+		if hits.Add(1) == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	if err := Configure(Options{MaxRetries: 2}); err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, srv.URL, strings.NewReader("payload"))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := Client(5 * time.Second).Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 after body replay", resp.StatusCode)
+	}
+
+	bmu.Lock()
+	defer bmu.Unlock()
+	if len(bodies) != 2 {
+		t.Fatalf("server saw %d requests, want 2", len(bodies))
+	}
+	for i, body := range bodies {
+		if body != "payload" {
+			t.Errorf("body[%d] = %q, want %q (rewind dropped the body)", i, body, "payload")
+		}
+	}
+}
+
+func TestRetryAfterHeader(t *testing.T) {
+	noHeader := &http.Response{Header: http.Header{}}
+	if got := retryAfter(noHeader, 0); got != retryBackoffBase {
+		t.Errorf("missing header: attempt 0 = %v, want %v", got, retryBackoffBase)
+	}
+	if got := retryAfter(noHeader, 1); got != 2*retryBackoffBase {
+		t.Errorf("missing header: attempt 1 = %v, want %v", got, 2*retryBackoffBase)
+	}
+	if got := retryAfter(noHeader, 1000); got != retryAfterCap {
+		t.Errorf("missing header: attempt 1000 = %v, want cap %v", got, retryAfterCap)
+	}
+
+	withSeconds := func(v string) *http.Response {
+		return &http.Response{Header: http.Header{"Retry-After": {v}}}
+	}
+	if got := retryAfter(withSeconds("3"), 0); got != 3*time.Second {
+		t.Errorf("Retry-After 3 = %v, want 3s", got)
+	}
+	if got := retryAfter(withSeconds("0"), 5); got != 0 {
+		t.Errorf("Retry-After 0 = %v, want 0", got)
+	}
+	if got := retryAfter(withSeconds("9999"), 0); got != retryAfterCap {
+		t.Errorf("Retry-After 9999 = %v, want cap %v", got, retryAfterCap)
+	}
+	if got := retryAfter(withSeconds("soon"), 0); got != retryBackoffBase {
+		t.Errorf("Retry-After junk = %v, want backoff %v", got, retryBackoffBase)
+	}
+
+	future := time.Now().Add(5 * time.Second).UTC().Format(http.TimeFormat)
+	if got := retryAfter(withSeconds(future), 0); got <= 0 || got > 5*time.Second {
+		t.Errorf("Retry-After http-date = %v, want (0, 5s]", got)
+	}
+}
+
+func TestCapDuration(t *testing.T) {
+	cases := []struct{ in, want time.Duration }{
+		{-time.Second, 0},
+		{0, 0},
+		{5 * time.Second, 5 * time.Second},
+		{retryAfterCap, retryAfterCap},
+		{retryAfterCap + time.Second, retryAfterCap},
+	}
+	for _, c := range cases {
+		if got := capDuration(c.in); got != c.want {
+			t.Errorf("capDuration(%v) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}
+
+func TestSleepCtxCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := sleepCtx(ctx, time.Hour); err == nil {
+		t.Error("sleepCtx on a cancelled context should return its error, not block")
+	}
 }

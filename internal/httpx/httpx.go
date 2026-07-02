@@ -16,11 +16,13 @@
 package httpx
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -74,6 +76,8 @@ type Options struct {
 	Cookie    string
 	UserAgent string
 	RateLimit int
+	// MaxRetries is how many 429/503 responses to retry with backoff (0 = off).
+	MaxRetries int
 	// Threads is the scan worker count; it sizes the per-host idle pool so
 	// concurrent workers hitting one target reuse conns instead of dialing fresh.
 	Threads int
@@ -107,11 +111,12 @@ func Configure(opts Options) error {
 	}
 
 	rt := &roundTripper{
-		base:      base,
-		headers:   headers,
-		cookie:    opts.Cookie,
-		userAgent: opts.UserAgent,
-		limiter:   limiter,
+		base:       base,
+		headers:    headers,
+		cookie:     opts.Cookie,
+		userAgent:  opts.UserAgent,
+		limiter:    limiter,
+		maxRetries: opts.MaxRetries,
 	}
 
 	mu.Lock()
@@ -226,20 +231,15 @@ func parseHeaders(raw []string) (map[string]string, error) {
 
 // roundTripper paces and decorates each request before delegating to base.
 type roundTripper struct {
-	base      *http.Transport
-	headers   map[string]string
-	cookie    string
-	userAgent string
-	limiter   *rate.Limiter
+	base       *http.Transport
+	headers    map[string]string
+	cookie     string
+	userAgent  string
+	limiter    *rate.Limiter
+	maxRetries int
 }
 
 func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if rt.limiter != nil {
-		if err := rt.limiter.Wait(req.Context()); err != nil {
-			return nil, fmt.Errorf("rate limiter: %w", err)
-		}
-	}
-
 	// only set what the caller hasn't already; a scanner that explicitly sets a
 	// header (e.g. an api key) must win over the global default.
 	for key, value := range rt.headers {
@@ -254,5 +254,101 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		req.Header.Set("User-Agent", rt.userAgent)
 	}
 
-	return rt.base.RoundTrip(req)
+	for attempt := 0; ; attempt++ {
+		if rt.limiter != nil {
+			if err := rt.limiter.Wait(req.Context()); err != nil {
+				return nil, fmt.Errorf("rate limiter: %w", err)
+			}
+		}
+
+		resp, err := rt.base.RoundTrip(req)
+		if err != nil || attempt >= rt.maxRetries || !retryableStatus(resp.StatusCode) {
+			return resp, err
+		}
+
+		// back off and retry, unless the body can't be replayed.
+		if !rewind(req) {
+			return resp, nil
+		}
+		wait := retryAfter(resp, attempt)
+		DrainClose(resp)
+
+		if err := sleepCtx(req.Context(), wait); err != nil {
+			return nil, err
+		}
+	}
+}
+
+func retryableStatus(code int) bool {
+	return code == http.StatusTooManyRequests || code == http.StatusServiceUnavailable
+}
+
+const (
+	retryAfterCap    = 20 * time.Second
+	retryBackoffBase = 500 * time.Millisecond
+	// clamp the shift so a large -max-retries can't overflow the duration.
+	retryBackoffMaxShift = 16
+)
+
+// retryAfter honors a Retry-After header (delta-seconds or HTTP-date) and
+// otherwise falls back to capped exponential backoff.
+func retryAfter(resp *http.Response, attempt int) time.Duration {
+	if v := strings.TrimSpace(resp.Header.Get("Retry-After")); v != "" {
+		if secs, err := strconv.Atoi(v); err == nil && secs >= 0 {
+			return capDuration(time.Duration(secs) * time.Second)
+		}
+		if t, err := http.ParseTime(v); err == nil {
+			return capDuration(time.Until(t))
+		}
+	}
+	shift := attempt
+	if shift > retryBackoffMaxShift {
+		shift = retryBackoffMaxShift
+	}
+	return capDuration(retryBackoffBase << shift)
+}
+
+// capDuration clamps d to [0, retryAfterCap].
+func capDuration(d time.Duration) time.Duration {
+	switch {
+	case d < 0:
+		return 0
+	case d > retryAfterCap:
+		return retryAfterCap
+	default:
+		return d
+	}
+}
+
+// rewind restores req.Body for a resend. Only a GetBody-backed body (set by
+// net/http for the in-memory bodies sif uses) is replayable; a nil or NoBody
+// request needs nothing, anything else can't be retried.
+func rewind(req *http.Request) bool {
+	if req.Body == nil || req.Body == http.NoBody {
+		return true
+	}
+	if req.GetBody == nil {
+		return false
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return false
+	}
+	req.Body = body
+	return true
+}
+
+// sleepCtx waits for d or until ctx is cancelled, whichever comes first.
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
