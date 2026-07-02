@@ -1,0 +1,39 @@
+# Selenoid Browser Grid Exposure Detection Module
+
+id: selenoid-exposure
+info:
+  name: Selenoid Browser Grid Exposure
+  author: sif
+  severity: medium
+  description: Detects a Selenoid browser grid whose status endpoint leaks running sessions and images and lets anyone start a browser container
+  tags: [selenoid, aerokube, webdriver, browser-automation, ssrf, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/status"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"total\""
+        - "\"used\""
+        - "\"queued\""
+        - "\"pending\""
+        - "\"browsers\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: selenoid_browser
+      part: body
+      regex:
+        - '"browsers"\s*:\s*\{\s*"([^"]+)"'
+      group: 1

@@ -1,0 +1,41 @@
+# Selenium Grid Status Exposure Detection Module
+
+id: selenium-grid-exposure
+info:
+  name: Selenium Grid Status Exposure
+  author: sif
+  severity: medium
+  description: Detects a Selenium Grid whose status endpoint leaks registered nodes and lets anyone drive a browser to internal urls
+  tags: [selenium, selenium-grid, webdriver, browser-automation, ssrf, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/status"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"value\""
+        - "\"nodes\""
+      condition: and
+
+    - type: regex
+      part: body
+      regex:
+        - '"message"\s*:\s*"Selenium Grid'
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: selenium_version
+      part: body
+      regex:
+        - '"availability"\s*:\s*"[^"]*"\s*,\s*"version"\s*:\s*"([^"]+)"'
+      group: 1
