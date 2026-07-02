@@ -1,0 +1,37 @@
+# Prometheus Alertmanager Status Exposure Detection Module
+
+id: alertmanager-status-exposure
+info:
+  name: Prometheus Alertmanager Status Exposure
+  author: sif
+  severity: high
+  description: Detects an unauthenticated Prometheus Alertmanager whose status api leaks the running config including receiver credentials
+  tags: [alertmanager, prometheus, monitoring, alerting, config, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v2/status"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"versionInfo\""
+        - "\"config\""
+        - "\"cluster\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: alertmanager_version
+      part: body
+      regex:
+        - '"versionInfo"\s*:\s*\{[^}]*"version"\s*:\s*"([^"]+)"'
+      group: 1
