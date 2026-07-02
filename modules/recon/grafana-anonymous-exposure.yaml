@@ -1,0 +1,41 @@
+# Grafana Anonymous Access Exposure Detection Module
+
+id: grafana-anonymous-exposure
+info:
+  name: Grafana Anonymous Access Exposure
+  author: sif
+  severity: medium
+  description: Detects a Grafana with anonymous access enabled that lists every dashboard and reaches backend data sources without login
+  tags: [grafana, dashboard, observability, anonymous, misconfiguration, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/search?type=dash-db"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"type"\s*:\s*"dash-db"'
+
+    - type: word
+      part: body
+      words:
+        - "\"uri\""
+        - "\"isStarred\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: grafana_dashboard
+      part: body
+      regex:
+        - '"title"\s*:\s*"([^"]+)"'
+      group: 1
