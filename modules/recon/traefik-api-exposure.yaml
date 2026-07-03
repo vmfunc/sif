@@ -1,0 +1,42 @@
+# Traefik API and Dashboard Exposure Detection Module
+
+id: traefik-api-exposure
+info:
+  name: Traefik API Exposure
+  author: sif
+  severity: high
+  description: Detects an unauthenticated Traefik dashboard api reachable at /api/overview, exposing a config summary of router and service counts, enabled features and providers
+  tags: [traefik, reverse-proxy, ingress, api, dashboard, controlplane, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/overview"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"http"\s*:\s*\{'
+
+    - type: word
+      part: body
+      words:
+        - "\"features\""
+        - "\"accessLog\""
+        - "\"providers\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: traefik_provider
+      part: body
+      regex:
+        - '"providers"\s*:\s*\[\s*"([^"]+)"'
+      group: 1
