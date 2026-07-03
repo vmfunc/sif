@@ -15,6 +15,7 @@ package scan
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -165,6 +166,22 @@ func TestPassive_ScopesSubdomainsToTarget(t *testing.T) {
 	}
 	if !urlsContain(result.Subdomains, "www.example.com") {
 		t.Errorf("expected the in-scope subdomain to remain: %v", result.Subdomains)
+	}
+}
+
+func TestPassive_SourcesUseTLS(t *testing.T) {
+	// all three passive feeds must be fetched over https: an on-path attacker
+	// able to tamper with a plain-http response could inject or drop
+	// subdomains/urls in the reported results without detection.
+	sources := map[string]string{
+		"crtsh":       crtshBaseURL,
+		"certspotter": certspotterBaseURL,
+		"wayback":     waybackBaseURL,
+	}
+	for name, base := range sources {
+		if !strings.HasPrefix(base, "https://") {
+			t.Errorf("%s base url is not https: %q", name, base)
+		}
 	}
 }
 
