@@ -72,6 +72,13 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 		}
 	}
 
+	// a module with an explicit request chain runs its steps in order, threading
+	// extracted variables between them; the concurrent single-request path below
+	// stays the default when no chain is defined.
+	if len(cfg.Requests) > 0 {
+		return executeHTTPChain(ctx, client, target, def)
+	}
+
 	// Generate requests based on paths and payloads
 	requests, err := generateHTTPRequests(target, cfg)
 	if err != nil {
@@ -127,6 +134,98 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 	}
 
 	return result, nil
+}
+
+// executeHTTPChain runs a module's ordered request chain. steps run in sequence
+// sharing one variable map: each step's extractors feed {{name}} references in
+// later steps' path, headers and body. a step with matchers records a finding
+// on a match and halts the chain on a miss, so a login/setup step can gate an
+// authenticated follow-up. steps are sequential by construction (a later step
+// depends on an earlier one), so this path is not concurrent.
+func executeHTTPChain(ctx context.Context, client *http.Client, target string, def *YAMLModule) (*Result, error) {
+	result := &Result{
+		ModuleID: def.ID,
+		Target:   target,
+		Findings: make([]Finding, 0),
+	}
+	base := strings.TrimSuffix(target, "/")
+	vars := make(map[string]string)
+
+	for i := range def.HTTP.Requests {
+		if err := ctx.Err(); err != nil {
+			return result, err
+		}
+		step := &def.HTTP.Requests[i]
+
+		method := step.Method
+		if method == "" {
+			method = "GET"
+		}
+		url := substituteVariablesWithVars(step.Path, base, "", vars)
+
+		var bodyReader io.Reader
+		if bodyStr := substituteVariablesWithVars(step.Body, base, "", vars); bodyStr != "" {
+			bodyReader = strings.NewReader(bodyStr)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+		if err != nil {
+			return result, nil
+		}
+		for k, v := range step.Headers {
+			req.Header.Set(k, substituteVariablesWithVars(v, base, "", vars))
+		}
+		if req.Header.Get("User-Agent") == "" {
+			req.Header.Set("User-Agent", defaultUserAgent)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			// a transport error breaks the chain; return whatever matched earlier.
+			return result, nil
+		}
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, MaxBodySize))
+		resp.Body.Close()
+		if err != nil {
+			return result, nil
+		}
+		respStr := string(respBody)
+
+		// feed this step's extractions into the shared vars for later steps,
+		// regardless of whether the step also carries matchers.
+		for k, v := range runExtractors(step.Extractors, resp, respStr) {
+			vars[k] = v
+		}
+
+		// a step with matchers gates the chain: a match records a finding, a miss
+		// means the precondition failed so the chain stops here.
+		if len(step.Matchers) > 0 {
+			if !checkMatchers(step.Matchers, step.MatchersCondition, resp, respStr) {
+				break
+			}
+			result.Findings = append(result.Findings, Finding{
+				URL:       url,
+				Severity:  def.Info.Severity,
+				Evidence:  truncateEvidence(respStr),
+				Extracted: snapshotVars(vars),
+			})
+		}
+	}
+
+	return result, nil
+}
+
+// snapshotVars copies the running chain variables so each finding carries an
+// independent view rather than aliasing the map that later steps keep mutating.
+func snapshotVars(vars map[string]string) map[string]string {
+	if len(vars) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(vars))
+	for k, v := range vars {
+		out[k] = v
+	}
+	return out
 }
 
 // generateHTTPRequests creates all requests based on paths and payloads.
@@ -270,6 +369,20 @@ func substituteVariables(template, baseURL, payload string) string {
 	return result
 }
 
+// substituteVariablesWithVars extends substituteVariables with the named values
+// a request chain accumulates: after {{BaseURL}}/{{payload}} it replaces every
+// {{name}} with the value an earlier step extracted under that name.
+func substituteVariablesWithVars(template, baseURL, payload string, vars map[string]string) string {
+	result := substituteVariables(template, baseURL, payload)
+	for name, value := range vars {
+		result = strings.ReplaceAll(result, "{{"+name+"}}", value)
+	}
+	return result
+}
+
+// defaultUserAgent is sent when a module doesn't set its own User-Agent header.
+const defaultUserAgent = "Mozilla/5.0 (compatible; sif/1.0)"
+
 // executeHTTPRequest executes a single HTTP request and checks matchers.
 func executeHTTPRequest(ctx context.Context, client *http.Client, r *httpRequest, cfg *HTTPConfig, severity string) (Finding, bool) {
 	var body io.Reader
@@ -287,7 +400,7 @@ func executeHTTPRequest(ctx context.Context, client *http.Client, r *httpRequest
 		req.Header.Set(k, v)
 	}
 	if req.Header.Get("User-Agent") == "" {
-		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; sif/1.0)")
+		req.Header.Set("User-Agent", defaultUserAgent)
 	}
 
 	resp, err := client.Do(req)

@@ -64,6 +64,24 @@ type HTTPConfig struct {
 	Matchers          []Matcher         `yaml:"matchers"`
 	MatchersCondition string            `yaml:"matchers-condition,omitempty"` // and (default), or
 	Extractors        []Extractor       `yaml:"extractors,omitempty"`
+	Requests          []HTTPStep        `yaml:"requests,omitempty"` // ordered request chain; see HTTPStep
+}
+
+// HTTPStep is one request in a chain. steps run in order and share a variable
+// map: each step's extractors populate {{name}} references usable in the path,
+// headers and body of later steps. a step whose matchers don't match halts the
+// chain, so a login step can gate an authenticated follow-up request. when
+// HTTPConfig.Requests is empty the single-request fields above drive the module
+// unchanged.
+type HTTPStep struct {
+	Name              string            `yaml:"name,omitempty"`
+	Method            string            `yaml:"method,omitempty"`
+	Path              string            `yaml:"path"`
+	Headers           map[string]string `yaml:"headers,omitempty"`
+	Body              string            `yaml:"body,omitempty"`
+	Matchers          []Matcher         `yaml:"matchers,omitempty"`
+	MatchersCondition string            `yaml:"matchers-condition,omitempty"`
+	Extractors        []Extractor       `yaml:"extractors,omitempty"`
 }
 
 // DNSConfig defines DNS module settings
@@ -108,6 +126,18 @@ func ParseYAMLModule(path string) (*YAMLModule, error) {
 		}
 		if err := validateMatchersCondition(ym.HTTP.MatchersCondition); err != nil {
 			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
+		}
+		for i := range ym.HTTP.Requests {
+			step := &ym.HTTP.Requests[i]
+			if step.Path == "" {
+				return nil, fmt.Errorf("module %q: request %d missing required field: path", ym.ID, i)
+			}
+			if err := validateMatchersCondition(step.MatchersCondition); err != nil {
+				return nil, fmt.Errorf("module %q request %d: %w", ym.ID, i, err)
+			}
+			if err := validateMatchers(step.Matchers); err != nil {
+				return nil, fmt.Errorf("module %q request %d: %w", ym.ID, i, err)
+			}
 		}
 	}
 	var matchers []Matcher
