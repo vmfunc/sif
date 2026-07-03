@@ -339,11 +339,13 @@ func (app *App) Run() error {
 		}
 
 		if app.settings.Framework {
-			result, err := frameworks.DetectFramework(url, app.settings.Timeout, app.settings.LogDir)
+			results, err := frameworks.DetectFrameworks(url, app.settings.Timeout, app.settings.LogDir)
 			if err != nil {
 				log.Errorf("Error while running framework detection: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
+			} else if len(results) > 0 {
+				for _, result := range results {
+					moduleResults = append(moduleResults, NewModuleResult(result))
+				}
 				scansRun = append(scansRun, "Framework Detection")
 			}
 		}
