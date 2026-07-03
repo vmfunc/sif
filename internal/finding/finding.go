@@ -562,7 +562,7 @@ func flattenDork(target string, rs []scan.DorkResult) []Finding {
 			Module:   "dork",
 			Severity: sevRecon,
 			Key:      key("dork", d.Url),
-			Title:    "dork hit",
+			Title:    fmt.Sprintf("dork hit [%s]", d.Dork),
 			Raw:      d.Url,
 		})
 	}

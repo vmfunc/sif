@@ -174,7 +174,7 @@ func coverageCases() []coverageCase {
 			wantItems: 1,
 		},
 		{
-			value:     scan.DorkResults{{Url: "http://x/leak", Count: 1}},
+			value:     scan.DorkResults{{Url: "http://x/leak", Dork: "site:x filetype:pdf", Count: 1}},
 			typed:     scan.DorkResults{},
 			module:    "dork",
 			wantItems: 1,
