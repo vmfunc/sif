@@ -1,0 +1,49 @@
+# ChartMuseum Index Exposure Detection Module
+
+id: chartmuseum-index-exposure
+info:
+  name: ChartMuseum Index Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed ChartMuseum helm chart repository that lets anyone list and download every stored chart through its index
+  tags: [chartmuseum, helm, kubernetes, package-registry, information-disclosure, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/index.yaml"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "apiVersion"
+        - "entries:"
+        - "serverInfo"
+      condition: and
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: chartmuseum_generated
+      part: body
+      regex:
+        - 'generated:\s*"?([0-9TZ:.+-]+)"?'
+      group: 1
