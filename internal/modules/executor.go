@@ -371,7 +371,7 @@ func checkMatcher(m *Matcher, resp *http.Response, body string) bool {
 		return false
 
 	case "word":
-		return checkWords(getPart(m.Part, resp, body), m.Words, m.Condition)
+		return checkWords(getPart(m.Part, resp, body), m.Words, m.Condition, m.CaseInsensitive)
 
 	case "regex":
 		return checkRegex(getPart(m.Part, resp, body), m.Regex, m.Condition)
@@ -424,10 +424,19 @@ func getPart(part string, resp *http.Response, body string) string {
 }
 
 // checkWords checks if any/all words are found.
-func checkWords(content string, words []string, condition string) bool {
+func checkWords(content string, words []string, condition string, caseInsensitive bool) bool {
+	if caseInsensitive {
+		content = strings.ToLower(content)
+	}
+	fold := func(w string) string {
+		if caseInsensitive {
+			return strings.ToLower(w)
+		}
+		return w
+	}
 	if condition == "or" {
 		for _, word := range words {
-			if strings.Contains(content, word) {
+			if strings.Contains(content, fold(word)) {
 				return true
 			}
 		}
@@ -435,7 +444,7 @@ func checkWords(content string, words []string, condition string) bool {
 	}
 	// Default to AND
 	for _, word := range words {
-		if !strings.Contains(content, word) {
+		if !strings.Contains(content, fold(word)) {
 			return false
 		}
 	}
