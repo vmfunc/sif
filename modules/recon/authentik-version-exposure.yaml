@@ -1,0 +1,39 @@
+# Authentik Version Endpoint Exposure Detection Module
+
+id: authentik-version-exposure
+info:
+  name: Authentik Version Exposure
+  author: sif
+  severity: info
+  description: Detects an Authentik identity provider that discloses its version family over the public default authentication flow page, rendered before any credentials are submitted
+  tags: [authentik, sso, idp, identity, fingerprint, version, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/if/flow/default-authentication-flow/"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "window.authentik"
+
+    - type: word
+      part: body
+      words:
+        - "versionFamily"
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: authentik_version_family
+      part: body
+      regex:
+        - 'versionFamily:\s*"([^"]+)"'
+      group: 1

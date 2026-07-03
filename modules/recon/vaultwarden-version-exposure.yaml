@@ -1,0 +1,39 @@
+# Vaultwarden Version Endpoint Exposure Detection Module
+
+id: vaultwarden-version-exposure
+info:
+  name: Vaultwarden Version Exposure
+  author: sif
+  severity: info
+  description: Detects a Vaultwarden (unofficial bitwarden-compatible) server that discloses its identity and client-compat version over the pre-login config endpoint; this route is served with no auth guard by design so bitwarden clients can read it before a user logs in
+  tags: [vaultwarden, bitwarden, password-manager, fingerprint, version, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/config"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"server"\s*:\s*\{\s*"name"\s*:\s*"Vaultwarden"'
+
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: vaultwarden_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
