@@ -852,9 +852,35 @@ func collectReportResults(target string, moduleResults []ModuleResult) []report.
 			log.Warnf("report: skipping %s result for %s: %v", mr.Id, target, err)
 			continue
 		}
-		out = append(out, report.Result{Target: target, Module: mr.Id, Data: data})
+		out = append(out, report.Result{
+			Target:   target,
+			Module:   mr.Id,
+			Severity: reportSeverity(target, mr),
+			Data:     data,
+		})
 	}
 	return out
+}
+
+// reportSeverity derives one severity string for a module result by flattening
+// it to per-item findings and taking the highest rank among them. a module
+// result can flatten to several severities; the worst is the meaningful one for
+// a single sarif result. an empty string means the source carried no severity.
+func reportSeverity(target string, mr ModuleResult) string {
+	findings := finding.Flatten(target, mr.Id, mr.Data)
+	if len(findings) == 0 {
+		return ""
+	}
+	worst := findings[0].Severity
+	for i := 1; i < len(findings); i++ {
+		if findings[i].Severity > worst {
+			worst = findings[i].Severity
+		}
+	}
+	if worst == finding.SeverityUnknown {
+		return ""
+	}
+	return worst.String()
 }
 
 // writeReports serializes the collected results to the requested export files.
