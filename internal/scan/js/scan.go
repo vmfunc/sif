@@ -120,7 +120,7 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 	for _, script := range scripts {
 		if strings.Contains(script, "/_buildManifest.js") {
 			log.Info("Detected Next.JS pages router! Getting all scripts from %s", script)
-			nextScripts, err := frameworks.GetPagesRouterScripts(script)
+			nextScripts, err := frameworks.GetPagesRouterScripts(script, timeout)
 			if err != nil {
 				spin.Stop()
 				return nil, err
