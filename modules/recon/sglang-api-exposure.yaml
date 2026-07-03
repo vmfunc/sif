@@ -1,0 +1,39 @@
+# SGLang API Exposure Detection Module
+
+id: sglang-api-exposure
+info:
+  name: SGLang API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed SGLang inference server that serves model info and generation without authentication
+  tags: [sglang, llm, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/model_info"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"is_generation\""
+
+    - type: word
+      part: body
+      words:
+        - "\"has_image_understanding\""
+
+  extractors:
+    - type: regex
+      name: sglang_model
+      part: body
+      regex:
+        - '"model_path"\s*:\s*"([^"]+)"'
+      group: 1
