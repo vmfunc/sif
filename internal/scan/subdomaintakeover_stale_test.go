@@ -35,7 +35,7 @@ func TestCheckSubdomainTakeover_CurrentUnclaimedPageDetected(t *testing.T) {
 			_, _ = w.Write([]byte(c.body))
 		}))
 		host := strings.TrimPrefix(srv.URL, "http://")
-		vulnerable, service := checkSubdomainTakeover(host, client)
+		vulnerable, service, _ := checkSubdomainTakeover(host, client)
 		srv.Close()
 		if !vulnerable || service != c.service {
 			t.Errorf("%s unclaimed page not detected, got vulnerable=%v service=%q", c.service, vulnerable, service)
@@ -57,7 +57,7 @@ func TestCheckSubdomainTakeover_StaleFingerprintRetired(t *testing.T) {
 			_, _ = w.Write([]byte("<html><body>" + body + "</body></html>"))
 		}))
 		host := strings.TrimPrefix(srv.URL, "http://")
-		vulnerable, service := checkSubdomainTakeover(host, client)
+		vulnerable, service, _ := checkSubdomainTakeover(host, client)
 		srv.Close()
 		if vulnerable || service != "" {
 			t.Errorf("stale fingerprint still raised a takeover (service %q) for body %q", service, body)
