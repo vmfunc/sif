@@ -1,0 +1,48 @@
+# Host Header Injection Detection Module
+id: host-header-injection
+info:
+  name: Host Header Injection
+  author: sif
+  severity: medium
+  description: Detects host header injection by confirming an attacker-controlled forwarded-host value is echoed back inside an absolute URL construct (href/src/action/content/url) in the rendered response, proving the app used the untrusted header to build a link
+  tags: [host-header-injection, ssrf, cache-poisoning, owasp-top10]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+    - "{{BaseURL}}/login"
+    - "{{BaseURL}}/reset-password"
+    - "{{BaseURL}}/password/reset"
+    - "{{BaseURL}}/forgot-password"
+    - "{{BaseURL}}/oauth/authorize"
+
+  # RFC 2606 .invalid guarantees the marker can never collide with a real
+  # domain, so any absolute-URL reflection of it in the body is proof the
+  # forwarded-host header (not the request line) drove link generation.
+  headers:
+    X-Forwarded-Host: "sifprobe-a8f31c92.invalid"
+    X-Forwarded-Server: "sifprobe-a8f31c92.invalid"
+    X-Host: "sifprobe-a8f31c92.invalid"
+    X-Original-Host: "sifprobe-a8f31c92.invalid"
+    Forwarded: "for=127.0.0.1;host=sifprobe-a8f31c92.invalid;proto=http"
+
+  threads: 10
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '(?is)(?:href|src|action|content)\s*=\s*["'']?(?:https?:)?//sifprobe-a8f31c92\.invalid'
+        - '(?is)url\(\s*["'']?(?:https?:)?//sifprobe-a8f31c92\.invalid'
+      condition: or
+
+  extractors:
+    - type: regex
+      name: reflected_context
+      part: body
+      regex:
+        - '((?:href|src|action|content|url)\s*[=(]\s*["'']?(?:https?:)?//sifprobe-a8f31c92\.invalid[^"'')\s]*)'
+      group: 1
