@@ -128,9 +128,11 @@ type svelteDetector struct{}
 func (d *svelteDetector) Name() string { return "Svelte" }
 
 func (d *svelteDetector) Signatures() []fw.Signature {
+	// "svelte-" alone cleared the detection threshold on prose merely naming a
+	// package (svelte-native, svelte-check). the remaining patterns only show
+	// up in an actual svelte bundle.
 	return []fw.Signature{
 		{Pattern: "__svelte", Weight: 0.5},
-		{Pattern: "svelte-", Weight: 0.4},
 		{Pattern: "svelte/internal", Weight: 0.4},
 	}
 }
