@@ -1,0 +1,44 @@
+# ZenML Server Exposure Detection Module
+
+id: zenml-server-exposure
+info:
+  name: ZenML Server Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed ZenML MLOps server over its unauthenticated info endpoint, disclosing the version and deployment topology including the database and secrets-store backends
+  tags: [zenml, ai, ml, mlops, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1/info"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"deployment_type\""
+
+    - type: word
+      part: body
+      words:
+        - "\"secrets_store_type\""
+
+    - type: word
+      part: body
+      words:
+        - "\"auth_scheme\""
+
+  extractors:
+    - type: regex
+      name: zenml_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
