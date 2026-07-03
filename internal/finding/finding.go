@@ -33,12 +33,13 @@ import (
 // match) rather than a whole module's blob, so consumers diff and notify at
 // item granularity.
 type Finding struct {
-	Target   string   // the url/host the scan ran against
-	Module   string   // the ResultType() of the source scanner
-	Severity Severity // ranked severity, SeverityUnknown when the source has none
-	Key      string   // stable identity for dedup/diff: module + ":" + identifier
-	Title    string   // short human label
-	Raw      string   // short evidence string, not the full body
+	Target     string   // the url/host the scan ran against
+	Module     string   // the ResultType() of the source scanner
+	Severity   Severity // ranked severity, SeverityUnknown when the source has none
+	Key        string   // stable identity for dedup/diff: module + ":" + identifier
+	Title      string   // short human label
+	Raw        string   // short evidence string, not the full body
+	Confidence float32  // detection confidence 0..1; zero when the source has none
 }
 
 // Line renders a finding as one stable, terse, machine-friendly line for the
@@ -603,12 +604,13 @@ func flattenFramework(target string, r *frameworks.FrameworkResult) []Finding {
 		raw = fmt.Sprintf("%s, %d cves", raw, len(r.CVEs))
 	}
 	return []Finding{{
-		Target:   target,
-		Module:   "framework",
-		Severity: sev,
-		Key:      key("framework", r.Name),
-		Title:    r.Name + " detected",
-		Raw:      raw,
+		Target:     target,
+		Module:     "framework",
+		Severity:   sev,
+		Key:        key("framework", r.Name),
+		Title:      r.Name + " detected",
+		Raw:        raw,
+		Confidence: r.Confidence,
 	}}
 }
 

@@ -750,6 +750,12 @@ func (app *App) Run() error {
 		}
 	}
 
+	if path := app.settings.JSONReport; path != "" {
+		if err := app.writeJSONReport(path, allFindings); err != nil {
+			return err
+		}
+	}
+
 	if !app.settings.ApiMode {
 		output.PrintSummary(scansRun, app.logFiles)
 	}
@@ -880,6 +886,21 @@ func (app *App) writeReports(results []report.Result) error {
 		output.Success("markdown report written to %s", path)
 	}
 
+	return nil
+}
+
+// writeJSONReport serializes the run's normalized findings to a json file. it
+// works off allFindings (not the raw report blobs) so the output carries the
+// same severity and confidence the -silent stream and notify path see.
+func (app *App) writeJSONReport(path string, findings []finding.Finding) error {
+	data, err := finding.JSONReport(findings)
+	if err != nil {
+		return fmt.Errorf("build json report: %w", err)
+	}
+	if err := os.WriteFile(path, data, reportFileMode); err != nil {
+		return fmt.Errorf("write json report %q: %w", path, err)
+	}
+	output.Success("json report written to %s", path)
 	return nil
 }
 
