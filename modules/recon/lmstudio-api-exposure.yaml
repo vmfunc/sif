@@ -1,0 +1,44 @@
+# LM Studio API Exposure Detection Module
+
+id: lmstudio-api-exposure
+info:
+  name: LM Studio API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed LM Studio server whose native rest api lists the local models with their quantization, architecture, and context length; with the optional api-token auth left disabled (the default) it serves unauthenticated inference and model load and unload requests
+  tags: [lmstudio, llm, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v0/models"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"compatibility_type\""
+
+    - type: word
+      part: body
+      words:
+        - "\"quantization\""
+
+    - type: word
+      part: body
+      words:
+        - "\"max_context_length\""
+
+  extractors:
+    - type: regex
+      name: lmstudio_model
+      part: body
+      regex:
+        - '"id"\s*:\s*"([^"]+)"'
+      group: 1

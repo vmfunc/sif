@@ -1,0 +1,34 @@
+# llama.cpp Server API Exposure Detection Module
+
+id: llamacpp-api-exposure
+info:
+  name: llama.cpp Server API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed llama.cpp server that lists its served model over the openai-compatible api without a key
+  tags: [llamacpp, llm, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v1/models"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"owned_by"\s*:\s*"llamacpp"'
+
+  extractors:
+    - type: regex
+      name: llamacpp_model
+      part: body
+      regex:
+        - '"id"\s*:\s*"([^"]+)"'
+      group: 1

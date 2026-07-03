@@ -1,0 +1,34 @@
+# vLLM OpenAI-Compatible API Exposure Detection Module
+
+id: vllm-api-exposure
+info:
+  name: vLLM API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed vLLM OpenAI-compatible server that lists its served models without an api key
+  tags: [vllm, llm, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/v1/models"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"owned_by"\s*:\s*"vllm"'
+
+  extractors:
+    - type: regex
+      name: vllm_model
+      part: body
+      regex:
+        - '"id"\s*:\s*"([^"]+)"'
+      group: 1
