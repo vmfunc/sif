@@ -1,0 +1,45 @@
+# Zabbix API Exposure Detection Module
+
+id: zabbix-api-exposure
+info:
+  name: Zabbix API Exposure
+  author: sif
+  severity: low
+  description: Detects an exposed Zabbix JSON-RPC API that discloses its version pre-authentication
+  tags: [zabbix, monitoring, api, json-rpc, exposure, recon]
+
+type: http
+
+http:
+  method: POST
+  paths:
+    - "{{BaseURL}}/api_jsonrpc.php"
+    - "{{BaseURL}}/zabbix/api_jsonrpc.php"
+
+  headers:
+    Content-Type: application/json-rpc
+
+  body: '{"jsonrpc":"2.0","method":"apiinfo.version","params":{},"id":1}'
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: header
+      words:
+        - "application/json-rpc"
+
+    - type: regex
+      part: body
+      regex:
+        - '"jsonrpc"\s*:\s*"2\.0"\s*,\s*"result"\s*:\s*"[0-9]+\.[0-9]+(\.[0-9]+)?"'
+
+  extractors:
+    - type: regex
+      name: zabbix_api_version
+      part: body
+      regex:
+        - '"result"\s*:\s*"([0-9]+\.[0-9]+(?:\.[0-9]+)?)"'
+      group: 1

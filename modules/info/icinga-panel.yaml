@@ -1,0 +1,30 @@
+# Icinga Web 2 Login Panel Detection Module
+
+id: icinga-panel
+info:
+  name: Icinga Web 2 Login Panel
+  author: sif
+  severity: info
+  description: Detects exposed Icinga Web 2 monitoring frontend login panels
+  tags: [icinga, monitoring, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/icingaweb2/authentication/login"
+    - "{{BaseURL}}/authentication/login"
+    - "{{BaseURL}}"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: and
+      words:
+        - 'id="icinga-logo"'
+        - 'class="login-form"'
