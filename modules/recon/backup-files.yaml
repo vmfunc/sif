@@ -43,3 +43,12 @@ http:
         - "SECRET_KEY"
         - "database_password"
       condition: or
+
+    # a 200 soft-404 that serves the site's html shell trips the generic tokens
+    # above (SECRET_KEY/APP_KEY appear in docs prose); suppress any response that
+    # opens like an html document. real dumps are plain text and carry no markup.
+    - type: regex
+      part: body
+      negative: true
+      regex:
+        - '(?i)<(!doctype|html|head|title|body)[ >]'
