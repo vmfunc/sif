@@ -1,0 +1,23 @@
+# Gitea favicon fingerprint
+
+id: favicon-gitea
+info:
+  name: Gitea Favicon Fingerprint
+  author: sif
+  severity: info
+  description: Detects Gitea by its default favicon hash
+  tags: [favicon, fingerprint, gitea, git, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/favicon.ico"
+
+  matchers:
+    - type: status
+      status: [200]
+    - type: favicon
+      hash:
+        - -1893514588 # Gitea default favicon

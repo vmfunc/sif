@@ -1,0 +1,29 @@
+# Cockpit Login Panel Detection Module
+
+id: cockpit-panel
+info:
+  name: Cockpit Login Panel
+  author: sif
+  severity: info
+  description: Detects exposed Cockpit web console login pages
+  tags: [cockpit, linux, console, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: all
+      condition: and
+      words:
+        - 'id="login-user-input"'
+        - 'id="login-password-input"'
+        - "cockpit/static/login.js"
