@@ -1,0 +1,44 @@
+# Verba RAG Health Exposure Detection Module
+
+id: verba-health-exposure
+info:
+  name: Verba Health Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Verba rag application; its health endpoint is intentionally exempt from the optional auth and, in the default Local mode, embeds the configured Weaviate cluster url and api key in cleartext, leaking the backend vector-database credentials. Fires only when a backend url is actually populated in the response
+  tags: [verba, weaviate, llm, ai, rag, vector, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/health"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"WEAVIATE_API_KEY_VERBA\""
+
+    - type: regex
+      part: body
+      regex:
+        - '"WEAVIATE_URL_VERBA"\s*:\s*"[^"]+'
+
+    - type: word
+      part: body
+      words:
+        - "\"default_deployment\""
+
+  extractors:
+    - type: regex
+      name: verba_weaviate_url
+      part: body
+      regex:
+        - '"WEAVIATE_URL_VERBA"\s*:\s*"([^"]+)"'
+      group: 1
