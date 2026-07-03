@@ -15,6 +15,7 @@ package scan
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -148,6 +149,59 @@ func TestGradeSecurityHeaders_Disclosure(t *testing.T) {
 		if !f.Present || f.Severity != "low" {
 			t.Errorf("%s finding = %+v, want present low", name, f)
 		}
+	}
+}
+
+func TestResponseIsHTTPS_UsesFinalRequestScheme(t *testing.T) {
+	httpURL, err := url.Parse("http://example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	httpsURL, err := url.Parse("https://example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name         string
+		resp         *http.Response
+		requestedURL string
+		want         bool
+	}{
+		{
+			// the requested url was http, but the client followed a redirect
+			// to https; hsts must be graded against the actual scheme.
+			name:         "redirected from http to https",
+			resp:         &http.Response{Request: &http.Request{URL: httpsURL}},
+			requestedURL: "http://example.com",
+			want:         true,
+		},
+		{
+			name:         "redirected from https to http",
+			resp:         &http.Response{Request: &http.Request{URL: httpURL}},
+			requestedURL: "https://example.com",
+			want:         false,
+		},
+		{
+			name:         "no redirect, stays http",
+			resp:         &http.Response{Request: &http.Request{URL: httpURL}},
+			requestedURL: "http://example.com",
+			want:         false,
+		},
+		{
+			name:         "no request on response falls back to requested url",
+			resp:         &http.Response{},
+			requestedURL: "https://example.com",
+			want:         true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := responseIsHTTPS(tt.resp, tt.requestedURL); got != tt.want {
+				t.Errorf("responseIsHTTPS() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
