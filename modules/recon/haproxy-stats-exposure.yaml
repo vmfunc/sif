@@ -1,0 +1,36 @@
+# HAProxy Stats Page Exposure Detection Module
+
+id: haproxy-stats-exposure
+info:
+  name: HAProxy Stats Page Exposure
+  author: sif
+  severity: medium
+  description: Detects an HAProxy statistics dashboard left reachable at its compiled-in default uri without stats auth configured, exposing backend server names, internal addresses, health state and session counts
+  tags: [haproxy, loadbalancer, reverse-proxy, dashboard, api, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/haproxy?stats"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "Statistics Report for"
+        - "HAProxy version"
+      condition: and
+
+  extractors:
+    - type: regex
+      name: haproxy_version
+      part: body
+      regex:
+        - 'HAProxy version\s+([0-9]+(?:\.[0-9]+)+)'
+      group: 1
