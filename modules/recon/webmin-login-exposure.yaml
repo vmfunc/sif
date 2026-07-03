@@ -1,0 +1,40 @@
+# Webmin Login Exposure Detection Module
+
+id: webmin-login-exposure
+info:
+  name: Webmin Login Exposure
+  author: sif
+  severity: low
+  description: Detects an internet-reachable Webmin login page, a browser-based root system administration console that should never sit directly on the open internet
+  tags: [webmin, remote-access, admin, sysadmin, miniserv, gateway, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/session_login.cgi"
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: header
+      words:
+        - "MiniServ"
+
+    - type: word
+      part: body
+      words:
+        - "Login to Webmin"
+
+  extractors:
+    - type: regex
+      name: webmin_version
+      part: header
+      regex:
+        - 'MiniServ/([0-9]+\.[0-9]+)'
+      group: 1

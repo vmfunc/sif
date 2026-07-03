@@ -1,0 +1,37 @@
+# Apache Guacamole Login Exposure Detection Module
+
+id: guacamole-login-exposure
+info:
+  name: Apache Guacamole Login Exposure
+  author: sif
+  severity: low
+  description: Detects an internet-reachable Apache Guacamole login page, a browser-based remote desktop/ssh gateway that should never sit directly on the open internet
+  tags: [guacamole, remote-access, rdp, vnc, ssh, gateway, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/guacamole/"
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: and
+      words:
+        - "guacamole-common-js"
+        - "<guac-login"
+
+  extractors:
+    - type: regex
+      name: guacamole_build_id
+      part: body
+      regex:
+        - 'guacamole-common-js/all\.min\.js\?b=([^"&]+)'
+      group: 1
