@@ -1,0 +1,66 @@
+# Terraform Tfvars Exposure Detection Module
+
+id: terraform-tfvars-exposure
+info:
+  name: Terraform Tfvars Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed terraform variable definitions file that commonly carries plaintext infrastructure credentials
+  tags: [terraform, iac, tfvars, secrets, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/terraform.tfvars"
+    - "{{BaseURL}}/.terraform.tfvars"
+    - "{{BaseURL}}/secret.auto.tfvars"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '(?m)^[A-Za-z_][A-Za-z0-9_-]*[ \t]*=[ \t]*"[^"\n]*"[ \t]*\r?\n[A-Za-z_][A-Za-z0-9_-]*[ \t]*=[ \t]*"[^"\n]*"[ \t]*$'
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "region"
+        - "instance_type"
+        - "vpc"
+        - "subnet"
+        - "cidr"
+        - "access_key"
+        - "secret_key"
+        - "api_key"
+        - "password"
+        - "db_"
+        - "ami"
+        - "zone"
+        - "project_id"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: tfvars_first_key
+      part: body
+      regex:
+        - '(?m)^([A-Za-z_][A-Za-z0-9_-]*)[ \t]*=[ \t]*"[^"\n]*"'
+      group: 1

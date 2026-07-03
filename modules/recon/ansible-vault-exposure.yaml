@@ -1,0 +1,49 @@
+# Ansible Vault Exposure Detection Module
+
+id: ansible-vault-exposure
+info:
+  name: Ansible Vault Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed ansible-vault encrypted file, confirming ansible-managed infrastructure and giving an attacker ciphertext to brute force offline
+  tags: [ansible, vault, iac, secrets, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/vault.yml"
+    - "{{BaseURL}}/secrets.yml"
+    - "{{BaseURL}}/group_vars/all/vault.yml"
+    - "{{BaseURL}}/group_vars/production/vault.yml"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '(?s)^\$ANSIBLE_VAULT;1\.[12];AES256\r?\n[0-9a-fA-F\s]+'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: vault_format_version
+      part: body
+      regex:
+        - '\$ANSIBLE_VAULT;1\.([12]);AES256'
+      group: 1
