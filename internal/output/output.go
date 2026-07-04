@@ -17,6 +17,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -154,6 +155,40 @@ func Silent() bool {
 	return silent
 }
 
+// concurrent is set when multiple targets are scanned in parallel. it serializes
+// sink writes so lines from different targets never garble, and disables live
+// widgets, which cannot share one terminal across goroutines.
+var concurrent bool
+
+// SetConcurrent switches the sink into parallel-safe mode: writes go through a
+// mutex and interactive widgets (spinners, live progress) are gated off. call it
+// once before launching target workers; it is not meant to be toggled back.
+func SetConcurrent(enabled bool) {
+	concurrent = enabled
+	if enabled {
+		sink = &lockingWriter{w: sink}
+	}
+}
+
+// Concurrent reports whether parallel-target mode is active; widget code gates on
+// it so spinners and progress bars stay silent when targets interleave.
+func Concurrent() bool {
+	return concurrent
+}
+
+// lockingWriter serializes concurrent writes to the wrapped sink so one target's
+// line is never interleaved mid-write with another's.
+type lockingWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (l *lockingWriter) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.w.Write(p)
+}
+
 // Writer is the current chrome sink (stdout normally, stderr under -silent).
 // callers that render their own chrome (the startup banner) write here so it
 // follows the same routing as everything else.
@@ -286,7 +321,9 @@ func (m *ModuleLogger) Complete(resultCount int, resultType string) {
 // ClearLine clears the current line (for progress bar updates). silent mode is
 // non-interactive, so there's no live line to clear and stdout stays untouched.
 func ClearLine() {
-	if !IsTTY || silent {
+	// under -concurrency there is no single live line to clear, and emitting the
+	// escape would wipe whatever another target just wrote.
+	if !IsTTY || silent || concurrent {
 		return
 	}
 	fmt.Fprint(sink, "\033[2K\r")

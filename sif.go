@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif/internal/config"
@@ -322,11 +323,14 @@ func (app *App) Run() error {
 		}
 	}
 
-	for _, url := range app.targets {
-		ts, err := app.scanTarget(url, storeDir, wantReport)
-		if err != nil {
-			return err
-		}
+	results, err := app.scanAllTargets(storeDir, wantReport)
+	if err != nil {
+		return err
+	}
+
+	// merge per-target results in input order so the run-wide view is identical
+	// regardless of the order workers finished under -concurrency.
+	for _, ts := range results {
 		scansRun = append(scansRun, ts.scansRun...)
 		app.logFiles = append(app.logFiles, ts.logFiles...)
 		allFindings = append(allFindings, ts.findings...)
@@ -345,6 +349,67 @@ type targetScan struct {
 	reportResults []report.Result
 	scansRun      []string
 	logFiles      []string
+}
+
+// scanAllTargets scans every target and returns the per-target results in input
+// order. With concurrency 1 it runs sequentially, behaviour-identical to a plain
+// loop. Above 1 it runs a bounded worker pool: scanTarget is self-contained
+// (isolated accumulators, no run-wide writes), so the only shared surface is the
+// console, which output.SetConcurrent serializes and de-animates. Results are
+// indexed by target position, so the caller merges them in a stable order no
+// matter which worker finished first.
+func (app *App) scanAllTargets(storeDir string, wantReport bool) ([]targetScan, error) {
+	results := make([]targetScan, len(app.targets))
+
+	concurrency := app.settings.Concurrency
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	if concurrency > len(app.targets) {
+		concurrency = len(app.targets)
+	}
+
+	if concurrency <= 1 {
+		for i, url := range app.targets {
+			ts, err := app.scanTarget(url, storeDir, wantReport)
+			if err != nil {
+				return nil, err
+			}
+			results[i] = ts
+		}
+		return results, nil
+	}
+
+	output.SetConcurrent(true)
+
+	errs := make([]error, len(app.targets))
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+	for i, url := range app.targets {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, url string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			// a panic in one target's scan (a module bug, a nil deref deep in a
+			// third-party client) must not take down every other worker's
+			// in-flight scan; convert it into that target's error instead.
+			defer func() {
+				if r := recover(); r != nil {
+					errs[i] = fmt.Errorf("panic scanning %s: %v", url, r)
+				}
+			}()
+			results[i], errs[i] = app.scanTarget(url, storeDir, wantReport)
+		}(i, url)
+	}
+	wg.Wait()
+
+	for _, err := range errs {
+		if err != nil {
+			return nil, err
+		}
+	}
+	return results, nil
 }
 
 // scanTarget runs the full scanner set for one target and returns its isolated
