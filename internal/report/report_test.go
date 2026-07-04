@@ -13,6 +13,7 @@
 package report
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -95,6 +96,44 @@ func TestSARIF_DedupesRulesAcrossTargets(t *testing.T) {
 	}
 	if len(run.Results) != 2 {
 		t.Errorf("expected 2 results, got %d", len(run.Results))
+	}
+}
+
+func TestSARIF_RulesOrderIsDeterministic(t *testing.T) {
+	// the same input must serialize to byte-identical sarif every run; the rules
+	// list is built from a set, so its order has to be sorted rather than left to
+	// map iteration order.
+	results := []Result{
+		{Target: "https://t", Module: "aaa", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "bbb", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "ccc", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "ddd", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "eee", Data: json.RawMessage(`{}`)},
+	}
+	first, err := SARIF(results)
+	if err != nil {
+		t.Fatalf("SARIF: %v", err)
+	}
+	for i := 0; i < 200; i++ {
+		out, err := SARIF(results)
+		if err != nil {
+			t.Fatalf("SARIF: %v", err)
+		}
+		if !bytes.Equal(out, first) {
+			t.Fatalf("sarif output not reproducible across runs:\nfirst:\n%s\ngot:\n%s", first, out)
+		}
+	}
+
+	// and the ids come out in sorted order.
+	var doc sarifLog
+	if err := json.Unmarshal(first, &doc); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	rules := doc.Runs[0].Tool.Driver.Rules
+	for i := 1; i < len(rules); i++ {
+		if rules[i-1].ID > rules[i].ID {
+			t.Errorf("rules not sorted: %q before %q", rules[i-1].ID, rules[i].ID)
+		}
 	}
 }
 
