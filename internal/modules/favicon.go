@@ -67,12 +67,13 @@ func faviconEvidence(matchers []Matcher, body string) (string, bool) {
 	return fmt.Sprintf("favicon mmh3=%d", hash), true
 }
 
-// validateMatchers fails favicon matchers that would silently never fire (no
-// hash, or one out of 32-bit range) and malformed range matchers at load
-// rather than at match time.
+// validateMatchers fails at load, rather than at match time, matchers that would
+// silently never fire: favicon matchers with no hash or one out of 32-bit range,
+// malformed range matchers, and word matchers with an unknown encoding.
 func validateMatchers(matchers []Matcher) error {
 	for i := range matchers {
-		if matchers[i].Type == "favicon" {
+		switch matchers[i].Type {
+		case "favicon":
 			if len(matchers[i].Hash) == 0 {
 				return fmt.Errorf("favicon matcher requires at least one hash")
 			}
@@ -81,9 +82,7 @@ func validateMatchers(matchers []Matcher) error {
 					return fmt.Errorf("favicon hash %d out of range (use a signed int32 or unsigned uint32 value)", h)
 				}
 			}
-		}
-
-		if matchers[i].Type == "range" {
+		case "range":
 			if matchers[i].Min == nil && matchers[i].Max == nil {
 				return fmt.Errorf("range matcher requires min or max")
 			}
@@ -92,6 +91,14 @@ func validateMatchers(matchers []Matcher) error {
 			}
 			if matchers[i].Min != nil && matchers[i].Max != nil && *matchers[i].Min > *matchers[i].Max {
 				return fmt.Errorf("range matcher min %d greater than max %d", *matchers[i].Min, *matchers[i].Max)
+			}
+
+		case "word":
+			if matchers[i].Encoding == "" {
+				continue
+			}
+			if _, err := encodeMatcherWord("", matchers[i].Encoding); err != nil {
+				return fmt.Errorf("word matcher: %w", err)
 			}
 		}
 	}

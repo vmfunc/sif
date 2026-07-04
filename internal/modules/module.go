@@ -105,6 +105,8 @@ type Matcher struct {
 	Max *int `yaml:"max,omitempty"`
 	// CaseInsensitive folds word matching to lower-case when set (word matcher only).
 	CaseInsensitive bool `yaml:"case-insensitive,omitempty"`
+	// Encoding encodes each word before matching: hex or base64. word only.
+	Encoding string `yaml:"encoding,omitempty"`
 }
 
 // Extractor defines data extraction from responses.
