@@ -161,41 +161,76 @@ func Writer() io.Writer {
 	return sink
 }
 
-// Info prints an informational message with [*] prefix
-func Info(format string, args ...interface{}) {
-	if apiMode {
-		return
-	}
-	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(sink, "%s %s\n", prefixInfo.Render("[*]"), msg)
+// Sink is a routable output destination: the writer chrome lands on, plus
+// whether interactive widgets (spinners, live progress) may animate on it. A
+// scan can be handed its own Sink so its chrome routes to a chosen writer.
+type Sink struct {
+	w           io.Writer
+	interactive bool
 }
 
-// Success prints a success message with [+] prefix
-func Success(format string, args ...interface{}) {
-	if apiMode {
-		return
-	}
-	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(sink, "%s %s\n", prefixSuccess.Render("[+]"), msg)
+// NewSink returns a Sink writing to w. interactive reports whether live widgets
+// are allowed; a captured buffer sink passes false so spinners/progress no-op.
+func NewSink(w io.Writer, interactive bool) *Sink {
+	return &Sink{w: w, interactive: interactive}
 }
 
-// Warn prints a warning message with [!] prefix
-func Warn(format string, args ...interface{}) {
-	if apiMode {
-		return
-	}
-	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(sink, "%s %s\n", prefixWarning.Render("[!]"), msg)
+// DefaultSink is the ambient sink the package-level chrome funcs write to: the
+// process output routing configured by SetSilent.
+func DefaultSink() *Sink {
+	return &Sink{w: sink, interactive: IsTTY && !silent}
 }
 
-// Error prints an error message with [-] prefix
-func Error(format string, args ...interface{}) {
+// Writer exposes the underlying writer, for callers that render their own chrome.
+func (s *Sink) Writer() io.Writer { return s.w }
+
+// Interactive reports whether live widgets may animate on this sink; a captured
+// buffer sink reports false so spinners and progress bars stay silent.
+func (s *Sink) Interactive() bool { return s.interactive }
+
+// Info prints an informational message with [*] prefix.
+func (s *Sink) Info(format string, args ...interface{}) {
 	if apiMode {
 		return
 	}
-	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(sink, "%s %s\n", prefixError.Render("[-]"), msg)
+	fmt.Fprintf(s.w, "%s %s\n", prefixInfo.Render("[*]"), fmt.Sprintf(format, args...))
 }
+
+// Success prints a success message with [+] prefix.
+func (s *Sink) Success(format string, args ...interface{}) {
+	if apiMode {
+		return
+	}
+	fmt.Fprintf(s.w, "%s %s\n", prefixSuccess.Render("[+]"), fmt.Sprintf(format, args...))
+}
+
+// Warn prints a warning message with [!] prefix.
+func (s *Sink) Warn(format string, args ...interface{}) {
+	if apiMode {
+		return
+	}
+	fmt.Fprintf(s.w, "%s %s\n", prefixWarning.Render("[!]"), fmt.Sprintf(format, args...))
+}
+
+// Error prints an error message with [-] prefix.
+func (s *Sink) Error(format string, args ...interface{}) {
+	if apiMode {
+		return
+	}
+	fmt.Fprintf(s.w, "%s %s\n", prefixError.Render("[-]"), fmt.Sprintf(format, args...))
+}
+
+// Info prints an informational message with [*] prefix to the default sink.
+func Info(format string, args ...interface{}) { DefaultSink().Info(format, args...) }
+
+// Success prints a success message with [+] prefix to the default sink.
+func Success(format string, args ...interface{}) { DefaultSink().Success(format, args...) }
+
+// Warn prints a warning message with [!] prefix to the default sink.
+func Warn(format string, args ...interface{}) { DefaultSink().Warn(format, args...) }
+
+// Error prints an error message with [-] prefix to the default sink.
+func Error(format string, args ...interface{}) { DefaultSink().Error(format, args...) }
 
 // ScanStart prints a styled scan start message
 func ScanStart(scanName string) {
@@ -213,11 +248,17 @@ func ScanComplete(scanName string, resultCount int, resultType string) {
 	fmt.Fprintf(sink, "%s %s complete (%d %s)\n", prefixInfo.Render("[*]"), scanName, resultCount, resultType)
 }
 
-// Module creates a prefixed logger for a specific module/tool
+// Module creates a prefixed logger for a specific module/tool on the default sink.
 func Module(name string) *ModuleLogger {
+	return DefaultSink().Module(name)
+}
+
+// Module creates a prefixed logger bound to this sink.
+func (s *Sink) Module(name string) *ModuleLogger {
 	return &ModuleLogger{
 		name:  name,
 		style: moduleStyleFor(name),
+		sink:  s,
 	}
 }
 
@@ -225,6 +266,7 @@ func Module(name string) *ModuleLogger {
 type ModuleLogger struct {
 	name  string
 	style lipgloss.Style
+	sink  *Sink
 }
 
 func (m *ModuleLogger) prefix() string {
@@ -237,7 +279,7 @@ func (m *ModuleLogger) Info(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(sink, "%s %s\n", m.prefix(), msg)
+	fmt.Fprintf(m.sink.w, "%s %s\n", m.prefix(), msg)
 }
 
 // Success prints a success message with module prefix
@@ -246,7 +288,7 @@ func (m *ModuleLogger) Success(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(sink, "%s %s %s\n", m.prefix(), prefixSuccess.Render("✓"), msg)
+	fmt.Fprintf(m.sink.w, "%s %s %s\n", m.prefix(), prefixSuccess.Render("✓"), msg)
 }
 
 // Warn prints a warning message with module prefix
@@ -255,7 +297,7 @@ func (m *ModuleLogger) Warn(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(sink, "%s %s %s\n", m.prefix(), prefixWarning.Render("!"), msg)
+	fmt.Fprintf(m.sink.w, "%s %s %s\n", m.prefix(), prefixWarning.Render("!"), msg)
 }
 
 // Error prints an error message with module prefix
@@ -264,7 +306,7 @@ func (m *ModuleLogger) Error(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(sink, "%s %s %s\n", m.prefix(), prefixError.Render("✗"), msg)
+	fmt.Fprintf(m.sink.w, "%s %s %s\n", m.prefix(), prefixError.Render("✗"), msg)
 }
 
 // Start prints a scan start message with module prefix (adds newline before for separation)
@@ -272,7 +314,7 @@ func (m *ModuleLogger) Start() {
 	if apiMode {
 		return
 	}
-	fmt.Fprintf(sink, "\n%s starting scan\n", m.prefix())
+	fmt.Fprintf(m.sink.w, "\n%s starting scan\n", m.prefix())
 }
 
 // Complete prints a scan complete message with module prefix
@@ -280,7 +322,7 @@ func (m *ModuleLogger) Complete(resultCount int, resultType string) {
 	if apiMode {
 		return
 	}
-	fmt.Fprintf(sink, "%s complete (%d %s)\n", m.prefix(), resultCount, resultType)
+	fmt.Fprintf(m.sink.w, "%s complete (%d %s)\n", m.prefix(), resultCount, resultType)
 }
 
 // ClearLine clears the current line (for progress bar updates). silent mode is
