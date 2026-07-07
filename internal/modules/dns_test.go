@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -421,4 +422,56 @@ func TestNewDNSResolverBuildsClient(t *testing.T) {
 		t.Fatal("newDNSResolver returned a nil resolver")
 	}
 	r.Close()
+}
+
+// TestNewDNSResolverFloorsZeroTimeout pins the timeout floor: opts.Timeout <= 0
+// must not reach retryabledns as a literal zero, since retryabledns applies no
+// default of its own and a zero-timeout dns.Client blocks forever on a
+// non-responsive resolver. A black-hole UDP listener (accepts the query,
+// never replies) stands in for that non-responsive resolver.
+func TestNewDNSResolverFloorsZeroTimeout(t *testing.T) {
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer pc.Close()
+	go func() {
+		buf := make([]byte, 512)
+		for {
+			if _, _, err := pc.ReadFrom(buf); err != nil {
+				return
+			}
+			// never reply: this is the black hole.
+		}
+	}()
+
+	origResolvers := defaultDNSResolvers
+	defaultDNSResolvers = []string{pc.LocalAddr().String()}
+	t.Cleanup(func() { defaultDNSResolvers = origResolvers })
+
+	r, err := newDNSResolver(nil, 0)
+	if err != nil {
+		t.Fatalf("newDNSResolver: %v", err)
+	}
+
+	done := make(chan error, 1)
+	start := time.Now()
+	go func() {
+		_, err := r.Query("example.com", dns.TypeA)
+		done <- err
+	}()
+
+	// the executor retries dnsMaxRetries times, each capped at the floored
+	// timeout, so the bound is a multiple of it, not the timeout itself.
+	bound := time.Duration(dnsMaxRetries) * defaultDNSTimeout
+	select {
+	case err := <-done:
+		elapsed := time.Since(start)
+		t.Logf("query against a black-hole resolver returned after %v: %v", elapsed, err)
+		if elapsed > bound+2*time.Second {
+			t.Errorf("query took %v, want it bounded by ~%v (floored timeout x retries)", elapsed, bound)
+		}
+	case <-time.After(bound + 5*time.Second):
+		t.Fatal("query against a black-hole resolver did not return in bounded time; a zero timeout is hanging forever")
+	}
 }

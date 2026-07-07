@@ -28,6 +28,12 @@ import (
 // timeout before giving up.
 const dnsMaxRetries = 3
 
+// defaultDNSTimeout bounds a query when the caller passes no timeout.
+// retryabledns applies no default of its own: a zero Options.Timeout reaches
+// the underlying dns.Client as a literal zero, which blocks forever against a
+// non-responsive resolver.
+const defaultDNSTimeout = 3 * time.Second
+
 // defaultDNSResolvers is the bundled pool: fast public anycast servers.
 var defaultDNSResolvers = []string{"1.1.1.1:53", "8.8.8.8:53", "9.9.9.9:53"}
 
@@ -59,19 +65,22 @@ type dnsResolver interface {
 }
 
 // newDNSResolver builds a resolver over the given pool (falling back to the
-// bundled default when it is empty) with the given timeout. It is a package var
-// so tests can supply a fake without touching the network.
+// bundled default when it is empty) with the given timeout, flooring a
+// non-positive timeout to the default so a caller can't request an
+// effectively unbounded resolve. It is a package var so tests can supply a
+// fake without touching the network.
 var newDNSResolver = func(resolvers []string, timeout time.Duration) (dnsResolver, error) {
 	pool := resolvers
 	if len(pool) == 0 {
 		pool = defaultDNSResolvers
 	}
+	if timeout <= 0 {
+		timeout = defaultDNSTimeout
+	}
 	opts := retryabledns.Options{
 		BaseResolvers: pool,
 		MaxRetries:    dnsMaxRetries,
-	}
-	if timeout > 0 {
-		opts.Timeout = timeout
+		Timeout:       timeout,
 	}
 	client, err := retryabledns.NewWithOptions(opts)
 	if err != nil {
