@@ -123,6 +123,12 @@ func TestParseYAMLModuleErrors(t *testing.T) {
 			content: "id: typo-http-section\ntype: http\nhtttp:\n  paths: [\"/\"]\n",
 		},
 		{
+			// a typo'd severity must fail load rather than flow into
+			// Finding.Severity verbatim and never rank against a real one.
+			name:    "unknown severity",
+			content: "id: bad-severity\ntype: http\ninfo:\n  severity: CRTICAL\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n", //nolint:misspell // intentional typo fixture
+		},
+		{
 			name:    "dns type with no dns section",
 			content: "id: no-dns-section\ntype: dns\n",
 		},
@@ -157,6 +163,36 @@ func TestParseYAMLModuleStrictFields(t *testing.T) {
 	correctField := writeModule(t, dir, "correct-field.yaml", "id: cf\ntype: http\nhttp:\n  method: GET\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")
 	if _, err := ParseYAMLModule(correctField); err != nil {
 		t.Fatalf("valid field name rejected: %v", err)
+	}
+}
+
+// TestValidateSeverity pins the known-set check: any casing of the five
+// documented levels passes, an empty severity is left alone (many modules
+// and test fixtures omit it; that is unrelated to catching a typo), and
+// anything else, including a near-miss typo, is rejected.
+func TestValidateSeverity(t *testing.T) {
+	tests := []struct {
+		name     string
+		severity string
+		wantErr  bool
+	}{
+		{name: "info", severity: "info", wantErr: false},
+		{name: "low", severity: "low", wantErr: false},
+		{name: "medium", severity: "medium", wantErr: false},
+		{name: "high", severity: "high", wantErr: false},
+		{name: "critical", severity: "critical", wantErr: false},
+		{name: "uppercase", severity: "HIGH", wantErr: false},
+		{name: "mixed case", severity: "Medium", wantErr: false},
+		{name: "empty is left alone", severity: "", wantErr: false},
+		{name: "typo rejected", severity: "CRTICAL", wantErr: true}, //nolint:misspell // intentional typo fixture
+		{name: "unknown word rejected", severity: "urgent", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateSeverity(tt.severity); (err != nil) != tt.wantErr {
+				t.Errorf("validateSeverity(%q) err = %v, wantErr %v", tt.severity, err, tt.wantErr)
+			}
+		})
 	}
 }
 

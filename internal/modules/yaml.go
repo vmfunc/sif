@@ -29,9 +29,34 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+// knownSeverities are the severity levels documented in docs/modules.md.
+// severity is looked up case-insensitively against this set.
+var knownSeverities = map[string]bool{
+	"info":     true,
+	"low":      true,
+	"medium":   true,
+	"high":     true,
+	"critical": true,
+}
+
+// validateSeverity rejects a level outside the known set, so a misspelling
+// fails at load instead of flowing into Finding.Severity and never ranking
+// against a real one. an empty severity is left alone: plenty of modules omit
+// it deliberately.
+func validateSeverity(severity string) error {
+	if severity == "" {
+		return nil
+	}
+	if !knownSeverities[strings.ToLower(severity)] {
+		return fmt.Errorf("severity %q is not one of info, low, medium, high, critical", severity)
+	}
+	return nil
+}
 
 // YAMLModule represents a parsed YAML module file
 type YAMLModule struct {
@@ -129,6 +154,10 @@ func ParseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 
 	if ym.Type == "" {
 		return nil, fmt.Errorf("module missing required field: type")
+	}
+
+	if err := validateSeverity(ym.Info.Severity); err != nil {
+		return nil, fmt.Errorf("module %q: %w", ym.ID, err)
 	}
 
 	// a module's type must have its matching configuration block: this is what
