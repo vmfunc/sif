@@ -80,6 +80,7 @@ func TestFavicon_LinkFallback(t *testing.T) {
 		case "/favicon.ico":
 			w.WriteHeader(http.StatusNotFound)
 		case "/static/icon.png":
+			w.Header().Set("Content-Type", "image/png")
 			_, _ = w.Write(goldenFaviconBytes)
 		default:
 			_, _ = w.Write([]byte(`<html><head><link rel="icon" href="/static/icon.png"></head></html>`))
@@ -177,6 +178,58 @@ func TestFavicon_OversizedIconMatchesSharedCap(t *testing.T) {
 	want := fingerprint.FaviconHash(big)
 	if result.Hash != want {
 		t.Errorf("Hash = %d, want %d (module-path hash over the same shared cap)", result.Hash, want)
+	}
+}
+
+// TestFavicon_SoftLoggedInHTML404NotHashed proves a soft-404 (200 text/html,
+// the common "not found" page many apps serve instead of a real 404) at
+// /favicon.ico is not mistaken for an icon. the doc comment above
+// getFaviconBytes used to claim this couldn't happen because a "non-200" was
+// rejected - but soft-404s are 200s, so the html body was hashed as if it were
+// the icon, producing a bogus hash and a wrong shodan pivot. with no
+// <link rel=icon> on the homepage either, there is nothing to fall back to, so
+// the scan should report no favicon at all.
+func TestFavicon_SoftLoggedInHTML404NotHashed(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("<html><head><title>Not Found</title></head><body>404 not found</body></html>"))
+	}))
+	defer srv.Close()
+
+	result, err := Favicon(srv.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("Favicon: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected nil result for a soft-404 html body, got %+v", result)
+	}
+}
+
+// TestFavicon_RealIconStillHashes proves the sniffing guard doesn't reject a
+// real icon served with no Content-Type header at all.
+func TestFavicon_RealIconStillHashes(t *testing.T) {
+	png := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'r', 'e', 's', 't'}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/favicon.ico" {
+			_, _ = w.Write(png)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	result, err := Favicon(srv.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("Favicon: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected a favicon result for a real png icon, got nil")
+	}
+	want := fingerprint.FaviconHash(png)
+	if result.Hash != want {
+		t.Errorf("Hash = %d, want %d", result.Hash, want)
 	}
 }
 
