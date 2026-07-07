@@ -14,6 +14,8 @@ package report
 
 import (
 	"encoding/json"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -72,6 +74,46 @@ func TestSARIF_ValidAndContainsFindings(t *testing.T) {
 	// rules list each module id once, deduped across targets
 	if len(run.Tool.Driver.Rules) != 3 {
 		t.Errorf("expected 3 deduped rules, got %d: %+v", len(run.Tool.Driver.Rules), run.Tool.Driver.Rules)
+	}
+}
+
+func TestSARIF_RulesAreSorted(t *testing.T) {
+	// rules are collected from a map internally, so without an explicit sort
+	// the emitted order is whatever the map iteration happened to produce.
+	// several distinct module ids make an accidentally-sorted iteration
+	// vanishingly unlikely, so this pins the fix rather than relying on luck.
+	results := []Result{
+		{Target: "https://t", Module: "zeta", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "mike", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "alpha", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "yankee", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "bravo", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "delta", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "kilo", Data: json.RawMessage(`{}`)},
+	}
+
+	var firstIDs []string
+	for run := 0; run < 5; run++ {
+		out, err := SARIF(results)
+		if err != nil {
+			t.Fatalf("SARIF: %v", err)
+		}
+		var doc sarifLog
+		if err := json.Unmarshal(out, &doc); err != nil {
+			t.Fatalf("invalid json: %v", err)
+		}
+		ids := make([]string, len(doc.Runs[0].Tool.Driver.Rules))
+		for i, r := range doc.Runs[0].Tool.Driver.Rules {
+			ids[i] = r.ID
+		}
+		if !sort.StringsAreSorted(ids) {
+			t.Fatalf("run %d: driver.rules not sorted: %v", run, ids)
+		}
+		if run == 0 {
+			firstIDs = ids
+		} else if !reflect.DeepEqual(firstIDs, ids) {
+			t.Fatalf("driver.rules order changed across runs: %v vs %v", firstIDs, ids)
+		}
 	}
 }
 
