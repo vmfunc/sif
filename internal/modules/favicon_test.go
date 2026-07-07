@@ -197,6 +197,16 @@ func TestValidateMatchers(t *testing.T) {
 		{name: "favicon with no hash", matchers: []Matcher{{Type: "favicon"}}, wantErr: true},
 		{name: "out-of-range hash", matchers: []Matcher{{Type: "favicon", Hash: []int64{99999999999}}}, wantErr: true},
 		{name: "non-favicon ignored", matchers: []Matcher{{Type: "word", Words: []string{"x"}}}, wantErr: false},
+		{name: "word with no words rejected", matchers: []Matcher{{Type: "word"}}, wantErr: true},
+		{name: "word with nil words rejected", matchers: []Matcher{{Type: "word", Words: nil}}, wantErr: true},
+		{name: "word with only empty string rejected", matchers: []Matcher{{Type: "word", Words: []string{""}}}, wantErr: true},
+		{name: "word with only empty strings rejected", matchers: []Matcher{{Type: "word", Words: []string{"", ""}}}, wantErr: true},
+		{name: "word with one real word allowed", matchers: []Matcher{{Type: "word", Words: []string{"real"}}}, wantErr: false},
+		{name: "word with empty and real word allowed", matchers: []Matcher{{Type: "word", Words: []string{"", "real"}}}, wantErr: false},
+		{name: "regex with no patterns rejected", matchers: []Matcher{{Type: "regex"}}, wantErr: true},
+		{name: "regex with nil patterns rejected", matchers: []Matcher{{Type: "regex", Regex: nil}}, wantErr: true},
+		{name: "regex with only empty pattern rejected", matchers: []Matcher{{Type: "regex", Regex: []string{""}}}, wantErr: true},
+		{name: "regex with one real pattern allowed", matchers: []Matcher{{Type: "regex", Regex: []string{"real"}}}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
