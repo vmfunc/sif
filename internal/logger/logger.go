@@ -62,6 +62,14 @@ func (l *Logger) getWriter(path string) (*bufio.Writer, error) {
 		return w, nil
 	}
 
+	// belt-and-suspenders: buildLogPath already flattens '/' out of the
+	// filename so path's parent is always dir itself, but make sure that
+	// parent exists too in case a caller ever hands getWriter a nested path
+	// directly (e.g. a future caller, or a dir that was never Init'd).
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return nil, err
+	}
+
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return nil, err
@@ -122,13 +130,43 @@ func (l *Logger) Close() error {
 	return firstErr
 }
 
-// CreateFile initializes a log file for the given URL and writes the header.
-func CreateFile(logFiles *[]string, url string, dir string) error {
+// flattenPath folds every '/' and '\\' run in s into a single '_' and trims
+// them from the ends. a target's path segments (or a stray backslash) would
+// otherwise be read as an implied - and almost always missing - subdirectory
+// tree; a URL maps to exactly one flat log file, never a directory tree.
+func flattenPath(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	prevSep := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '/' || c == '\\' {
+			if !prevSep {
+				b.WriteByte('_')
+				prevSep = true
+			}
+			continue
+		}
+		b.WriteByte(c)
+		prevSep = false
+	}
+	return strings.Trim(b.String(), "_")
+}
+
+// logPath builds the flattened log-file path for a URL under dir. CreateFile
+// and Write both go through it so the header and every later line for a
+// target always land in the same file.
+func logPath(dir, url string) string {
 	sanitizedURL := url
 	if _, after, ok := strings.Cut(url, "://"); ok {
 		sanitizedURL = after
 	}
-	path := filepath.Join(dir, sanitizedURL+".log")
+	return filepath.Join(dir, flattenPath(sanitizedURL)+".log")
+}
+
+// CreateFile initializes a log file for the given URL and writes the header.
+func CreateFile(logFiles *[]string, url string, dir string) error {
+	path := logPath(dir, url)
 
 	header := fmt.Sprintf("       _____________\n__________(_)__  __/\n__  ___/_  /__  /_  \n_(__  )_  / _  __/  \n/____/ /_/  /_/    \n\nsif log file for %s\nhttps://sif.sh\n\n", url)
 
@@ -142,7 +180,7 @@ func CreateFile(logFiles *[]string, url string, dir string) error {
 
 // Write appends text to the log file for the given URL.
 func Write(url string, dir string, text string) error {
-	path := filepath.Join(dir, url+".log")
+	path := logPath(dir, url)
 	return defaultLogger.write(path, text)
 }
 
