@@ -16,8 +16,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/vmfunc/sif/internal/finding"
@@ -46,16 +48,17 @@ func renderFindings(findings []finding.Finding) string {
 	return b.String()
 }
 
-// postJSON marshals payload and POSTs it to url through the shared client. it
-// drains+closes the response so the conn returns to httpx's pool, and treats any
-// non-2xx as a delivery failure so a 4xx from a bad webhook surfaces loudly.
-func postJSON(ctx context.Context, client *http.Client, url string, payload any) error {
+// postJSON marshals payload and POSTs it to endpoint through the shared
+// client. it drains+closes the response so the conn returns to httpx's pool,
+// and treats any non-2xx as a delivery failure so a 4xx from a bad webhook
+// surfaces loudly.
+func postJSON(ctx context.Context, client *http.Client, endpoint string, payload any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("build request: %w", err)
 	}
@@ -63,7 +66,7 @@ func postJSON(ctx context.Context, client *http.Client, url string, payload any)
 
 	resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 	if err != nil {
-		return fmt.Errorf("post: %w", err)
+		return fmt.Errorf("post to %s: %w", req.URL.Host, redactTransportErr(err))
 	}
 	defer httpx.DrainClose(resp)
 
@@ -71,4 +74,21 @@ func postJSON(ctx context.Context, client *http.Client, url string, payload any)
 		return fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// redactTransportErr strips the request url out of a client.Do failure before
+// it reaches a log line or a returned error. for these providers the url IS
+// the credential (a slack/discord/generic webhook secret is the whole url; a
+// telegram bot token rides the path) and http.Client wraps every transport
+// failure in a *url.Error whose Error() quotes that url verbatim. the
+// underlying cause (*net.OpError, a dns error, tls, timeout, ...) only ever
+// mentions the host:port, never the path, so unwrapping to it and letting the
+// caller prefix the host separately keeps a transport failure debuggable
+// without leaking the secret.
+func redactTransportErr(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return urlErr.Err
+	}
+	return err
 }

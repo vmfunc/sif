@@ -222,3 +222,56 @@ func assertPostJSON(t *testing.T, c capture) {
 		t.Errorf("content-type = %q, want %q", c.contentType, contentTypeJSON)
 	}
 }
+
+// deadURL returns a URL that will refuse connection: bind a listener, close
+// it, reuse the address. good enough to force a transport-level error out of
+// client.Do without touching the network.
+func deadURL(t *testing.T) string {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	u := srv.URL
+	srv.Close() // now nothing listens on that port
+	return u
+}
+
+// the webhook url IS the credential for slack/discord/generic sinks, and the
+// telegram bot token rides the url path. a transport failure used to surface
+// through a raw *url.Error, whose Error() quotes the full request url - so
+// any dns/tls/timeout/refused error leaked the secret into the operator log
+// and the returned error. postJSON must redact the url while still letting an
+// operator see which host failed.
+func TestNotifyErrorRedactsSecretWebhookURL(t *testing.T) {
+	host := deadURL(t)
+	secret := host + "/services/T00000000/B11111111/SUPERSECRETTOKEN"
+	p := &slackProvider{webhook: secret}
+	err := p.send(context.Background(), http.DefaultClient, sampleFindings())
+	if err == nil {
+		t.Fatal("expected transport error")
+	}
+	if strings.Contains(err.Error(), "SUPERSECRETTOKEN") {
+		t.Fatalf("LEAK: secret webhook token present in error: %v", err)
+	}
+	if !strings.Contains(err.Error(), strings.TrimPrefix(host, "http://")) {
+		t.Errorf("error dropped the host too, operator can't debug: %v", err)
+	}
+}
+
+func TestNotifyErrorRedactsTelegramToken(t *testing.T) {
+	orig := telegramAPIBase
+	host := deadURL(t)
+	telegramAPIBase = host
+	t.Cleanup(func() { telegramAPIBase = orig })
+
+	p := &telegramProvider{token: "123456:AAHsupersecretbottoken", chatID: "42"}
+	err := p.send(context.Background(), http.DefaultClient, sampleFindings())
+	if err == nil {
+		t.Fatal("expected transport error")
+	}
+	if strings.Contains(err.Error(), "AAHsupersecretbottoken") {
+		t.Fatalf("LEAK: telegram bot token present in error: %v", err)
+	}
+	if !strings.Contains(err.Error(), strings.TrimPrefix(host, "http://")) {
+		t.Errorf("error dropped the host too, operator can't debug: %v", err)
+	}
+}
+
