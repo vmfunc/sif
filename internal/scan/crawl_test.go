@@ -13,8 +13,10 @@
 package scan
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -154,5 +156,34 @@ func TestCrawl_ResultType(t *testing.T) {
 	r := &CrawlResult{}
 	if r.ResultType() != "crawl" {
 		t.Errorf("ResultType = %q, want crawl", r.ResultType())
+	}
+}
+
+// robots.txt is intentionally NOT honored: sif is a recon/pentest crawler and
+// Disallow rules are not a scope boundary it should respect. This pins the
+// intentional behavior so it isn't "fixed" into a partial robots.txt
+// implementation by accident later.
+func TestCrawl_DoesNotHonorRobots(t *testing.T) {
+	var secretHits int64
+	mux := http.NewServeMux()
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/secret" {
+			atomic.AddInt64(&secretHits, 1)
+			_, _ = w.Write([]byte("leaf"))
+			return
+		}
+		_, _ = fmt.Fprint(w, `<a href="/secret">s</a>`)
+	})
+	target := httptest.NewServer(mux)
+	defer target.Close()
+
+	if _, err := Crawl(target.URL, 2, 5*time.Second, ""); err != nil {
+		t.Fatalf("Crawl: %v", err)
+	}
+	if got := atomic.LoadInt64(&secretHits); got == 0 {
+		t.Errorf("expected Disallow:/ path to be fetched (robots.txt is not honored), got %d hits", got)
 	}
 }

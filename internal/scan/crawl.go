@@ -38,7 +38,8 @@ var _ ScanResult = (*CrawlResult)(nil)
 
 // Crawl spiders the target up to depth, following same-host links/scripts/forms.
 // all traffic flows through the shared httpx client so proxy/headers/rate-limit
-// apply, and robots.txt is respected (colly honors it by default).
+// apply. robots.txt is intentionally NOT honored: this is a recon/pentest
+// crawler and Disallow rules are not a scope boundary we want to respect.
 func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*CrawlResult, error) {
 	log := output.Module("CRAWL")
 	log.Start()
