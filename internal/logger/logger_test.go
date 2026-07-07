@@ -119,8 +119,8 @@ func TestCreateFile(t *testing.T) {
 // TestCreateFileURLWithPathDoesNotFail proves a target with a URL path (e.g.
 // http://127.0.0.1:8931/) gets a writable log file. Before the fix, the
 // scheme-stripped sanitized URL kept the '/' verbatim, so CreateFile tried to
-// open "<dir>/127.0.0.1:8931/.log" - a path whose parent directory was never
-// created - and OpenFile failed, aborting the whole target's scan.
+// open "<dir>/127.0.0.1:8931/.log", a path whose parent directory was never
+// created, and OpenFile failed, aborting the whole target's scan.
 func TestCreateFileURLWithPathDoesNotFail(t *testing.T) {
 	tmpDir := t.TempDir()
 

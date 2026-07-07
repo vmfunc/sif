@@ -137,10 +137,7 @@ func TestLoadCorruptSnapshotErrors(t *testing.T) {
 }
 
 func TestPathForDistinctTargetsNeverCollide(t *testing.T) {
-	// sanitize() folds every separator run to a single '_', so two distinct
-	// targets that only differ in separator punctuation collapse to the same
-	// sanitize() output - proven below - which used to mean the same snapshot
-	// file too, silently overwriting one target's baseline with another's.
+	// see pathFor's doc comment (store.go) for why this used to collide.
 	dir := t.TempDir()
 	tests := [][2]string{
 		{"https://a.com/x", "https://a.com//x"},

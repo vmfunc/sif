@@ -98,8 +98,8 @@ func sanitize(target string) string {
 }
 
 // targetHashLen is how many hex characters of the target's sha256 are kept in
-// the snapshot filename. 16 hex chars is 64 bits of the hash - astronomically
-// collision-free for the number of targets a single run ever has - while
+// the snapshot filename. 16 hex chars is 64 bits of the hash, astronomically
+// collision-free for the number of targets a single run ever has, while
 // keeping the filename short and stable.
 const targetHashLen = 16
 
@@ -107,10 +107,10 @@ const targetHashLen = 16
 // so the filename invariant lives in one place; Save and Load both go through
 // it so a target always maps to the same file.
 //
-// sanitize alone is lossy - it folds every separator run (and a literal '_')
+// sanitize alone is lossy: it folds every separator run (and a literal '_')
 // to one '_', so distinct targets like "https://a.com/x" and "https://a.com//x"
 // (or "host:8443/path" and "host_8443_path") produce the identical string and
-// would silently share - and clobber - one snapshot. appending a hash of the
+// would silently share, and clobber, one snapshot. appending a hash of the
 // full, un-sanitized target makes the path injective for distinct targets
 // while keeping the sanitized prefix for a human skimming the state dir.
 func pathFor(dir, target string) string {
@@ -164,9 +164,9 @@ func writeFileAtomic(dir, path string, data []byte) error {
 	}
 	tmpPath := tmp.Name()
 	// on any early return the temp file must not linger; once the rename
-	// below succeeds this Remove is a harmless no-op (the path is already
-	// gone).
-	defer os.Remove(tmpPath)
+	// below succeeds this is a no-op (the path is already gone) and its
+	// error is deliberately discarded.
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()

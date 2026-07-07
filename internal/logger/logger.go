@@ -62,10 +62,9 @@ func (l *Logger) getWriter(path string) (*bufio.Writer, error) {
 		return w, nil
 	}
 
-	// belt-and-suspenders: buildLogPath already flattens '/' out of the
-	// filename so path's parent is always dir itself, but make sure that
-	// parent exists too in case a caller ever hands getWriter a nested path
-	// directly (e.g. a future caller, or a dir that was never Init'd).
+	// belt-and-suspenders: logPath already flattens '/' out of the filename
+	// so path's parent is always dir itself, but a future caller could still
+	// hand getWriter a nested path directly, so make sure it exists too.
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, err
 	}
@@ -132,7 +131,7 @@ func (l *Logger) Close() error {
 
 // flattenPath folds every '/' and '\\' run in s into a single '_' and trims
 // them from the ends. a target's path segments (or a stray backslash) would
-// otherwise be read as an implied - and almost always missing - subdirectory
+// otherwise be read as an implied (and almost always missing) subdirectory
 // tree; a URL maps to exactly one flat log file, never a directory tree.
 func flattenPath(s string) string {
 	var b strings.Builder
