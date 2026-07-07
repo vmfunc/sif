@@ -286,7 +286,7 @@ func TestDetectFramework_NoMatch(t *testing.T) {
 
 func TestFrameworkResult_Fields(t *testing.T) {
 	result := frameworks.NewFrameworkResult("Laravel", "9.0.0", 0.85, 0.9)
-	result.WithVulnerabilities([]string{"CVE-2021-3129"}, []string{"Update to latest version"})
+	result.WithVulnerabilities([]string{"CVE-2021-3129"}, []string{"Update to latest version"}, []string{"https://nvd.nist.gov/vuln/detail/CVE-2021-3129"})
 
 	if result.Name != "Laravel" {
 		t.Errorf("expected Name 'Laravel', got '%s'", result.Name)
@@ -305,6 +305,9 @@ func TestFrameworkResult_Fields(t *testing.T) {
 	}
 	if len(result.Suggestions) != 1 {
 		t.Errorf("expected 1 suggestion, got %d", len(result.Suggestions))
+	}
+	if len(result.References) != 1 {
+		t.Errorf("expected 1 reference, got %d", len(result.References))
 	}
 }
 
@@ -353,7 +356,7 @@ func TestDetermineRiskLevel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test via WithVulnerabilities which uses determineRiskLevel internally
 			result := frameworks.NewFrameworkResult("Test", "1.0", 0.5, 0.5)
-			result.WithVulnerabilities(tt.cves, nil)
+			result.WithVulnerabilities(tt.cves, nil, nil)
 			if result.RiskLevel != tt.expected {
 				t.Errorf("determineRiskLevel() = %q, want %q", result.RiskLevel, tt.expected)
 			}

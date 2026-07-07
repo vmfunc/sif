@@ -20,6 +20,7 @@ type CVEEntry struct {
 	Severity         string // critical, high, medium, low
 	Description      string
 	Recommendations  []string
+	References       []string
 }
 
 // knownCVEs contains known vulnerabilities for popular frameworks.
@@ -33,6 +34,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "critical",
 			Description:      "Ignition debug mode RCE vulnerability",
 			Recommendations:  []string{"Update to Laravel 8.4.2 or later", "Disable debug mode in production"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2021-3129"},
 		},
 		{
 			CVE:              "CVE-2021-21263",
@@ -41,6 +43,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "high",
 			Description:      "SQL injection via request validation",
 			Recommendations:  []string{"Update to Laravel 8.5.0 or later", "Use parameterized queries"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2021-21263"},
 		},
 	},
 	"Django": {
@@ -51,6 +54,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "high",
 			Description:      "Potential ReDoS in EmailValidator and URLValidator",
 			Recommendations:  []string{"Update to Django 4.2.3 or later"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2023-36053"},
 		},
 		{
 			CVE:              "CVE-2023-31047",
@@ -59,6 +63,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "medium",
 			Description:      "File upload validation bypass",
 			Recommendations:  []string{"Update to Django 4.1.9 or later", "Implement additional file validation"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2023-31047"},
 		},
 	},
 	"WordPress": {
@@ -69,6 +74,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "medium",
 			Description:      "Directory traversal vulnerability",
 			Recommendations:  []string{"Update to WordPress 6.2 or later"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2023-2745"},
 		},
 	},
 	"Drupal": {
@@ -79,6 +85,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "high",
 			Description:      "HTTP/2 rapid reset attack (DoS)",
 			Recommendations:  []string{"Update to Drupal 10.1.4 or later", "Configure HTTP/2 rate limiting"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2023-44487"},
 		},
 	},
 	"Next.js": {
@@ -89,6 +96,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "medium",
 			Description:      "Server-side request forgery vulnerability",
 			Recommendations:  []string{"Update to Next.js 13.5.0 or later"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2023-46298"},
 		},
 	},
 	"Angular": {
@@ -99,6 +107,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "medium",
 			Description:      "Regular expression denial of service",
 			Recommendations:  []string{"Update to Angular 15.2.0 or later"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2023-26117"},
 		},
 	},
 	"Vue.js": {
@@ -109,6 +118,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "medium",
 			Description:      "XSS vulnerability in certain configurations",
 			Recommendations:  []string{"Update to Vue.js 2.7.16 or 3.x"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2024-5987"},
 		},
 	},
 	"Express.js": {
@@ -119,6 +129,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "medium",
 			Description:      "Open redirect vulnerability",
 			Recommendations:  []string{"Update to Express.js 4.19.2 or later"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2024-29041"},
 		},
 	},
 	"Ruby on Rails": {
@@ -129,6 +140,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "high",
 			Description:      "ReDoS vulnerability in Action Dispatch",
 			Recommendations:  []string{"Update to Rails 7.0.4.1 or later"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2023-22795"},
 		},
 	},
 	"Spring": {
@@ -139,6 +151,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "critical",
 			Description:      "Spring4Shell RCE vulnerability",
 			Recommendations:  []string{"Update to Spring 5.3.18 or later", "Disable class binding on user input"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2022-22965"},
 		},
 	},
 	"Spring Boot": {
@@ -149,6 +162,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "critical",
 			Description:      "RCE via Spring Cloud Function",
 			Recommendations:  []string{"Update to Spring Boot 2.6.6 or later"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2022-22963"},
 		},
 	},
 	"ASP.NET": {
@@ -159,6 +173,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "high",
 			Description:      "Elevation of privilege vulnerability",
 			Recommendations:  []string{"Apply latest security patches", "Ensure proper request validation"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2023-36899"},
 		},
 	},
 	"Joomla": {
@@ -169,6 +184,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "critical",
 			Description:      "Improper access check allowing unauthorized access to webservice endpoints",
 			Recommendations:  []string{"Update to Joomla 4.2.8 or later"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2023-23752"},
 		},
 	},
 	"Magento": {
@@ -179,6 +195,7 @@ var knownCVEs = map[string][]CVEEntry{
 			Severity:         "critical",
 			Description:      "Improper input validation leading to arbitrary code execution",
 			Recommendations:  []string{"Update to Magento 2.4.3-p1 or later"},
+			References:       []string{"https://nvd.nist.gov/vuln/detail/CVE-2022-24086"},
 		},
 	},
 }

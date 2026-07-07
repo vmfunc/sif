@@ -89,6 +89,11 @@ func (m *FrameworksModule) Execute(ctx context.Context, target string, opts modu
 		finding.Extracted["recommendations"] = strings.Join(frameworkResult.Suggestions, "; ")
 	}
 
+	// Add reference URLs
+	if len(frameworkResult.References) > 0 {
+		finding.Extracted["references"] = strings.Join(frameworkResult.References, ", ")
+	}
+
 	result.Findings = append(result.Findings, finding)
 
 	return result, nil

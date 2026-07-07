@@ -28,6 +28,7 @@ type FrameworkResult struct {
 	CVEs              []string `json:"cves,omitempty"`
 	Suggestions       []string `json:"suggestions,omitempty"`
 	RiskLevel         string   `json:"risk_level,omitempty"`
+	References        []string `json:"references,omitempty"`
 }
 
 // ResultType implements the ScanResult interface.
@@ -44,10 +45,11 @@ func NewFrameworkResult(name, version string, confidence, versionConfidence floa
 }
 
 // WithVulnerabilities adds CVE information to the result.
-func (r *FrameworkResult) WithVulnerabilities(cves, suggestions []string) *FrameworkResult {
+func (r *FrameworkResult) WithVulnerabilities(cves, suggestions, references []string) *FrameworkResult {
 	r.CVEs = cves
 	r.Suggestions = suggestions
 	r.RiskLevel = determineRiskLevel(cves)
+	r.References = references
 	return r
 }
 
