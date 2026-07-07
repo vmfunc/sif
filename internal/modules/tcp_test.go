@@ -19,6 +19,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -303,6 +304,175 @@ func TestExecuteTCPModuleContextCancel(t *testing.T) {
 	}
 }
 
+// fakeSlowConn is a net.Conn stand-in whose Write yields for a fixed duration
+// before returning success, and whose Read blocks until whatever deadline was
+// last armed via SetReadDeadline/SetDeadline, then returns a timeout error. It
+// reproduces a real socket closely enough to prove the cancellation race: the
+// watchdog's SetDeadline(now) trip can land during the slow Write, before
+// readTCP arms its own (later) read deadline.
+type fakeSlowConn struct {
+	net.Conn
+	mu           sync.Mutex
+	readDeadline time.Time
+	writeYield   time.Duration
+}
+
+func (c *fakeSlowConn) Write(b []byte) (int, error) {
+	time.Sleep(c.writeYield)
+	return len(b), nil
+}
+
+func (c *fakeSlowConn) Read([]byte) (int, error) {
+	c.mu.Lock()
+	dl := c.readDeadline
+	c.mu.Unlock()
+	if dl.IsZero() {
+		dl = time.Now().Add(time.Hour)
+	}
+	if wait := time.Until(dl); wait > 0 {
+		time.Sleep(wait)
+	}
+	return 0, os.ErrDeadlineExceeded
+}
+
+func (c *fakeSlowConn) SetDeadline(t time.Time) error {
+	c.mu.Lock()
+	c.readDeadline = t
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *fakeSlowConn) SetReadDeadline(t time.Time) error { return c.SetDeadline(t) }
+func (c *fakeSlowConn) SetWriteDeadline(time.Time) error  { return nil }
+func (c *fakeSlowConn) Close() error                      { return nil }
+
+// TestExecuteTCPModuleContextCancelDuringWrite reproduces the deadline re-arm
+// race: the ctx is already cancelled before the call, so the watchdog trips
+// conn.SetDeadline(now) while the probe Write is still yielding. Before the
+// fix, readTCP's own SetReadDeadline(now+timeout) call overwrote that trip and
+// the read blocked for the full timeout instead of returning promptly.
+func TestExecuteTCPModuleContextCancelDuringWrite(t *testing.T) {
+	conn := &fakeSlowConn{writeYield: 150 * time.Millisecond}
+	orig := newTCPConn
+	newTCPConn = func(context.Context, string, time.Duration) (net.Conn, error) { return conn, nil }
+	t.Cleanup(func() { newTCPConn = orig })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // already cancelled before ExecuteTCPModule is even called.
+
+	def := tcpDef(&TCPConfig{Port: 22, Data: "PING\r\n", Matchers: []Matcher{tcpWord("x")}})
+	start := time.Now()
+	res, err := ExecuteTCPModule(ctx, "example.com", def, Options{Timeout: 2 * time.Second})
+	elapsed := time.Since(start)
+
+	if elapsed > time.Second {
+		t.Errorf("returned after %v, want prompt (a pre-cancelled ctx must not be swallowed by the read-deadline re-arm)", elapsed)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if len(res.Findings) != 0 {
+		t.Errorf("got %d findings on cancel, want 0", len(res.Findings))
+	}
+}
+
+// TestExecuteTCPModuleContextCancelBeforeWrite proves an already-cancelled ctx
+// is caught before the probe write arms its deadline, rather than falling
+// through to SetWriteDeadline and Write regardless. Without the guard this
+// would only fail if the write itself then blocked past the deadline; here it
+// is asserted directly so the guard cannot regress silently.
+func TestExecuteTCPModuleContextCancelBeforeWrite(t *testing.T) {
+	client, server := net.Pipe()
+	t.Cleanup(func() { server.Close() })
+	orig := newTCPConn
+	newTCPConn = func(context.Context, string, time.Duration) (net.Conn, error) { return client, nil }
+	t.Cleanup(func() { newTCPConn = orig })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	def := tcpDef(&TCPConfig{Port: 22, Data: "PING\r\n", Matchers: []Matcher{tcpWord("x")}})
+	res, err := ExecuteTCPModule(ctx, "example.com", def, Options{Timeout: 2 * time.Second})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if len(res.Findings) != 0 {
+		t.Errorf("got %d findings on cancel, want 0", len(res.Findings))
+	}
+}
+
+// TestExecuteTCPModuleContextCancelBlocksInWrite reproduces the write-side
+// twin of the read-deadline re-arm race: the probe write blocks on a real
+// synchronous conn (net.Pipe with no reader), and the cancel watchdog's
+// SetDeadline(now) is what has to unblock it. Before the ctx.Err() guard, the
+// watchdog trip could land between goroutine start and the SetWriteDeadline
+// call and be silently overwritten by it, since the watchdog only fires once
+// and never gets a second chance to re-trip; the write would then block for
+// the full timeout instead of returning promptly, and a write that the
+// watchdog did manage to trip surfaced as a raw i/o timeout rather than the
+// cancellation it actually was.
+func TestExecuteTCPModuleContextCancelBlocksInWrite(t *testing.T) {
+	client, server := net.Pipe()
+	t.Cleanup(func() { server.Close() }) // no reader: the probe write blocks until the deadline trips
+
+	orig := newTCPConn
+	newTCPConn = func(context.Context, string, time.Duration) (net.Conn, error) { return client, nil }
+	t.Cleanup(func() { newTCPConn = orig })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+	}()
+
+	def := tcpDef(&TCPConfig{Port: 22, Data: "PING\r\n", Matchers: []Matcher{tcpWord("x")}})
+	start := time.Now()
+	res, err := ExecuteTCPModule(ctx, "example.com", def, Options{Timeout: 5 * time.Second})
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("returned after %v, want the watchdog to trip the blocked write promptly", elapsed)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if len(res.Findings) != 0 {
+		t.Errorf("got %d findings on cancel, want 0", len(res.Findings))
+	}
+}
+
+// TestExecuteTCPModuleSlowConnCompletesWithoutCancel proves the ctx.Err()
+// guards added for the read-deadline re-arm fix do not clip a legitimately
+// slow but healthy connection: with no cancellation, a banner that trickles
+// in well under the timeout still completes and matches normally.
+func TestExecuteTCPModuleSlowConnCompletesWithoutCancel(t *testing.T) {
+	client, server := net.Pipe()
+	orig := newTCPConn
+	newTCPConn = func(context.Context, string, time.Duration) (net.Conn, error) { return client, nil }
+	t.Cleanup(func() { newTCPConn = orig })
+
+	go func() {
+		buf := make([]byte, 4096)
+		_, _ = server.Read(buf)
+		time.Sleep(200 * time.Millisecond)
+		_, _ = server.Write([]byte("+OK ready\r\n"))
+		server.Close()
+	}()
+
+	def := tcpDef(&TCPConfig{Port: 22, Data: "PING\r\n", Matchers: []Matcher{tcpWord("+OK")}})
+	start := time.Now()
+	res, err := ExecuteTCPModule(context.Background(), "example.com", def, Options{Timeout: 2 * time.Second})
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("ExecuteTCPModule: %v", err)
+	}
+	if elapsed < 200*time.Millisecond {
+		t.Errorf("returned after %v, want it to wait out the slow banner (~200ms)", elapsed)
+	}
+	if len(res.Findings) != 1 {
+		t.Fatalf("got %d findings, want 1 (a healthy slow connection must not be treated as cancelled)", len(res.Findings))
+	}
+}
+
 func TestExecuteTCPModuleDialError(t *testing.T) {
 	orig := newTCPConn
 	newTCPConn = func(context.Context, string, time.Duration) (net.Conn, error) {
@@ -430,7 +600,7 @@ func TestReadTCPCapsAtLimit(t *testing.T) {
 	}()
 	defer client.Close()
 
-	got := readTCP(client, time.Second)
+	got := readTCP(context.Background(), client, time.Second)
 	if len(got) < tcpReadLimit {
 		t.Fatalf("read %d bytes, want at least the %d cap", len(got), tcpReadLimit)
 	}
