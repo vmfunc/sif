@@ -15,6 +15,7 @@ package modules
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -112,19 +113,31 @@ func dslCompile(expr string) (*govaluate.EvaluableExpression, error) {
 // Named extractor values overlay the builtins (matching nuclei's mutation
 // order), so an extractor may reference, and on a name clash shadow, a builtin.
 func dslVars(mc *MatchContext) map[string]interface{} {
+	headers := getPart("header", mc.Resp, mc.Body)
 	vars := map[string]interface{}{
 		"status_code":    statusCodeOf(mc.Resp),
 		"body":           mc.Body,
 		"content_length": len(mc.Body),
-		"all_headers":    getPart("header", mc.Resp, mc.Body),
-		"header":         getPart("header", mc.Resp, mc.Body),
+		"all_headers":    headers,
+		"header":         headers,
 		"duration":       mc.Duration.Seconds(),
-		"host":           mc.URL,
+		"host":           hostOf(mc.URL),
 	}
 	for k, v := range mc.Extracted {
 		vars[k] = v
 	}
 	return vars
+}
+
+// hostOf returns the host[:port] of a request URL, matching nuclei's `host`
+// variable so a pasted nuclei expression (host == "example.com") behaves as
+// expected. On an unparseable URL it falls back to the raw string rather than
+// binding an empty host.
+func hostOf(rawURL string) string {
+	if u, err := url.Parse(rawURL); err == nil && u.Host != "" {
+		return u.Host
+	}
+	return rawURL
 }
 
 func statusCodeOf(resp *http.Response) int {

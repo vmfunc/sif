@@ -109,6 +109,22 @@ func TestCheckMatcherDSLNegative(t *testing.T) {
 	}
 }
 
+func TestCheckMatcherDSLHost(t *testing.T) {
+	// host must bind the hostname (nuclei parity), not the full requested URL,
+	// so a pasted `host == "..."` expression behaves as a nuclei user expects.
+	mc := &MatchContext{
+		Resp: fakeResponse(t, 200, nil),
+		Body: "x",
+		URL:  "http://example.com/admin/panel",
+	}
+	if m := (&Matcher{Type: "dsl", DSL: []string{`host == "example.com"`}}); !checkMatcher(m, mc) {
+		t.Error(`host should bind the hostname "example.com", got a miss`)
+	}
+	if m := (&Matcher{Type: "dsl", DSL: []string{`contains(host, "/admin")`}}); checkMatcher(m, mc) {
+		t.Error("host must not contain the URL path")
+	}
+}
+
 func TestCheckMatcherDSLExtractorVar(t *testing.T) {
 	mc := &MatchContext{
 		Resp:      fakeResponse(t, 200, nil),
