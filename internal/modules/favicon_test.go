@@ -207,6 +207,8 @@ func TestValidateMatchers(t *testing.T) {
 		{name: "regex with nil patterns rejected", matchers: []Matcher{{Type: "regex", Regex: nil}}, wantErr: true},
 		{name: "regex with only empty pattern rejected", matchers: []Matcher{{Type: "regex", Regex: []string{""}}}, wantErr: true},
 		{name: "regex with one real pattern allowed", matchers: []Matcher{{Type: "regex", Regex: []string{"real"}}}, wantErr: false},
+		{name: "unknown matcher type rejected", matchers: []Matcher{{Type: "words", Words: []string{"x"}}}, wantErr: true},
+		{name: "status matcher allowed", matchers: []Matcher{{Type: "status", Status: []int{200}}}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -324,3 +324,22 @@ func TestResolveBuiltinDirFindsPackagedModules(t *testing.T) {
 		t.Errorf("resolveBuiltinDir = %q, want packaged %q", got, pkg)
 	}
 }
+
+// TestShippedModulesLoadClean parses every module shipped in the repo-root
+// modules/ tree so a new load-time guard is checked against real modules, not
+// just fixtures: it must reject genuinely bad modules without rejecting any
+// of these.
+func TestShippedModulesLoadClean(t *testing.T) {
+	files, err := filepath.Glob("../../modules/*/*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) == 0 {
+		t.Fatal("no shipped modules found; check the glob against modules/")
+	}
+	for _, f := range files {
+		if _, err := ParseYAMLModule(f); err != nil {
+			t.Errorf("%s: %v", f, err)
+		}
+	}
+}
