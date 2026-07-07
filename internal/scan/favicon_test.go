@@ -18,6 +18,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vmfunc/sif/internal/fingerprint"
 )
 
 // goldenFaviconBytes is a fixed payload long enough to span multiple base64
@@ -60,6 +62,11 @@ func TestFavicon_FetchAndHash(t *testing.T) {
 	wantQ := "http.favicon.hash:-1554620260"
 	if result.ShodanQ != wantQ {
 		t.Errorf("ShodanQ = %q, want %q", result.ShodanQ, wantQ)
+	}
+
+	wantTech, _ := fingerprint.LookupFaviconTech(fingerprint.FaviconHash(goldenFaviconBytes))
+	if result.Tech != wantTech {
+		t.Errorf("Tech = %q, want %q", result.Tech, wantTech)
 	}
 }
 
