@@ -294,8 +294,7 @@ func (d *flaskDetector) Detect(body string, headers http.Header) (float32, strin
 
 	var version string
 	if confidence > 0.5 {
-		// Flask's version is often only visible as "Werkzeug/x.y.z" in the
-		// Server header, so search headers too, not just the body.
+		// same header-search rationale as ASP.NET above.
 		version = fw.ExtractVersionFromResponse(body, headers, d.Name()).Version
 	}
 	return confidence, version
