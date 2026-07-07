@@ -152,6 +152,7 @@ func loadCustomDetectorsFromDir(dir string) int {
 	}
 	if len(detectors) > 0 {
 		output.Module("FRAMEWORK").Info("Loaded %d custom signatures", len(detectors))
+		output.Module("FRAMEWORK").Info("~/.config/sif/signatures is deprecated; write type: fingerprint modules under ~/.config/sif/modules instead")
 	}
 	return len(detectors)
 }

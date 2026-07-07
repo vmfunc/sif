@@ -10,7 +10,7 @@ import (
 
 // okFingerprintDef builds a root-path, default-confidence, all-positive-weight
 // fingerprint module: the one shape the framework engine can reproduce exactly
-// (C2's shared domain).
+// (the shared domain).
 func okFingerprintDef(id string) *YAMLModule {
 	return &YAMLModule{
 		ID:   id,
@@ -80,7 +80,7 @@ func TestBridgeFingerprint_CustomConfidence_Refuses(t *testing.T) {
 
 // TestBridgeFingerprint_MatchesNativeAcrossSampledInputs proves the bridged
 // detector and the native module scorer agree on the shared domain, mirroring
-// C2's TestScorerEquivalenceSharedDomain but through the bridge itself.
+// TestScorerEquivalenceSharedDomain but through the bridge itself.
 func TestBridgeFingerprint_MatchesNativeAcrossSampledInputs(t *testing.T) {
 	def := okFingerprintDef("fp-bridge-sampled")
 	registered, reason := bridgeFingerprint(def)
@@ -116,12 +116,12 @@ func TestBridgeFingerprint_MatchesNativeAcrossSampledInputs(t *testing.T) {
 }
 
 // TestBridgeFingerprint_ExactlyHalfBoundaryDiverges pins the one documented
-// residual (3.4): on the shared domain the scores agree, but the module
-// engine fires at score >= threshold (inclusive) while the framework engine's
-// gate (detectionThreshold, applied by the caller as best.confidence <=
+// residual: on the shared domain the scores agree, but the module engine
+// fires at score >= threshold (inclusive) while the framework engine's gate
+// (detectionThreshold, applied by the caller as best.confidence <=
 // detectionThreshold) is exclusive of exactly 0.5. this test only pins the
 // score-equality half from inside the bridge; the exclusivity of the
-// framework gate itself is proven by TestFrameworkThresholdIsStrict (C3).
+// framework gate itself is proven by TestFrameworkThresholdIsStrict.
 func TestBridgeFingerprint_ExactlyHalfBoundaryDiverges(t *testing.T) {
 	def := okFingerprintDef("fp-bridge-half")
 	def.Fingerprint.Signatures = []FPSignature{

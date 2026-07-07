@@ -21,7 +21,7 @@ import (
 
 // bridgeableToFramework reports whether def is a fingerprint whose semantics
 // the framework engine can reproduce exactly: root path, default confidence,
-// all weights > 0 (the C2 shared domain). anything else stays module-only.
+// all weights > 0 (the shared domain). anything else stays module-only.
 //
 // even on this domain the firing boundary still differs at score == 0.5: the
 // module engine fires at score >= confidence, the framework engine at
@@ -76,7 +76,7 @@ func bridgeFingerprint(def *YAMLModule) (bool, string) {
 // bridgedDetector adapts a bridgeable fingerprint module into a
 // frameworks.Detector. structurally the same as frameworks' own (unexported)
 // customDetector; kept as a small local copy here rather than exporting that
-// type, since frameworks cannot import modules (1.5, avoids an import cycle).
+// type, since frameworks cannot import modules and this avoids an import cycle.
 type bridgedDetector struct {
 	frameworks.BaseDetector
 	versionRe    *regexp.Regexp
