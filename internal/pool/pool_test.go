@@ -13,9 +13,11 @@
 package pool
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // every item runs exactly once across a spread of sizes and worker counts,
@@ -142,4 +144,51 @@ func TestEachCapsAtItemCount(t *testing.T) {
 	if got := atomic.LoadInt64(&peak); got > items {
 		t.Fatalf("peak concurrency %d exceeded item count %d", got, items)
 	}
+}
+
+// TestEachCtxStopsEarlyOnCancel proves the cancellation contract documented on
+// EachCtx (pool.go), for the -max-time / ctrl-c fan-out case.
+func TestEachCtxStopsEarlyOnCancel(t *testing.T) {
+	const (
+		items   = 1000
+		workers = 4
+	)
+	work := make([]int, items)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var processed int64
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		EachCtx(ctx, work, workers, func(_ context.Context, _ int) {
+			// cancel partway through so most items are still queued when it fires.
+			if atomic.AddInt64(&processed, 1) == 20 {
+				cancel()
+			}
+			// give the other workers a chance to observe the cancellation
+			// before grabbing their next item, instead of racing straight
+			// through the buffered channel.
+			time.Sleep(time.Millisecond)
+		})
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("EachCtx did not return after cancellation; workers kept draining the queue")
+	}
+
+	got := atomic.LoadInt64(&processed)
+	if got >= items {
+		t.Fatalf("EachCtx processed all %d items despite cancellation (processed=%d): cancel had no effect", items, got)
+	}
+	t.Logf("EachCtx stopped after %d/%d items once ctx was cancelled", got, items)
 }
