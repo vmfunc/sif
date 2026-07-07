@@ -37,11 +37,6 @@ type FaviconResult struct {
 	ShodanQ    string `json:"shodan_query"`
 }
 
-// faviconBodyReadCap bounds the icon read. real favicons are tens of kilobytes;
-// a megabyte ceiling covers oversized ones without letting a hostile endpoint
-// stream forever.
-const faviconBodyReadCap = 1 << 20
-
 // faviconLinkRegex pulls the href off a <link rel="...icon..."> tag so we can
 // fall back to a declared icon when /favicon.ico is absent.
 var faviconLinkRegex = regexp.MustCompile(`(?i)<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*>`)
@@ -139,7 +134,7 @@ func getFaviconBytes(client *http.Client, iconURL string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("favicon status %d", resp.StatusCode)
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, faviconBodyReadCap))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpx.MaxBodySize))
 	if err != nil {
 		return nil, fmt.Errorf("read favicon: %w", err)
 	}
@@ -162,7 +157,7 @@ func declaredFaviconHref(client *http.Client, base string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, faviconBodyReadCap))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, httpx.MaxBodySize))
 	if err != nil {
 		return "", fmt.Errorf("read homepage: %w", err)
 	}

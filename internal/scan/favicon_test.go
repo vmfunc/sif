@@ -13,6 +13,7 @@
 package scan
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"github.com/vmfunc/sif/internal/fingerprint"
+	"github.com/vmfunc/sif/internal/httpx"
 )
 
 // goldenFaviconBytes is a fixed payload long enough to span multiple base64
@@ -137,6 +139,44 @@ func TestResolveFaviconURL(t *testing.T) {
 				t.Errorf("resolveFaviconURL(%q, %q) = %q, want %q", tc.base, tc.href, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestFavicon_OversizedIconMatchesSharedCap proves scan.Favicon hashes an icon
+// larger than 1MB (but within the shared 5MB module-path cap) over the exact
+// same bytes the module matcher would see. before the fix, scan.Favicon read
+// with its own 1MB cap while the module path reads via httpx.ReadCappedBody's
+// 5MB cap, so a >1MB icon hashed to two different values through the same
+// shared FaviconHash - the -favicon shodan pivot was wrong, and the two SSOT
+// paths disagreed on tech.
+func TestFavicon_OversizedIconMatchesSharedCap(t *testing.T) {
+	// 1.5MB: bigger than the old 1MB scan cap, well under the 5MB module cap.
+	big := bytes.Repeat([]byte("A"), (3<<20)/2)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/favicon.ico" {
+			w.Header().Set("Content-Type", "image/x-icon")
+			_, _ = w.Write(big)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	result, err := Favicon(srv.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("Favicon: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected a favicon result, got nil")
+	}
+
+	if len(big) >= httpx.MaxBodySize {
+		t.Fatalf("fixture body (%d bytes) must be under httpx.MaxBodySize (%d) for this assertion to hold", len(big), httpx.MaxBodySize)
+	}
+	want := fingerprint.FaviconHash(big)
+	if result.Hash != want {
+		t.Errorf("Hash = %d, want %d (module-path hash over the same shared cap)", result.Hash, want)
 	}
 }
 
