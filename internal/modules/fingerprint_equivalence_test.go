@@ -53,3 +53,41 @@ func TestScorerEquivalenceSharedDomain(t *testing.T) {
 		}
 	}
 }
+
+func TestScorerDivergesAtZeroWeight(t *testing.T) {
+	// one zero-weight sig that misses, one positive sig that hits.
+	src := []FPSignature{
+		{Pattern: "absent", Weight: 0, Header: false},
+		{Pattern: "present", Weight: 1, Header: false},
+	}
+	fwSigs, fpCfg := pairedSigs(src)
+	body := "present"
+
+	fw := frameworks.NewBaseDetector("x", fwSigs).MatchSignatures(body, http.Header{})
+	fp, _ := scoreFingerprint(fpCfg, body, http.Header{})
+
+	// framework: matched 1 / total 1 = 1.0 (zero-weight sig contributes nothing).
+	if fw != 1 {
+		t.Fatalf("framework score = %v, want 1", fw)
+	}
+	// fingerprint: zero weight remapped to 1, absent sig misses: matched 1 / total 2 = 0.5.
+	if fp != 0.5 {
+		t.Fatalf("fingerprint score = %v, want 0.5", fp)
+	}
+	if fw == fp {
+		t.Fatal("expected divergence at weight==0, got equality")
+	}
+}
+
+func TestFrameworkThresholdIsStrict(t *testing.T) {
+	// a signature set that scores exactly 0.5 must not clear the > 0.5 gate.
+	src := []FPSignature{
+		{Pattern: "hit", Weight: 1, Header: false},
+		{Pattern: "miss", Weight: 1, Header: false},
+	}
+	fwSigs, _ := pairedSigs(src)
+	score := frameworks.NewBaseDetector("x", fwSigs).MatchSignatures("hit", http.Header{})
+	if score != 0.5 {
+		t.Fatalf("score = %v, want exactly 0.5", score)
+	}
+}
