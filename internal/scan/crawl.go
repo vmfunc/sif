@@ -36,6 +36,11 @@ func (r *CrawlResult) ResultType() string { return "crawl" }
 // compile-time check so a result-type drift fails the build, not a run.
 var _ ScanResult = (*CrawlResult)(nil)
 
+// maxCrawlRequests caps the total pages a single Crawl call will fetch, so a
+// hostile page fanning out to an attacker-controlled number of links can't
+// turn a bounded-depth crawl into an unbounded one (b^d).
+const maxCrawlRequests = 2000
+
 // Crawl spiders the target up to depth, following same-host links/scripts/forms.
 // all traffic flows through the shared httpx client so proxy/headers/rate-limit
 // apply. robots.txt is intentionally NOT honored: this is a recon/pentest
@@ -66,6 +71,7 @@ func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*
 	collector := colly.NewCollector(
 		colly.MaxDepth(depth),
 		colly.AllowedDomains(host),
+		colly.MaxRequests(maxCrawlRequests),
 	)
 	// reuse the shared client so proxy/cookie/-H/rate-limit are honored and the
 	// configured timeout applies to every fetch, robots.txt included.

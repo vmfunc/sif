@@ -159,6 +159,45 @@ func TestCrawl_ResultType(t *testing.T) {
 	}
 }
 
+// a hostile page that fans out to far more links than any real page would
+// must not turn a bounded-depth crawl into an unbounded one: colly's
+// MaxRequests budget was left at 0 (unlimited) and Crawl set no Limit rule,
+// so every fanned-out child got fetched regardless of depth. maxCrawlRequests
+// now caps the total number of pages (i.e. actual HTTP fetches) a single
+// Crawl call will make. Note the child pages are leaves with no links of
+// their own, so this exercises the request cap rather than the (unbounded,
+// by design) count of links recorded off of a single already-fetched page.
+func TestCrawl_BoundsRequestFanout(t *testing.T) {
+	fanout := maxCrawlRequests + 500
+	var hits int64
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		if r.URL.Path != "/" {
+			_, _ = w.Write([]byte("leaf"))
+			return
+		}
+		for i := 0; i < fanout; i++ {
+			_, _ = fmt.Fprintf(w, `<a href="/p/%d">l</a>`, i)
+		}
+	})
+	target := httptest.NewServer(mux)
+	defer target.Close()
+
+	if _, err := Crawl(target.URL, 1, 30*time.Second, ""); err != nil {
+		t.Fatalf("Crawl: %v", err)
+	}
+
+	// +1 for the root page itself; the rest must be capped at maxCrawlRequests.
+	if got, want := atomic.LoadInt64(&hits), int64(maxCrawlRequests+1); got > want {
+		t.Errorf("expected at most %d requests (request cap), server received %d", want, got)
+	}
+}
+
 // robots.txt is intentionally NOT honored: sif is a recon/pentest crawler and
 // Disallow rules are not a scope boundary it should respect. This pins the
 // intentional behavior so it isn't "fixed" into a partial robots.txt
