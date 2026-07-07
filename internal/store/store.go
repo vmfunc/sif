@@ -18,6 +18,8 @@
 package store
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -95,11 +97,26 @@ func sanitize(target string) string {
 	return name
 }
 
+// targetHashLen is how many hex characters of the target's sha256 are kept in
+// the snapshot filename. 16 hex chars is 64 bits of the hash - astronomically
+// collision-free for the number of targets a single run ever has - while
+// keeping the filename short and stable.
+const targetHashLen = 16
+
 // pathFor builds the absolute snapshot path for a target under dir. kept private
-// so the sanitized-filename invariant lives in one place; Save and Load both go
-// through it so a target always maps to the same file.
+// so the filename invariant lives in one place; Save and Load both go through
+// it so a target always maps to the same file.
+//
+// sanitize alone is lossy - it folds every separator run (and a literal '_')
+// to one '_', so distinct targets like "https://a.com/x" and "https://a.com//x"
+// (or "host:8443/path" and "host_8443_path") produce the identical string and
+// would silently share - and clobber - one snapshot. appending a hash of the
+// full, un-sanitized target makes the path injective for distinct targets
+// while keeping the sanitized prefix for a human skimming the state dir.
 func pathFor(dir, target string) string {
-	return filepath.Join(dir, sanitize(target)+snapshotExt)
+	sum := sha256.Sum256([]byte(target))
+	suffix := hex.EncodeToString(sum[:])[:targetHashLen]
+	return filepath.Join(dir, sanitize(target)+"-"+suffix+snapshotExt)
 }
 
 // Save writes the run's findings for target as a json snapshot under dir,
@@ -126,10 +143,42 @@ func Save(dir, target string, findings []finding.Finding) error {
 	}
 
 	path := pathFor(dir, target)
-	if err := os.WriteFile(path, data, snapshotFileMode); err != nil {
+	if err := writeFileAtomic(dir, path, data); err != nil {
 		return fmt.Errorf("writing snapshot %q: %w", path, err)
 	}
 	return nil
+}
+
+// writeFileAtomic writes data to path without ever exposing a reader to a
+// partially-written file: it writes to a temp file in the same directory
+// (so the later rename is same-filesystem and atomic) and only renames it
+// onto path once the write and close both succeed. under -concurrency>1, two
+// targets whose sanitized names previously collided could otherwise race two
+// os.WriteFile calls on the same path and interleave their writes; a rename
+// is atomic, so a concurrent reader always sees one complete snapshot or the
+// other, never a mix.
+func writeFileAtomic(dir, path string, data []byte) error {
+	tmp, err := os.CreateTemp(dir, ".snapshot-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	// on any early return the temp file must not linger; once the rename
+	// below succeeds this Remove is a harmless no-op (the path is already
+	// gone).
+	defer os.Remove(tmpPath)
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpPath, snapshotFileMode); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }
 
 // Load reads the previously saved snapshot for target under dir. a missing
