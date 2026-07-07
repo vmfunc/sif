@@ -14,6 +14,7 @@ package modules
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -104,4 +105,65 @@ func dslCompile(expr string) (*govaluate.EvaluableExpression, error) {
 	}
 	actual, _ := dslCache.LoadOrStore(expr, compiled)
 	return actual.(*govaluate.EvaluableExpression), nil
+}
+
+// dslVars builds the variable environment a dsl expression evaluates against,
+// using nuclei's lowercase names so nuclei dsl expressions paste in unchanged.
+// Named extractor values overlay the builtins (matching nuclei's mutation
+// order), so an extractor may reference, and on a name clash shadow, a builtin.
+func dslVars(mc *MatchContext) map[string]interface{} {
+	vars := map[string]interface{}{
+		"status_code":    statusCodeOf(mc.Resp),
+		"body":           mc.Body,
+		"content_length": len(mc.Body),
+		"all_headers":    getPart("header", mc.Resp, mc.Body),
+		"header":         getPart("header", mc.Resp, mc.Body),
+		"duration":       mc.Duration.Seconds(),
+		"host":           mc.URL,
+	}
+	for k, v := range mc.Extracted {
+		vars[k] = v
+	}
+	return vars
+}
+
+func statusCodeOf(resp *http.Response) int {
+	if resp == nil {
+		return 0
+	}
+	return resp.StatusCode
+}
+
+// evalDSL folds a dsl matcher's expressions under its condition (default AND).
+// An expression that errors at eval, or yields a non-bool, counts as false
+// (fail-closed), matching the engine's swallow-at-match-time invariant.
+func evalDSL(m *Matcher, mc *MatchContext) bool {
+	if len(m.DSL) == 0 {
+		return false
+	}
+	vars := dslVars(mc)
+	or := strings.EqualFold(m.Condition, "or")
+	for _, expr := range m.DSL {
+		matched := evalOneDSL(expr, vars)
+		if or && matched {
+			return true
+		}
+		if !or && !matched {
+			return false
+		}
+	}
+	return !or
+}
+
+func evalOneDSL(expr string, vars map[string]interface{}) bool {
+	compiled, err := dslCompile(expr)
+	if err != nil {
+		return false // unreachable after load validation; fail closed anyway
+	}
+	result, err := compiled.Evaluate(vars)
+	if err != nil {
+		return false // unbound var / type mismatch -> miss
+	}
+	b, ok := result.(bool)
+	return ok && b
 }

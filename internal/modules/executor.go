@@ -541,6 +541,9 @@ func checkMatcher(m *Matcher, mc *MatchContext) bool {
 			return false
 		}
 
+	case "dsl":
+		return evalDSL(m, mc)
+
 	default:
 		return false
 	}
