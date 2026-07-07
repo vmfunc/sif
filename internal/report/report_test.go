@@ -196,6 +196,24 @@ func TestMarkdown_GroupsByTarget(t *testing.T) {
 	}
 }
 
+func TestMarkdown_StripsNewlinesFromTargetHeader(t *testing.T) {
+	// same newline-injection guard as sanitizeHeading (markdown.go); this exercises the malicious-input case.
+	results := []Result{
+		{Target: "https://evil.example.com\n## injected", Module: "probe", Data: json.RawMessage(`{"status_code":200}`)},
+	}
+	out := string(Markdown(results))
+
+	lines := strings.Split(out, "\n")
+	for _, line := range lines {
+		if line == "## injected" {
+			t.Errorf("target newline produced a standalone injected heading:\n%s", out)
+		}
+	}
+	if strings.Contains(out, "\r") {
+		t.Errorf("markdown output must not contain carriage returns:\n%q", out)
+	}
+}
+
 // sarifHasResult reports whether any result carries the given rule id and target
 // uri, the pairing that proves a finding survived serialization.
 func sarifHasResult(results []sarifResult, ruleID, target string) bool {
