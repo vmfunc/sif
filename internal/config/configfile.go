@@ -13,6 +13,7 @@
 package config
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -51,7 +52,7 @@ func resolveConfigInput(args []string) (string, func(), error) {
 		return "", nil, fmt.Errorf("config file %q is a directory", path)
 	}
 
-	return buildFlatConfig(path, prof)
+	return buildFlatConfig(path, prof, args)
 }
 
 // rawFlagValue pulls a -name value out of raw args before Parse (space and =
@@ -88,9 +89,22 @@ func defaultConfigFilePath() string {
 
 // buildFlatConfig reads the config file at path through loadConfigMap (so a
 // malformed file always errors the same way, whether or not -profile is set),
-// optionally overlays profiles[profile] onto the top-level keys, and writes
-// the result to a temp yaml file for goflags to merge.
-func buildFlatConfig(path, profile string) (string, func(), error) {
+// optionally overlays profiles[profile] onto the top-level keys, strips any
+// key the command line set explicitly, and writes what's left to a temp yaml
+// file for goflags to merge.
+//
+// the strip step exists because goflags' own merge (readConfigFile) treats a
+// flag whose current value equals its DefValue as "unset" and applies the
+// config value over it; that makes an explicit cli flag lose to the config
+// file whenever the user happens to pass the flag's own default (e.g.
+// "-timeout 10s" against the built-in 10s default). deleting those keys here,
+// before the map ever reaches goflags, makes cli precedence unconditional.
+//
+// note: goflags' merge also swallows a type-mismatched config value (e.g. a
+// string where an int flag expects one) because readConfigFile discards
+// fl.Value.Set's error. that is a separate, lower-severity gap in the vendored
+// dependency itself and is not addressed here.
+func buildFlatConfig(path, profile string, args []string) (string, func(), error) {
 	top, profiles, err := loadConfigMap(path)
 	if err != nil {
 		return "", nil, err
@@ -120,11 +134,74 @@ func buildFlatConfig(path, profile string) (string, func(), error) {
 		}
 	}
 
+	for key := range explicitConfigKeys(args) {
+		delete(merged, key)
+	}
+
 	data, err := yaml.Marshal(merged)
 	if err != nil {
 		return "", nil, err
 	}
 	return materializePreset(data)
+}
+
+// explicitConfigKeys returns every config key that the command line set
+// explicitly (by long name or short alias), so buildFlatConfig can drop it
+// from the file/profile map regardless of what value the flag was given.
+func explicitConfigKeys(args []string) map[string]bool {
+	groups := flagAliasGroups()
+	keys := map[string]bool{}
+	for token := range explicitFlagTokens(args) {
+		for _, alias := range groups[token] {
+			keys[alias] = true
+		}
+	}
+	return keys
+}
+
+// explicitFlagTokens pulls the bare name out of every "-name"/"--name"/
+// "-name=value"/"--name=value" token in args. it is a presence check only
+// (not a value parse), so it does not need to know which flags take a
+// following argument.
+func explicitFlagTokens(args []string) map[string]bool {
+	tokens := map[string]bool{}
+	for _, arg := range args {
+		if !strings.HasPrefix(arg, "-") {
+			continue
+		}
+		name := strings.TrimLeft(arg, "-")
+		if name == "" {
+			continue
+		}
+		if i := strings.IndexByte(name, '='); i >= 0 {
+			name = name[:i]
+		}
+		tokens[name] = true
+	}
+	return tokens
+}
+
+// flagAliasGroups maps every registered flag name to the full set of names
+// (long and short) that back the same Settings field, keyed by the shared
+// flag.Value each alias registers against a throwaway FlagSet. registering
+// flags has no side effects (no parsing, no file i/o), so building this on
+// every call stays cheap and keeps it in sync with registerFlags by
+// construction rather than a second hardcoded name table.
+func flagAliasGroups() map[string][]string {
+	flagSet := registerFlags(&Settings{})
+
+	byValue := map[flag.Value][]string{}
+	flagSet.CommandLine.VisitAll(func(f *flag.Flag) {
+		byValue[f.Value] = append(byValue[f.Value], f.Name)
+	})
+
+	groups := make(map[string][]string, len(byValue))
+	for _, names := range byValue {
+		for _, name := range names {
+			groups[name] = names
+		}
+	}
+	return groups
 }
 
 // loadConfigMap decodes a config file into its top-level keys and its

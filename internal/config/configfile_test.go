@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/projectdiscovery/goflags"
 )
@@ -141,15 +142,36 @@ func TestConfigFileOverridesDefault(t *testing.T) {
 }
 
 // an explicit cli flag beats the file, mirroring TestTemplateConfigPrecedence.
-// caveat (pre-existing goflags property, not introduced here): a cli flag
-// explicitly set to its own default is indistinguishable from unset, so a
-// file value for that flag would still win in that edge case.
 func TestExplicitFlagBeatsFile(t *testing.T) {
 	path := writeConfigFile(t, "threads: 20\n")
 	settings := parseWith(t, "-u", "x", "-config", path, "-threads", "5")
 
 	if settings.Threads != 5 {
 		t.Errorf("expected cli threads=5 to win over file, got %d", settings.Threads)
+	}
+}
+
+// an explicit cli flag must beat the file even when its value happens to
+// equal the flag's own registered default: goflags treats "flag == DefValue"
+// as "unset" (readConfigFile), so without stripping explicit keys out of the
+// config map first, the file value would silently win here.
+func TestExplicitFlagAtDefaultBeatsFile(t *testing.T) {
+	path := writeConfigFile(t, "timeout: 1s\n")
+	settings := parseWith(t, "-u", "x", "-config", path, "-timeout", "10s")
+
+	if settings.Timeout != 10*time.Second {
+		t.Errorf("expected explicit cli timeout=10s to beat file's 1s, got %s", settings.Timeout)
+	}
+}
+
+// the same default-value precedence bug via the flag's short alias: a config
+// keyed by the long name must not survive an explicit "-t 10s" on the cli.
+func TestExplicitShortFlagAtDefaultBeatsFile(t *testing.T) {
+	path := writeConfigFile(t, "timeout: 1s\n")
+	settings := parseWith(t, "-u", "x", "-config", path, "-t", "10s")
+
+	if settings.Timeout != 10*time.Second {
+		t.Errorf("expected explicit cli -t 10s to beat file's 1s, got %s", settings.Timeout)
 	}
 }
 
@@ -195,6 +217,21 @@ func TestCLIBeatsProfile(t *testing.T) {
 
 	if settings.Threads != 7 {
 		t.Errorf("expected cli threads=7 to win over profile, got %d", settings.Threads)
+	}
+}
+
+// same default-value precedence bug as TestExplicitFlagAtDefaultBeatsFile,
+// but through a profile overlay instead of the file's top level.
+func TestExplicitFlagAtDefaultBeatsProfile(t *testing.T) {
+	path := writeConfigFile(t, ""+
+		"profiles:\n"+
+		"  quick:\n"+
+		"    timeout: 1s\n")
+
+	settings := parseWith(t, "-u", "x", "-config", path, "-profile", "quick", "-timeout", "10s")
+
+	if settings.Timeout != 10*time.Second {
+		t.Errorf("expected explicit cli timeout=10s to beat profile's 1s, got %s", settings.Timeout)
 	}
 }
 
