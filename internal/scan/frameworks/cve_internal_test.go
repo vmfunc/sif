@@ -69,10 +69,10 @@ func TestResolveVersionFeedsCVELookup(t *testing.T) {
 // is "10"/"9". the cve lookup must still surface the matching CVE instead of
 // missing it because the affected entries are dotted.
 func TestGetVulnerabilitiesBareMajor(t *testing.T) {
-	if cves, _ := getVulnerabilities("Drupal", "10"); len(cves) == 0 {
+	if cves, _, _ := getVulnerabilities("Drupal", "10"); len(cves) == 0 {
 		t.Error("expected Drupal 10 to surface CVE-2023-44487, got none")
 	}
-	if cves, _ := getVulnerabilities("Drupal", "9"); len(cves) == 0 {
+	if cves, _, _ := getVulnerabilities("Drupal", "9"); len(cves) == 0 {
 		t.Error("expected Drupal 9 to surface CVE-2023-44487, got none")
 	}
 }
