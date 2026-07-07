@@ -335,7 +335,7 @@ func TestFlattenStableKeysAndSeverities(t *testing.T) {
 			name:    "header is recon info",
 			value:   scan.HeaderResults{{Name: "Server", Value: "nginx"}},
 			module:  "headers",
-			wantKey: "headers:Server",
+			wantKey: "headers:Server:nginx",
 			wantSev: SeverityInfo,
 		},
 		{
@@ -400,5 +400,41 @@ func TestDeadProbeIsNotAFinding(t *testing.T) {
 	findings := Flatten(target, "probe", &scan.ProbeResult{URL: "http://x", Alive: false})
 	if len(findings) != 0 {
 		t.Errorf("dead probe produced %d findings, want 0", len(findings))
+	}
+}
+
+func TestMultiValuedHeaderGetsDistinctKeys(t *testing.T) {
+	hdrs := []scan.HeaderResult{
+		{Name: "Set-Cookie", Value: "session=aaa; HttpOnly"},
+		{Name: "Set-Cookie", Value: "tracking=bbb"},
+	}
+	fs := Flatten(target, "headers", hdrs)
+	if len(fs) != 2 {
+		t.Fatalf("flatten len = %d, want 2", len(fs))
+	}
+	if fs[0].Key == fs[1].Key {
+		t.Fatalf("distinct header values %q and %q share dedup Key %q", fs[0].Raw, fs[1].Raw, fs[0].Key)
+	}
+}
+
+func TestJSEnvVarOrderingIsStable(t *testing.T) {
+	res := &js.JavascriptScanResult{
+		FoundEnvironmentVars: map[string]string{
+			"A_KEY": "1", "B_KEY": "2", "C_KEY": "3",
+			"D_KEY": "4", "E_KEY": "5", "F_KEY": "6",
+		},
+	}
+
+	orderings := make(map[string]struct{})
+	for i := 0; i < 200; i++ {
+		fs := Flatten(target, "js", res)
+		keys := make([]string, 0, len(fs))
+		for _, f := range fs {
+			keys = append(keys, f.Key)
+		}
+		orderings[strings.Join(keys, ",")] = struct{}{}
+	}
+	if len(orderings) != 1 {
+		t.Errorf("Flatten produced %d distinct env-var orderings over 200 runs, want 1", len(orderings))
 	}
 }
