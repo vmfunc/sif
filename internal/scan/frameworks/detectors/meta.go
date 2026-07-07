@@ -43,7 +43,11 @@ func (d *nextjsDetector) Name() string { return "Next.js" }
 func (d *nextjsDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: "__NEXT_DATA__", Weight: 0.5},
-		{Pattern: "_next/static", Weight: 0.4},
+		// require the attribute-assignment form (href="/_next/static/... or
+		// src="/_next/static/...) so prose that merely names the directory
+		// can't match; a self-hosted app-router page often serves only this
+		// asset path, so weight it high enough to clear the threshold alone.
+		{Pattern: `="/_next/static/`, Weight: 0.6},
 		{Pattern: "__next", Weight: 0.3},
 		{Pattern: "x-nextjs", Weight: 0.3, HeaderOnly: true},
 	}
@@ -166,7 +170,11 @@ func (d *astroDetector) Name() string { return "Astro" }
 
 func (d *astroDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: `<meta name="generator" content="Astro`, Weight: 0.5},
+		// the generator meta tag is already a definitive, quote-anchored
+		// structural marker (not a bare brand word); weight it high enough
+		// that a minimal static page carrying only this meta tag still
+		// clears the detection threshold on its own.
+		{Pattern: `<meta name="generator" content="Astro`, Weight: 1.1},
 		{Pattern: "astro-island", Weight: 0.5},
 		{Pattern: "data-astro-cid-", Weight: 0.4},
 		{Pattern: "/_astro/", Weight: 0.4},

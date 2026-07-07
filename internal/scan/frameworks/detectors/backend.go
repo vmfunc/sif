@@ -174,9 +174,11 @@ func (d *aspnetDetector) Signatures() []fw.Signature {
 		{Pattern: "__VIEWSTATE", Weight: 0.4},
 		{Pattern: "__EVENTVALIDATION", Weight: 0.3},
 		{Pattern: "__VIEWSTATEGENERATOR", Weight: 0.3},
-		{Pattern: ".aspx", Weight: 0.2},
-		{Pattern: ".ashx", Weight: 0.2},
-		{Pattern: ".asmx", Weight: 0.2},
+		// .aspx/.ashx/.asmx path-extension signatures were dropped: they are
+		// weak (any page can link to one) and their combined weight diluted
+		// the canonical X-AspNet-Version/X-Powered-By headers below the
+		// detection threshold on a plain ASP.NET response that carries no
+		// body markers at all (e.g. a JSON API reply).
 		{Pattern: "asp.net_sessionid", Weight: 0.4, HeaderOnly: true},
 	}
 }
