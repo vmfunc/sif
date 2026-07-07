@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"math/rand"
 	"net/http"
 	"testing"
 
@@ -74,6 +75,92 @@ func TestBridgeFingerprint_CustomConfidence_Refuses(t *testing.T) {
 	}
 	if _, ok := frameworks.GetDetector(def.ID); ok {
 		t.Fatalf("frameworks.GetDetector(%q) found a detector that should have been refused", def.ID)
+	}
+}
+
+// TestBridgeFingerprint_MatchesNativeAcrossSampledInputs proves the bridged
+// detector and the native module scorer agree on the shared domain, mirroring
+// C2's TestScorerEquivalenceSharedDomain but through the bridge itself.
+func TestBridgeFingerprint_MatchesNativeAcrossSampledInputs(t *testing.T) {
+	def := okFingerprintDef("fp-bridge-sampled")
+	registered, reason := bridgeFingerprint(def)
+	if !registered {
+		t.Fatalf("bridgeFingerprint registered = false, reason %q", reason)
+	}
+	det, ok := frameworks.GetDetector(def.ID)
+	if !ok {
+		t.Fatalf("frameworks.GetDetector(%q) not found after bridging", def.ID)
+	}
+
+	tokens := []string{"nginx", "X-Powered-By", "cloudflare", "wp-content"}
+	r := rand.New(rand.NewSource(2))
+	for iter := 0; iter < 500; iter++ {
+		body := ""
+		for _, tk := range tokens {
+			if r.Intn(2) == 0 {
+				body += tk + " "
+			}
+		}
+		headers := http.Header{}
+		for _, tk := range tokens {
+			if r.Intn(2) == 0 {
+				headers.Add(tk, "v")
+			}
+		}
+		got, _ := det.Detect(body, headers)
+		want, _ := scoreFingerprint(def.Fingerprint, body, headers)
+		if got != want {
+			t.Fatalf("iter %d: bridged=%v native=%v body=%q headers=%v", iter, got, want, body, headers)
+		}
+	}
+}
+
+// TestBridgeFingerprint_ExactlyHalfBoundaryDiverges pins the one documented
+// residual (3.4): on the shared domain the scores agree, but the module
+// engine fires at score >= threshold (inclusive) while the framework engine's
+// gate (detectionThreshold, applied by the caller as best.confidence <=
+// detectionThreshold) is exclusive of exactly 0.5. this test only pins the
+// score-equality half from inside the bridge; the exclusivity of the
+// framework gate itself is proven by TestFrameworkThresholdIsStrict (C3).
+func TestBridgeFingerprint_ExactlyHalfBoundaryDiverges(t *testing.T) {
+	def := okFingerprintDef("fp-bridge-half")
+	def.Fingerprint.Signatures = []FPSignature{
+		{Pattern: "hit", Weight: 1},
+		{Pattern: "miss", Weight: 1},
+	}
+	registered, reason := bridgeFingerprint(def)
+	if !registered {
+		t.Fatalf("bridgeFingerprint registered = false, reason %q", reason)
+	}
+	det, ok := frameworks.GetDetector(def.ID)
+	if !ok {
+		t.Fatalf("frameworks.GetDetector(%q) not found after bridging", def.ID)
+	}
+
+	body := "hit"
+	bridgedScore, _ := det.Detect(body, http.Header{})
+	if bridgedScore != 0.5 {
+		t.Fatalf("bridged score = %v, want exactly 0.5", bridgedScore)
+	}
+
+	nativeScore, _ := scoreFingerprint(def.Fingerprint, body, http.Header{})
+	if nativeScore != 0.5 {
+		t.Fatalf("native score = %v, want exactly 0.5", nativeScore)
+	}
+
+	// module engine: score >= threshold(0.5) fires (fingerprint.go:130).
+	moduleFires := nativeScore >= defaultFingerprintConfidence
+	if !moduleFires {
+		t.Fatal("module engine should fire at score == 0.5 (inclusive gate)")
+	}
+
+	// framework engine: DetectFramework/DetectFrameworks require
+	// confidence > detectionThreshold(0.5) (detect.go:133/168), so an exact
+	// 0.5 does not clear it even though the score itself matches.
+	const detectionThreshold = 0.5
+	frameworkFires := bridgedScore > detectionThreshold
+	if frameworkFires {
+		t.Fatal("framework engine should not fire at score == 0.5 (exclusive gate)")
 	}
 }
 
