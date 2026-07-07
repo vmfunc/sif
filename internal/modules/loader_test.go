@@ -220,6 +220,44 @@ func TestLoaderLoadAll(t *testing.T) {
 	}
 }
 
+// TestLoaderLoadDirSkipsUnreadableEntry proves one entry the walk cannot read
+// (a directory with its permissions stripped) does not abort the rest of the
+// walk: a module sorted after it must still load. filepath.Walk aborts
+// entirely on the first non-nil error a walkFn returns, and loadDir used to
+// just pass that error straight through.
+func TestLoaderLoadDirSkipsUnreadableEntry(t *testing.T) {
+	Clear()
+	t.Cleanup(Clear)
+
+	if os.Getuid() == 0 {
+		t.Skip("running as root: unreadable-permission trick does not apply")
+	}
+
+	dir := t.TempDir()
+	unreadable := filepath.Join(dir, "a-unreadable")
+	if err := os.Mkdir(unreadable, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeModule(t, unreadable, "inner.yaml", "id: inner-mod\ntype: http\nhttp:\n  paths: [\"/\"]\n")
+	if err := os.Chmod(unreadable, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(unreadable, 0o755) })
+
+	// "zlast" sorts after "a-unreadable" so the walk must reach it only if it
+	// presses on past the unreadable directory instead of aborting there.
+	writeModule(t, dir, "zlast.yaml", "id: zlast-mod\ntype: http\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")
+
+	l := &Loader{builtinDir: dir, userDir: filepath.Join(dir, "nonexistent-user")}
+	if err := l.LoadAll(); err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+
+	if _, ok := Get("zlast-mod"); !ok {
+		t.Error("zlast-mod not registered: an unreadable entry earlier in the walk dropped it")
+	}
+}
+
 // TestLoaderMergesEmbeddedAndDiskByID confirms embedded and on-disk builtins
 // merge by module id, rather than the disk set winning outright whenever
 // anything on disk loads: every embedded-only id must still register, and a

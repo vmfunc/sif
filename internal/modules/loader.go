@@ -88,12 +88,10 @@ func resolveBuiltinDir() string {
 // development), then the freedesktop system data dirs so packaged installs
 // (modules under /usr/share/sif) are found too.
 //
-// The bare "modules" candidate resolves against whatever the working directory
-// happens to be at runtime, so it is only offered when the working directory is
-// a sif checkout (or when the binary carries no embedded set at all). That keeps
-// the development flow of editing modules/ and re-running the binary, without
-// letting a release binary run from some unrelated directory treat a modules/
-// folder it happens to find there as a trusted builtin source.
+// The bare "modules" candidate resolves against the working directory at
+// runtime, so it is only offered inside a sif checkout (or when the binary
+// carries no embedded set), keeping the edit-and-rerun flow without letting a
+// release binary trust a modules/ folder it happens to find.
 func builtinDirCandidates() []string {
 	candidates := make([]string, 0, 4)
 
@@ -149,14 +147,9 @@ func firstExistingDir(candidates []string) string {
 // LoadAll discovers and loads all modules from both built-in
 // and user directories.
 func (l *Loader) LoadAll() error {
-	// Load the modules embedded in the binary first, as the baseline builtin
-	// set, then layer the on-disk builtin dir over it. loadDir and loadFS
-	// both register by id, and Register replaces an existing id rather than
-	// duplicating it, so a disk module overrides only its own id; every other
-	// embedded module survives. This also covers the release-binary case
-	// (embedded, no builtinDir on disk) and the dev-tree case (both present,
-	// disk wins for whatever it ships) without an all-or-nothing choice
-	// between them.
+	// the embedded set is the baseline; the on-disk builtin dir layers over it.
+	// Register replaces by id rather than duplicating, so a disk module overrides
+	// only its own id and every other embedded module survives.
 	if l.embedded != nil {
 		if err := l.loadFS(l.embedded); err != nil {
 			log.Debugf("No embedded modules loaded: %v", err)
@@ -181,11 +174,15 @@ func (l *Loader) LoadAll() error {
 	return nil
 }
 
-// loadDir loads modules from a directory.
+// loadDir loads modules from a directory. a per-entry error is logged and
+// skipped rather than returned: filepath.Walk aborts the whole walk on the
+// first error a walkFn returns, silently dropping every module sorted after
+// the bad entry.
 func (l *Loader) loadDir(dir string, userDefined bool) error {
 	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			log.Debugf("Skipping %s: %v", path, err)
+			return nil
 		}
 
 		if info.IsDir() {
