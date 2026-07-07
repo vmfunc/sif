@@ -23,11 +23,9 @@ import (
 	"time"
 )
 
-// supabaseTestRoundTripper redirects any request bound for *.supabase.co to a
-// local httptest server, tagging the request with the original host (via a
-// header) so the fake handler can tell projects apart. This lets ScanSupabase
-// run its real code path (regex match, decode, signup, openapi, sample fetch)
-// against a fake backend instead of the real network.
+// supabaseTestRoundTripper redirects *.supabase.co requests to a local
+// httptest server, tagging the original host in a header so the fake handler
+// can tell projects apart and ScanSupabase's real code path can be exercised.
 type supabaseTestRoundTripper struct {
 	orig   http.RoundTripper
 	target *url.URL
@@ -97,7 +95,6 @@ func projectHandler(openAPIStatus int) http.HandlerFunc {
 		}
 	}
 }
-
 
 // regression: one project's openapi fetch failing must not discard findings
 // already collected for another project in the same scan.

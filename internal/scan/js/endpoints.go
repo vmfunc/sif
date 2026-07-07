@@ -46,10 +46,9 @@ var mimePrefixes = []string{
 	"application/", "multipart/", "model/", "message/",
 }
 
-// regexFlagLiterals are quoted regex flag combinations (e.g. `str.replace("/gi", x)`)
-// that the root-relative path alternative in endpointRegex mistakes for a
-// slash-prefixed endpoint. They're denylisted by exact match rather than by a
-// blanket length bump so real short endpoints like /v1 or /me still extract.
+// regexFlagLiterals are quoted regex flags (e.g. `str.replace("/gi", x)`) that
+// the endpoint regex mistakes for slash-prefixed paths. Denylisted by exact
+// match, not a length bump, so short real endpoints like /v1 still extract.
 var regexFlagLiterals = map[string]struct{}{
 	"/gi": {}, "/gm": {}, "/gs": {}, "/gu": {}, "/gy": {}, "/mi": {}, "/su": {},
 }
