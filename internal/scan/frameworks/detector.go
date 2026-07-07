@@ -20,6 +20,7 @@
 package frameworks
 
 import (
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -128,7 +129,25 @@ func (b BaseDetector) MatchSignatures(body string, headers http.Header) float32 
 		return 0
 	}
 
-	return weightedScore / totalWeight
+	return clampUnit(weightedScore / totalWeight)
+}
+
+// clampUnit bounds a fraction to [0, 1]. Signature weights are expected
+// non-negative and finite, so this is a no-op on any real detector; it only
+// guards a caller that feeds MatchSignatures a negative or NaN weight. NaN
+// needs its own check: every ordered comparison against NaN is false, so
+// the < 0 and > 1 checks below would silently let it through otherwise.
+func clampUnit(f float32) float32 {
+	if math.IsNaN(float64(f)) {
+		return 0
+	}
+	if f < 0 {
+		return 0
+	}
+	if f > 1 {
+		return 1
+	}
+	return f
 }
 
 // headerValueContains reports whether the named header's value contains the signature.
