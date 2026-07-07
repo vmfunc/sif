@@ -146,10 +146,19 @@ func ParseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 			if err := validateMatchers(step.Matchers); err != nil {
 				return nil, fmt.Errorf("module %q request %d: %w", ym.ID, i, err)
 			}
+			if err := validateExtractors(step.Extractors); err != nil {
+				return nil, fmt.Errorf("module %q request %d: %w", ym.ID, i, err)
+			}
+		}
+		if err := validateExtractors(ym.HTTP.Extractors); err != nil {
+			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
 		}
 	}
 	if ym.TCP != nil {
 		if err := validateTCP(ym.TCP); err != nil {
+			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
+		}
+		if err := validateExtractors(ym.TCP.Extractors); err != nil {
 			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
 		}
 	}

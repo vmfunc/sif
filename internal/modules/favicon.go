@@ -15,6 +15,7 @@ package modules
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 
 	"github.com/vmfunc/sif/internal/fingerprint"
@@ -78,16 +79,25 @@ func hasNonEmpty(vals []string) bool {
 }
 
 // validateMatchers fails favicon matchers that would silently never fire (no
-// hash, or one out of 32-bit range), an unknown matcher type and a malformed
-// range matcher at load rather than at match time. an empty word or regex list
-// matches every response under the default AND condition, so it is rejected
-// here too. dns and tcp narrow the allowlist further in their own validators.
+// hash, or one out of 32-bit range), an unknown matcher type, an unparseable
+// regex and a malformed range matcher at load rather than at match time. an
+// empty word or regex list matches every response under the default AND
+// condition, so it is rejected here too. dns and tcp narrow the allowlist
+// further in their own validators.
 func validateMatchers(matchers []Matcher) error {
 	for i := range matchers {
 		switch matchers[i].Type {
 		case "word", "regex", "status", "favicon", "size", "range":
 		default:
 			return fmt.Errorf("matcher type %q is not supported (use word, regex, status, favicon, size, or range)", matchers[i].Type)
+		}
+
+		if matchers[i].Type == "regex" {
+			for _, pattern := range matchers[i].Regex {
+				if _, err := regexp.Compile(pattern); err != nil {
+					return fmt.Errorf("regex matcher pattern %q: %w", pattern, err)
+				}
+			}
 		}
 
 		if matchers[i].Type == "favicon" {

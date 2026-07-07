@@ -706,4 +706,30 @@ func TestParseTCPValidation(t *testing.T) {
 	if _, err := ParseYAMLModule(badCond); err == nil {
 		t.Fatal("invalid matchers-condition on tcp accepted")
 	}
+
+	badRegex := write("badregex.yaml", "id: brx\ntype: tcp\ntcp:\n  port: 6379\n  matchers:\n    - type: regex\n      regex: [\"(unclosed\"]\n")
+	if _, err := ParseYAMLModule(badRegex); err == nil {
+		t.Fatal("unclosed regex matcher on tcp accepted")
+	}
+
+	badExtractorRegex := write("badextractorregex.yaml", "id: ber\ntype: tcp\ntcp:\n  port: 6379\n  matchers:\n    - type: word\n      words: [x]\n  extractors:\n    - type: regex\n      name: y\n      regex: [\"(unclosed\"]\n")
+	if _, err := ParseYAMLModule(badExtractorRegex); err == nil {
+		t.Fatal("unclosed regex extractor on tcp accepted")
+	}
+}
+
+func TestExecuteTCPModuleCaseInsensitiveWord(t *testing.T) {
+	withFakeTCP(t, "+OK REDIS ready\r\n")
+	def := tcpDef(&TCPConfig{
+		Port:     6379,
+		Matchers: []Matcher{{Type: "word", Words: []string{"redis"}, CaseInsensitive: true}},
+	})
+
+	res, err := ExecuteTCPModule(context.Background(), "example.com", def, Options{})
+	if err != nil {
+		t.Fatalf("ExecuteTCPModule: %v", err)
+	}
+	if len(res.Findings) != 1 {
+		t.Fatalf("got %d findings, want 1 (case-insensitive word should hit mixed-case banner)", len(res.Findings))
+	}
 }
