@@ -109,6 +109,26 @@ func TestParseYAMLModuleErrors(t *testing.T) {
 			name:    "type mismatch",
 			content: "id: bad-shape\ntype: http\nhttp: \"should-be-a-map\"\n",
 		},
+		{
+			// type http with no http: section at all: parses fine today and only
+			// fails at Execute, which never runs on a passive scan.
+			name:    "http type with no http section",
+			content: "id: no-http-section\ntype: http\n",
+		},
+		{
+			// a typo'd section name (htttp instead of http) leaves HTTP nil the
+			// same way, since yaml silently ignores unknown top-level keys.
+			name:    "typo'd http section",
+			content: "id: typo-http-section\ntype: http\nhtttp:\n  paths: [\"/\"]\n",
+		},
+		{
+			name:    "dns type with no dns section",
+			content: "id: no-dns-section\ntype: dns\n",
+		},
+		{
+			name:    "tcp type with no tcp section",
+			content: "id: no-tcp-section\ntype: tcp\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -118,6 +138,24 @@ func TestParseYAMLModuleErrors(t *testing.T) {
 				t.Fatalf("expected error for %s", tt.name)
 			}
 		})
+	}
+}
+
+// TestParseYAMLModuleStrictFields confirms a typo'd field inside a present
+// config block (as opposed to a missing/typo'd top-level section, covered by
+// TestParseYAMLModuleErrors) is rejected: strict/KnownFields decoding, not
+// just the block-presence check.
+func TestParseYAMLModuleStrictFields(t *testing.T) {
+	dir := t.TempDir()
+
+	typoField := writeModule(t, dir, "typo-field.yaml", "id: tf\ntype: http\nhttp:\n  methdo: GET\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")
+	if _, err := ParseYAMLModule(typoField); err == nil {
+		t.Fatal("typo'd field (methdo) inside http section accepted")
+	}
+
+	correctField := writeModule(t, dir, "correct-field.yaml", "id: cf\ntype: http\nhttp:\n  method: GET\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")
+	if _, err := ParseYAMLModule(correctField); err != nil {
+		t.Fatalf("valid field name rejected: %v", err)
 	}
 }
 

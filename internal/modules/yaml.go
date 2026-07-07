@@ -25,6 +25,7 @@
 package modules
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -116,7 +117,9 @@ func ParseYAMLModule(path string) (*YAMLModule, error) {
 // so the loader can read modules from an embedded fs.FS as well as from disk.
 func ParseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 	var ym YAMLModule
-	if err := yaml.Unmarshal(data, &ym); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&ym); err != nil {
 		return nil, fmt.Errorf("parse yaml: %w", err)
 	}
 
@@ -126,6 +129,24 @@ func ParseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 
 	if ym.Type == "" {
 		return nil, fmt.Errorf("module missing required field: type")
+	}
+
+	// a module's type must have its matching configuration block: this is what
+	// keeps a missing or typo'd section (e.g. "htttp:") from parsing clean and
+	// only failing later, at Execute, which passive scans never reach.
+	switch ym.Type {
+	case TypeHTTP:
+		if ym.HTTP == nil {
+			return nil, fmt.Errorf("module %q: type %q requires an http configuration block", ym.ID, ym.Type)
+		}
+	case TypeDNS:
+		if ym.DNS == nil {
+			return nil, fmt.Errorf("module %q: type %q requires a dns configuration block", ym.ID, ym.Type)
+		}
+	case TypeTCP:
+		if ym.TCP == nil {
+			return nil, fmt.Errorf("module %q: type %q requires a tcp configuration block", ym.ID, ym.Type)
+		}
 	}
 
 	if ym.HTTP != nil {
