@@ -230,16 +230,11 @@ func deadURL(t *testing.T) string {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	u := srv.URL
-	srv.Close() // now nothing listens on that port
+	srv.Close()
 	return u
 }
 
-// the webhook url IS the credential for slack/discord/generic sinks, and the
-// telegram bot token rides the url path. a transport failure used to surface
-// through a raw *url.Error, whose Error() quotes the full request url - so
-// any dns/tls/timeout/refused error leaked the secret into the operator log
-// and the returned error. postJSON must redact the url while still letting an
-// operator see which host failed.
+// see redactTransportErr's doc comment (message.go) for why this matters.
 func TestNotifyErrorRedactsSecretWebhookURL(t *testing.T) {
 	host := deadURL(t)
 	secret := host + "/services/T00000000/B11111111/SUPERSECRETTOKEN"
@@ -275,3 +270,87 @@ func TestNotifyErrorRedactsTelegramToken(t *testing.T) {
 	}
 }
 
+// attacker-controlled finding content (a scanned target's page title, a
+// crawled url, a cms name) reaches the slack/discord code block verbatim. a
+// title that embeds a closing fence used to break out of our wrapping block
+// and inject live markdown (mentions, masked links) into the channel.
+func TestNotifyCodeBlockBreakoutNeutralized(t *testing.T) {
+	var c capture
+	srv := captureServer(t, &c)
+
+	evil := []finding.Finding{{
+		Target:   "https://evil.test",
+		Module:   "probe",
+		Severity: finding.SeverityHigh,
+		Key:      "probe:x",
+		Title:    "```\n@everyone pwned <https://evil.test|click>\n```",
+	}}
+	p := &discordProvider{webhook: srv.URL}
+	if err := p.send(context.Background(), srv.Client(), evil); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	var payload discordPayload
+	if err := json.Unmarshal(c.body, &payload); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	// a clean payload has exactly the 2 fences we added (open+close); any more
+	// means attacker content broke out.
+	if fences := strings.Count(payload.Content, "```"); fences > 2 {
+		t.Fatalf("INJECTION: attacker content added %d extra code fences, breaking out: %q", fences-2, payload.Content)
+	}
+}
+
+// slack resolves a bare "<...|...>" as a link/mention independent of code-block
+// boundaries, so the fence fix alone isn't enough for slack: the control
+// characters (&, <, >) must be entity-escaped too.
+func TestSlackEscapesControlChars(t *testing.T) {
+	var c capture
+	srv := captureServer(t, &c)
+
+	evil := []finding.Finding{{
+		Target:   "https://evil.test",
+		Module:   "probe",
+		Severity: finding.SeverityHigh,
+		Key:      "probe:x",
+		Title:    "<https://evil.test|click> & <!everyone>",
+	}}
+	p := &slackProvider{webhook: srv.URL}
+	if err := p.send(context.Background(), srv.Client(), evil); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	var payload slackPayload
+	if err := json.Unmarshal(c.body, &payload); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if strings.Contains(payload.Text, "<https://evil.test|click>") {
+		t.Fatalf("INJECTION: unescaped slack link syntax reached the payload: %q", payload.Text)
+	}
+	if !strings.Contains(payload.Text, "&lt;https://evil.test|click&gt;") || !strings.Contains(payload.Text, "&amp;") {
+		t.Fatalf("expected slack control chars entity-escaped, got: %q", payload.Text)
+	}
+}
+
+// robustness sanity: confirm a zero http.Client.Timeout would mean an
+// unbounded client. not a bug in notify per se, but documents that ctx, not
+// Timeout, is what bounds a hung endpoint here.
+func TestNotifyZeroTimeoutIsUnbounded(t *testing.T) {
+	blocked := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		<-blocked
+	}))
+	t.Cleanup(func() { close(blocked); srv.Close() })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	p := &slackProvider{webhook: srv.URL}
+	done := make(chan error, 1)
+	go func() { done <- p.send(ctx, srv.Client(), sampleFindings()) }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected ctx-cancel error from hung endpoint")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("send did not honor ctx cancellation on hung endpoint")
+	}
+}

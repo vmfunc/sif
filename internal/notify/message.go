@@ -76,15 +76,11 @@ func postJSON(ctx context.Context, client *http.Client, endpoint string, payload
 	return nil
 }
 
-// redactTransportErr strips the request url out of a client.Do failure before
-// it reaches a log line or a returned error. for these providers the url IS
-// the credential (a slack/discord/generic webhook secret is the whole url; a
-// telegram bot token rides the path) and http.Client wraps every transport
-// failure in a *url.Error whose Error() quotes that url verbatim. the
-// underlying cause (*net.OpError, a dns error, tls, timeout, ...) only ever
-// mentions the host:port, never the path, so unwrapping to it and letting the
-// caller prefix the host separately keeps a transport failure debuggable
-// without leaking the secret.
+// redactTransportErr strips the webhook url out of a client.Do failure. for
+// these providers the url IS the credential, and http.Client wraps every
+// transport failure in a *url.Error whose Error() quotes it verbatim; unwrap
+// to the underlying cause (which only ever mentions host:port) and let the
+// caller prefix the host separately.
 func redactTransportErr(err error) error {
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) {
