@@ -86,7 +86,10 @@ func (d *djangoDetector) Name() string { return "Django" }
 
 func (d *djangoDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "csrfmiddlewaretoken", Weight: 0.4, HeaderOnly: true},
+		// csrfmiddlewaretoken is a hidden form BODY field Django templates
+		// render (`<input type="hidden" name="csrfmiddlewaretoken" ...>`),
+		// never a header, so this must not be HeaderOnly.
+		{Pattern: "csrfmiddlewaretoken", Weight: 0.4},
 		{Pattern: "csrftoken", Weight: 0.3, HeaderOnly: true},
 		{Pattern: "django.contrib", Weight: 0.3},
 		{Pattern: "django.core", Weight: 0.3},
