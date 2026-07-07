@@ -51,10 +51,7 @@ func resolveConfigInput(args []string) (string, func(), error) {
 		return "", nil, fmt.Errorf("config file %q is a directory", path)
 	}
 
-	if prof == "" {
-		return path, nil, nil
-	}
-	return buildProfileConfig(path, prof)
+	return buildFlatConfig(path, prof)
 }
 
 // rawFlagValue pulls a -name value out of raw args before Parse (space and =
@@ -89,35 +86,38 @@ func defaultConfigFilePath() string {
 	return filepath.Join(folderutil.AppConfigDirOrDefault(".", toolName), "config.yaml")
 }
 
-// buildProfileConfig reads the config file at path, overlays profiles[profile]
-// onto the top-level keys, and writes the merged flat map to a temp yaml file
-// for goflags to merge (map overlay guarantees the profile wins over the
-// file's top-level defaults).
-func buildProfileConfig(path, profile string) (string, func(), error) {
+// buildFlatConfig reads the config file at path through loadConfigMap (so a
+// malformed file always errors the same way, whether or not -profile is set),
+// optionally overlays profiles[profile] onto the top-level keys, and writes
+// the result to a temp yaml file for goflags to merge.
+func buildFlatConfig(path, profile string) (string, func(), error) {
 	top, profiles, err := loadConfigMap(path)
 	if err != nil {
 		return "", nil, err
 	}
-	overlay, ok := profiles[profile]
-	if !ok {
-		names := make([]string, 0, len(profiles))
-		for name := range profiles {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		available := "none"
-		if len(names) > 0 {
-			available = strings.Join(names, ", ")
-		}
-		return "", nil, fmt.Errorf("unknown profile %q; available profiles: %s", profile, available)
-	}
 
-	merged := make(map[string]any, len(top)+len(overlay))
+	merged := make(map[string]any, len(top))
 	for k, v := range top {
 		merged[k] = v
 	}
-	for k, v := range overlay {
-		merged[k] = v
+
+	if profile != "" {
+		overlay, ok := profiles[profile]
+		if !ok {
+			names := make([]string, 0, len(profiles))
+			for name := range profiles {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			available := "none"
+			if len(names) > 0 {
+				available = strings.Join(names, ", ")
+			}
+			return "", nil, fmt.Errorf("unknown profile %q; available profiles: %s", profile, available)
+		}
+		for k, v := range overlay {
+			merged[k] = v
+		}
 	}
 
 	data, err := yaml.Marshal(merged)

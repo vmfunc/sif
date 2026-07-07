@@ -234,6 +234,49 @@ func TestMissingExplicitConfigFileErrors(t *testing.T) {
 	}
 }
 
+// malformed yaml in an explicit -config file must be a hard error, matching
+// the error the -profile branch already produces (its overlay logic routes
+// through loadConfigMap, which validates). without -profile, resolveConfigInput
+// used to return the raw path unparsed, skipping validation entirely; goflags
+// then silently discarded the decode error, dropping every real setting in
+// the file with no diagnostic and exit 0.
+func TestMalformedConfigNoProfileErrors(t *testing.T) {
+	path := writeConfigFile(t, "timeout: \"unterminated\n")
+
+	_, _, err := resolveConfigInput([]string{"-config", path})
+	if err == nil {
+		t.Fatal("expected an error for malformed yaml with no -profile")
+	}
+	if !strings.Contains(err.Error(), "is not valid yaml") {
+		t.Errorf("expected a %q error, got: %s", "is not valid yaml", err)
+	}
+}
+
+// same malformed file, this time with -profile set, to confirm both branches
+// now share one error message.
+func TestMalformedConfigWithProfileErrors(t *testing.T) {
+	path := writeConfigFile(t, "timeout: \"unterminated\n")
+
+	_, _, err := resolveConfigInput([]string{"-config", path, "-profile", "quick"})
+	if err == nil {
+		t.Fatal("expected an error for malformed yaml with -profile")
+	}
+	if !strings.Contains(err.Error(), "is not valid yaml") {
+		t.Errorf("expected a %q error, got: %s", "is not valid yaml", err)
+	}
+}
+
+// a well-formed -config file with no -profile must still apply normally;
+// routing it through the shared validator must not change this.
+func TestWellFormedConfigNoProfileStillApplies(t *testing.T) {
+	path := writeConfigFile(t, "threads: 25\n")
+	settings := parseWith(t, "-u", "x", "-config", path)
+
+	if settings.Threads != 25 {
+		t.Errorf("expected well-formed no-profile config threads=25, got %d", settings.Threads)
+	}
+}
+
 func TestRawFlagValue(t *testing.T) {
 	cases := []struct {
 		name string
