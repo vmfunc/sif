@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -117,7 +118,9 @@ func Favicon(targetURL string, timeout time.Duration, logdir string) (*FaviconRe
 // homepage html. it returns the url it pulled the bytes from so the report shows
 // exactly which icon was hashed.
 func fetchFavicon(client *http.Client, base string) (string, []byte, error) {
-	iconURL := base + "/favicon.ico"
+	// the well-known icon always lives at the origin root, so resolve it there
+	// rather than appending to a target that may carry a path.
+	iconURL := resolveFaviconURL(base, "/favicon.ico")
 	if data, err := getFaviconBytes(client, iconURL); err == nil {
 		return iconURL, data, nil
 	}
@@ -191,23 +194,18 @@ func declaredFaviconHref(client *http.Client, base string) (string, error) {
 }
 
 // resolveFaviconURL turns a possibly-relative href into an absolute url against
-// the target base. an absolute href is returned as-is.
+// the target base, browser-style (root-relative anchors at the origin, not the
+// target's path). unparsable input falls back to the raw href.
 func resolveFaviconURL(base, href string) string {
-	if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") {
+	baseURL, err := url.Parse(base)
+	if err != nil {
 		return href
 	}
-	if strings.HasPrefix(href, "//") {
-		// scheme-relative; inherit the base scheme.
-		scheme := "https:"
-		if strings.HasPrefix(base, "http://") {
-			scheme = "http:"
-		}
-		return scheme + href
+	ref, err := url.Parse(href)
+	if err != nil {
+		return href
 	}
-	if strings.HasPrefix(href, "/") {
-		return base + href
-	}
-	return base + "/" + href
+	return baseURL.ResolveReference(ref).String()
 }
 
 // ResultType identifies favicon findings for the result registry.

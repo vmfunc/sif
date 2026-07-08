@@ -110,6 +110,29 @@ func TestFavicon_NoIcon(t *testing.T) {
 	}
 }
 
+func TestResolveFaviconURL(t *testing.T) {
+	cases := []struct {
+		name string
+		base string
+		href string
+		want string
+	}{
+		// see resolveFaviconURL's doc comment (favicon.go) for the anchoring rule.
+		{"root-relative against pathful base", "https://example.com/app", "/favicon.ico", "https://example.com/favicon.ico"},
+		{"root-relative against bare base", "https://example.com", "/static/icon.png", "https://example.com/static/icon.png"},
+		{"absolute href kept", "https://example.com", "https://cdn.example.net/f.ico", "https://cdn.example.net/f.ico"},
+		{"scheme-relative inherits https", "https://example.com", "//cdn.example.net/f.ico", "https://cdn.example.net/f.ico"},
+		{"scheme-relative inherits http", "http://example.com", "//cdn.example.net/f.ico", "http://cdn.example.net/f.ico"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := resolveFaviconURL(tc.base, tc.href); got != tc.want {
+				t.Errorf("resolveFaviconURL(%q, %q) = %q, want %q", tc.base, tc.href, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestFaviconResult_ResultType(t *testing.T) {
 	r := &FaviconResult{}
 	if r.ResultType() != "favicon" {
