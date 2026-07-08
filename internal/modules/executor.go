@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/tidwall/gjson"
 	"github.com/vmfunc/sif/internal/httpx"
 )
@@ -91,8 +92,13 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 		return executeHTTPChain(ctx, client, target, def)
 	}
 
-	// Generate requests based on paths and payloads
-	requests, err := generateHTTPRequests(target, cfg)
+	// Resolve paths and payload sets up front (the only failing steps); the
+	// product itself is streamed and never materialized.
+	paths, err := resolvePaths(cfg)
+	if err != nil {
+		return nil, err
+	}
+	sets, err := resolveSets(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -106,43 +112,62 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 		threads = 10
 	}
 
-	// Execute requests concurrently
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	resultsChan := make(chan Finding, len(requests))
+	reqCh := make(chan *httpRequest)
+	resultCh := make(chan Finding)
 
-	// Limit concurrency
-	sem := make(chan struct{}, threads)
-
-	for _, req := range requests {
-		select {
-		case <-ctx.Done():
-			return result, ctx.Err()
-		case sem <- struct{}{}:
-		}
-
-		wg.Add(1)
-		go func(r *httpRequest) {
-			defer wg.Done()
-			defer func() { <-sem }()
-
-			finding, ok := executeHTTPRequest(ctx, client, r, cfg, def.Info.Severity)
-			if ok {
-				resultsChan <- finding
-			}
-		}(req)
-	}
-
-	// Collect results
+	// Producer: stream combinations into reqCh, stopping at the request budget
+	// (0 = unlimited) and logging a single truncation line. Watches ctx so a
+	// cancelled run stops pulling promptly.
 	go func() {
-		wg.Wait()
-		close(resultsChan)
+		defer close(reqCh)
+		var sent int
+		budget := opts.FuzzMaxRequests
+		for req := range streamRequests(target, cfg, paths, sets) {
+			if ctx.Err() != nil {
+				return
+			}
+			if budget > 0 && sent >= budget {
+				log.Warnf("fuzz: module %s hit the %d-request budget on %s (further combinations skipped)", def.ID, budget, target)
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case reqCh <- req:
+				sent++
+			}
+		}
 	}()
 
-	for finding := range resultsChan {
-		mu.Lock()
+	// Workers: a fixed pool pulling from reqCh; matches flow to resultCh.
+	var wg sync.WaitGroup
+	wg.Add(threads)
+	for i := 0; i < threads; i++ {
+		go func() {
+			defer wg.Done()
+			for r := range reqCh {
+				if ctx.Err() != nil {
+					return
+				}
+				if finding, ok := executeHTTPRequest(ctx, client, r, cfg, def.Info.Severity); ok {
+					select {
+					case <-ctx.Done():
+						return
+					case resultCh <- finding:
+					}
+				}
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	// Collector: single consumer owns result.Findings, so no mutex is needed.
+	for finding := range resultCh {
 		result.Findings = append(result.Findings, finding)
-		mu.Unlock()
 	}
 
 	return result, nil

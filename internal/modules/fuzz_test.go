@@ -13,13 +13,19 @@
 package modules
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"sync/atomic"
 	"testing"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/vmfunc/sif/internal/httpx"
 )
 
 // legacyPayloads builds the single anonymous set the sequence form desugars to,
@@ -169,5 +175,67 @@ func TestStreamRequestsHeaderSubstitution(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Headers["X-Token"] != "t-abc" {
 		t.Errorf("header not substituted: %+v", got[0].Headers)
+	}
+}
+
+func TestExecuteHTTPModuleBudgetTruncates(t *testing.T) {
+	var hits int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	// 10 x 10 = 100 combinations, capped at 15.
+	users := make([]string, 10)
+	passes := make([]string, 10)
+	for i := range users {
+		users[i] = string(rune('a' + i))
+		passes[i] = string(rune('0' + i))
+	}
+	def := &YAMLModule{
+		ID:   "fz",
+		Type: TypeHTTP,
+		HTTP: &HTTPConfig{
+			Paths: []string{"{{BaseURL}}/?u={{user}}&p={{pass}}"},
+			Payloads: PayloadSets{Sets: []PayloadSet{
+				{Name: "user", Values: users},
+				{Name: "pass", Values: passes},
+			}},
+			Matchers: []Matcher{{Type: "word", Part: "body", Words: []string{"ok"}}},
+		},
+	}
+	opts := Options{Timeout: testTimeout, Client: httpx.Client(testTimeout), FuzzMaxRequests: 15}
+	if _, err := ExecuteHTTPModule(context.Background(), srv.URL, def, opts); err != nil {
+		t.Fatalf("ExecuteHTTPModule: %v", err)
+	}
+	if got := atomic.LoadInt64(&hits); got != 15 {
+		t.Errorf("sent %d requests, want 15 (budget cap)", got)
+	}
+}
+
+func TestExecuteHTTPModuleBudgetUnlimited(t *testing.T) {
+	var hits int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	def := &YAMLModule{
+		ID:   "fz",
+		Type: TypeHTTP,
+		HTTP: &HTTPConfig{
+			Paths:    []string{"{{BaseURL}}/?p={{payload}}"},
+			Payloads: legacyPayloads([]string{"1", "2", "3", "4", "5"}),
+			Matchers: []Matcher{{Type: "word", Part: "body", Words: []string{"ok"}}},
+		},
+	}
+	opts := Options{Timeout: testTimeout, Client: httpx.Client(testTimeout), FuzzMaxRequests: 0}
+	if _, err := ExecuteHTTPModule(context.Background(), srv.URL, def, opts); err != nil {
+		t.Fatalf("ExecuteHTTPModule: %v", err)
+	}
+	if got := atomic.LoadInt64(&hits); got != 5 {
+		t.Errorf("sent %d requests, want 5 (0 = unlimited)", got)
 	}
 }
