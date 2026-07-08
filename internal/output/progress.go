@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"unicode/utf8"
 )
 
 // Progress bar configuration
@@ -174,11 +175,7 @@ func (p *Progress) render() {
 		}
 	}
 
-	// Truncate item if too long
-	maxItemLen := 30
-	if len(lastItem) > maxItemLen {
-		lastItem = lastItem[:maxItemLen-3] + "..."
-	}
+	lastItem = truncateItem(lastItem, 30)
 
 	// Format: [========>          ] 45% (4500/10000) /admin
 	line := fmt.Sprintf("    [%s] %3d%% (%d/%d) %s",
@@ -191,4 +188,23 @@ func (p *Progress) render() {
 
 	ClearLine()
 	fmt.Fprint(sink, line)
+}
+
+// truncateItem shortens item to at most limit columns for the progress line,
+// cutting on a rune boundary so a multibyte path never leaves a half-rune that
+// renders as a replacement glyph. width is counted in runes, not bytes.
+func truncateItem(item string, limit int) string {
+	if utf8.RuneCountInString(item) <= limit {
+		return item
+	}
+	runes := []rune(item)
+	// the ellipsis is 3 columns; a smaller cap can't hold it, so cut plainly and
+	// never let limit-3 go negative (a negative slice bound panics).
+	if limit < 3 {
+		if limit < 0 {
+			limit = 0
+		}
+		return string(runes[:limit])
+	}
+	return string(runes[:limit-3]) + "..."
 }

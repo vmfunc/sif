@@ -17,7 +17,39 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"unicode/utf8"
 )
+
+// see truncateItem's doc comment (progress.go) for why this must hold.
+func TestTruncateItemStaysValidUTF8(t *testing.T) {
+	item := strings.Repeat("é", 40) // 40 runes, 80 bytes, well over the cap
+	got := truncateItem(item, 30)
+	if !utf8.ValidString(got) {
+		t.Fatalf("truncateItem produced invalid utf-8: %q", got)
+	}
+	if !strings.HasSuffix(got, "...") {
+		t.Errorf("truncateItem dropped the ellipsis: %q", got)
+	}
+}
+
+// a cap smaller than the 3-column ellipsis must not panic on the limit-3 slice
+// bound; it falls back to a plain rune cut and honours the cap.
+func TestTruncateItemSmallLimit(t *testing.T) {
+	for _, tc := range []struct {
+		item  string
+		limit int
+		want  string
+	}{
+		{"abcdef", 2, "ab"},
+		{"abcdef", 0, ""},
+		{"héllo", 1, "h"},
+		{"abcdef", -1, ""},
+	} {
+		if got := truncateItem(tc.item, tc.limit); got != tc.want {
+			t.Errorf("truncateItem(%q, %d) = %q, want %q", tc.item, tc.limit, got, tc.want)
+		}
+	}
+}
 
 // the non-tty milestone path divides current*100/total, so a zero-total bar
 // used to panic with integer divide-by-zero when piped or redirected.

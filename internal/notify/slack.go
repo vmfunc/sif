@@ -60,17 +60,17 @@ func slackEscape(s string) string {
 }
 
 // codeBlock wraps body in a triple-backtick fence; both slack and discord render
-// it fixed-width, which preserves the column-aligned finding lines. finding text
-// is untrusted (a scraped html title can carry its own ``` run plus a @everyone),
-// so any triple-backtick inside the body is neutralized first: a run of three
-// would close the fence early and spill the tail out as live markdown.
+// it fixed-width, which preserves the column-aligned finding lines.
 func codeBlock(body string) string {
 	return "```\n" + fenceGuard(body) + "```"
 }
 
 // fenceGuard breaks every run of three backticks in s with zero-width spaces so
-// no ``` survives to terminate the surrounding fence. the inserted U+200B is
-// invisible in both slack and discord, so the finding lines still read cleanly.
+// no ``` survives to terminate the surrounding fence: finding text is untrusted
+// (a scraped html title can carry its own ``` run), and a run of three would
+// close the fence early and spill the tail out as live markdown. the inserted
+// U+200B is invisible in both slack and discord, so the finding lines still
+// read cleanly.
 func fenceGuard(s string) string {
 	return strings.ReplaceAll(s, "```", "`\u200b`\u200b`")
 }
