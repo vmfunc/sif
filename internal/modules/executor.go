@@ -487,7 +487,7 @@ func runExtractors(extractors []Extractor, resp *http.Response, body string) map
 					continue
 				}
 				matches := re.FindStringSubmatch(part)
-				if len(matches) > e.Group {
+				if e.Group >= 0 && len(matches) > e.Group {
 					result[e.Name] = matches[e.Group]
 					break
 				}

@@ -334,6 +334,14 @@ func TestRunExtractors(t *testing.T) {
 			wantNil: true,
 		},
 		{
+			// a negative group must be skipped, not panic on matches[-1].
+			name: "negative group is skipped",
+			extractors: []Extractor{
+				{Type: "regex", Name: "session", Part: "body", Regex: []string{`"session":"([^"]+)"`}, Group: -1},
+			},
+			wantNil: true,
+		},
+		{
 			name: "invalid pattern is skipped, no capture",
 			extractors: []Extractor{
 				{Type: "regex", Name: "session", Part: "body", Regex: []string{`(`}, Group: 1},
