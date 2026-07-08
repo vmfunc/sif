@@ -129,7 +129,7 @@ func TestExecuteHTTPModulePayloadExpansion(t *testing.T) {
 		Type: TypeHTTP,
 		HTTP: &HTTPConfig{
 			Paths:    []string{"{{BaseURL}}/search?q={{payload}}"},
-			Payloads: []string{"safe", "boom"},
+			Payloads: legacyPayloads([]string{"safe", "boom"}),
 			Matchers: []Matcher{
 				{Type: "word", Part: "body", Words: []string{"sql syntax"}},
 			},

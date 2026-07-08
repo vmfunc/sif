@@ -463,7 +463,7 @@ func TestGenerateHTTPRequests(t *testing.T) {
 		cfg := &HTTPConfig{
 			Method:   "POST",
 			Paths:    []string{"{{BaseURL}}/q?x={{payload}}"},
-			Payloads: []string{"1", "2", "3"},
+			Payloads: legacyPayloads([]string{"1", "2", "3"}),
 			Body:     "data={{payload}}",
 		}
 		got, err := generateHTTPRequests("http://h", cfg)
@@ -492,7 +492,7 @@ func TestGenerateHTTPRequests(t *testing.T) {
 	t.Run("multiple paths times multiple payloads", func(t *testing.T) {
 		cfg := &HTTPConfig{
 			Paths:    []string{"{{BaseURL}}/a", "{{BaseURL}}/b"},
-			Payloads: []string{"x", "y"},
+			Payloads: legacyPayloads([]string{"x", "y"}),
 		}
 		got, err := generateHTTPRequests("http://h", cfg)
 		if err != nil {
@@ -537,7 +537,7 @@ func TestGenerateHTTPRequests(t *testing.T) {
 		cfg := &HTTPConfig{
 			Paths:    []string{"{{BaseURL}}/{{word}}?q={{payload}}"},
 			Wordlist: list,
-			Payloads: []string{"1", "2", "3"},
+			Payloads: legacyPayloads([]string{"1", "2", "3"}),
 		}
 		got, err := generateHTTPRequests("http://h", cfg)
 		if err != nil {
