@@ -19,9 +19,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -237,5 +239,72 @@ func TestExecuteHTTPModuleBudgetUnlimited(t *testing.T) {
 	}
 	if got := atomic.LoadInt64(&hits); got != 5 {
 		t.Errorf("sent %d requests, want 5 (0 = unlimited)", got)
+	}
+}
+
+// TestExecuteHTTPModuleCancelMidStream is a regression guard for the fan-out
+// pool's two send-selects (producer -> reqCh, worker -> resultCh in
+// ExecuteHTTPModule). TestExecuteHTTPModuleContextCancel only ever passes an
+// already-cancelled context, so the producer returns at its up-front ctx.Err()
+// check and never reaches `select { case <-ctx.Done(): case reqCh <- req: }`.
+// Here the context is cancelled *while* requests are in flight: the server
+// blocks on the request's context so workers sit parked mid-request, the
+// producer keeps trying to push a large payload set through an unbuffered
+// reqCh with only 2 workers draining it, and cancel has to land on the
+// producer's send-select (not just the worker's). If either escape-hatch were
+// ever removed, this test would hang and fail via the time.After branch below
+// - there is no red phase, since the production code is already correct.
+func TestExecuteHTTPModuleCancelMidStream(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-time.After(3 * time.Second):
+		}
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	payloads := make([]string, 200)
+	for i := range payloads {
+		payloads[i] = string(rune('a'+(i%26))) + string(rune('0'+(i%10)))
+	}
+	def := &YAMLModule{
+		ID:   "fz-cancel-mid",
+		Type: TypeHTTP,
+		HTTP: &HTTPConfig{
+			Paths:    []string{"{{BaseURL}}/?p={{payload}}"},
+			Payloads: legacyPayloads(payloads),
+			Matchers: []Matcher{{Type: "word", Part: "body", Words: []string{"ok"}}},
+		},
+	}
+	opts := Options{Timeout: testTimeout, Client: httpx.Client(testTimeout), Threads: 2, FuzzMaxRequests: 0}
+
+	before := runtime.NumGoroutine()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(75 * time.Millisecond)
+		cancel()
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if _, err := ExecuteHTTPModule(ctx, srv.URL, def, opts); err != nil {
+			t.Errorf("ExecuteHTTPModule: %v", err)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ExecuteHTTPModule did not return promptly after mid-stream cancel")
+	}
+
+	// let any teardown goroutines settle, then check for leaks.
+	time.Sleep(200 * time.Millisecond)
+	runtime.GC()
+	if after := runtime.NumGoroutine(); after > before+2 {
+		t.Errorf("possible goroutine leak: before=%d after=%d", before, after)
 	}
 }
