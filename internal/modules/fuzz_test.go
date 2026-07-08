@@ -13,6 +13,8 @@
 package modules
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
@@ -67,9 +69,43 @@ func TestPayloadSetsValidation(t *testing.T) {
 	if err := yaml.Unmarshal([]byte("payloads:\n  BaseURL: [\"1\"]\n"), &HTTPConfig{}); err == nil {
 		t.Error("BaseURL set name accepted")
 	}
-	// file-backed set rejected in Task 1 (lifted in Task 2)
-	if err := yaml.Unmarshal([]byte("payloads:\n  p: creds.txt\n"), &HTTPConfig{}); err == nil {
-		t.Error("file-backed set accepted before Task 2")
+	// file-backed set now parses (loaded at resolve time)
+	if err := yaml.Unmarshal([]byte("payloads:\n  p: creds.txt\n"), &HTTPConfig{}); err != nil {
+		t.Errorf("file-backed set rejected: %v", err)
+	}
+}
+
+func TestResolveSetsLoadsFile(t *testing.T) {
+	dir := t.TempDir()
+	wl := filepath.Join(dir, "creds.txt")
+	if err := os.WriteFile(wl, []byte("admin\nroot\n\nguest\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &HTTPConfig{
+		Paths: []string{"{{BaseURL}}/?u={{user}}"},
+		Payloads: PayloadSets{Sets: []PayloadSet{
+			{Name: "user", File: wl},
+		}},
+	}
+	got, err := generateHTTPRequests("http://t", cfg)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	// loadWordlist skips the blank line, leaving 3 words.
+	want := []string{"http://t/?u=admin", "http://t/?u=guest", "http://t/?u=root"}
+	urls := reqURLs(got)
+	if !reflect.DeepEqual(urls, want) {
+		t.Errorf("file-set urls = %v, want %v", urls, want)
+	}
+}
+
+func TestResolveSetsMissingFile(t *testing.T) {
+	cfg := &HTTPConfig{
+		Paths:    []string{"{{BaseURL}}/?u={{user}}"},
+		Payloads: PayloadSets{Sets: []PayloadSet{{Name: "user", File: "/no/such/wordlist"}}},
+	}
+	if _, err := generateHTTPRequests("http://t", cfg); err == nil {
+		t.Error("missing wordlist accepted")
 	}
 }
 

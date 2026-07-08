@@ -257,11 +257,34 @@ func generateHTTPRequests(target string, cfg *HTTPConfig) ([]*httpRequest, error
 	if err != nil {
 		return nil, err
 	}
+	sets, err := resolveSets(cfg)
+	if err != nil {
+		return nil, err
+	}
 	var requests []*httpRequest
-	for req := range streamRequests(target, cfg, paths, cfg.Payloads.Sets) {
+	for req := range streamRequests(target, cfg, paths, sets) {
 		requests = append(requests, req)
 	}
 	return requests, nil
+}
+
+// resolveSets loads any file-backed payload sets into inline values, returning
+// the sets ready for streaming. It is the only place set resolution can fail.
+func resolveSets(cfg *HTTPConfig) ([]PayloadSet, error) {
+	sets := cfg.Payloads.Sets
+	out := make([]PayloadSet, len(sets))
+	for i, s := range sets {
+		if s.File == "" {
+			out[i] = s
+			continue
+		}
+		vals, err := loadWordlist(s.File)
+		if err != nil {
+			return nil, fmt.Errorf("payloads[%s]: %w", s.Name, err)
+		}
+		out[i] = PayloadSet{Name: s.Name, Values: vals}
+	}
+	return out, nil
 }
 
 // streamRequests lazily yields one *httpRequest per fuzz combination, so at

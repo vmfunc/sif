@@ -124,8 +124,9 @@ func (p *PayloadSets) UnmarshalYAML(value *yaml.Node) error {
 	return p.validate()
 }
 
-// validate rejects ambiguous or reserved set names. The file-backed rejection is
-// lifted in the file-set task once resolveSets can load them.
+// validate rejects ambiguous or reserved set names. A file-backed set (File
+// non-empty) parses cleanly here; resolveSets is where a missing or unreadable
+// wordlist actually fails.
 func (p PayloadSets) validate() error {
 	seen := make(map[string]struct{}, len(p.Sets))
 	for _, s := range p.Sets {
@@ -137,9 +138,6 @@ func (p PayloadSets) validate() error {
 			return fmt.Errorf("payloads: duplicate set name %q", s.Name)
 		}
 		seen[s.Name] = struct{}{}
-		if s.File != "" {
-			return fmt.Errorf("payloads[%s]: file-backed sets not yet supported", s.Name)
-		}
 	}
 	return nil
 }
