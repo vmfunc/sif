@@ -88,7 +88,9 @@ func Git(url string, timeout time.Duration, threads int, logdir string) ([]strin
 			return
 		}
 
-		if resp.StatusCode == 200 && !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+		// mime types are case-insensitive, so lowercase before matching or an
+		// html soft-404 sent as "Text/HTML" slips past the filter and reads as git.
+		if resp.StatusCode == 200 && !strings.HasPrefix(strings.ToLower(resp.Header.Get("Content-Type")), "text/html") {
 			spin.Stop()
 			log.Success("Git found at %s [%s]", output.Highlight.Render(repourl), output.Status.Render(strconv.Itoa(resp.StatusCode)))
 			spin.Start()
