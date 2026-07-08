@@ -58,10 +58,11 @@ type Info struct {
 
 // Options for module execution.
 type Options struct {
-	Timeout time.Duration
-	Threads int
-	LogDir  string
-	Client  *http.Client
+	Timeout         time.Duration
+	Threads         int
+	LogDir          string
+	FuzzMaxRequests int
+	Client          *http.Client
 }
 
 // Result from module execution.
