@@ -397,6 +397,41 @@ func TestExecuteHTTPModuleDSL(t *testing.T) {
 	}
 }
 
+// drives the full executor with a dsl matcher that references the Capitalized
+// URL-part vars, proving they are bound from the real request URL end-to-end
+// (not just in a unit-level MatchContext). Assertions are port-independent so
+// the ephemeral httptest port does not matter.
+func TestExecuteHTTPModuleDSLURLPartVars(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	def := &YAMLModule{
+		ID:   "dsl-urlpart-e2e",
+		Type: TypeHTTP,
+		Info: YAMLModuleInfo{Severity: "info"},
+		HTTP: &HTTPConfig{
+			Method: "GET",
+			Paths:  []string{"{{BaseURL}}/admin/panel"},
+			Matchers: []Matcher{{
+				Type: "dsl",
+				DSL:  []string{`Scheme == "http" && Host == "127.0.0.1" && Path == "/admin"`},
+			}},
+		},
+	}
+	opts := Options{Timeout: testTimeout, Client: httpx.Client(testTimeout)}
+
+	result, err := ExecuteHTTPModule(context.Background(), srv.URL, def, opts)
+	if err != nil {
+		t.Fatalf("ExecuteHTTPModule: %v", err)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("expected exactly 1 url-part dsl finding, got %d", len(result.Findings))
+	}
+}
+
 func TestTruncateEvidence(t *testing.T) {
 	short := "short evidence"
 	if got := truncateEvidence(short); got != short {

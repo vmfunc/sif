@@ -125,6 +125,59 @@ func TestCheckMatcherDSLHost(t *testing.T) {
 	}
 }
 
+func TestCheckMatcherDSLURLPartVars(t *testing.T) {
+	// each row pins one nuclei URL-part semantic (see dslVars); the values are
+	// deliberately counterintuitive, so this is the regression guard on parity.
+	mc := &MatchContext{
+		Resp: fakeResponse(t, 200, nil),
+		Body: "x",
+		URL:  "https://sub.example.com:8443/admin/login?q=1",
+	}
+	rows := []struct {
+		name string
+		expr string
+	}{
+		{"Scheme", `Scheme == "https"`},
+		{"Host is hostname without port", `Host == "sub.example.com"`},
+		{"Hostname carries the port", `Hostname == "sub.example.com:8443"`},
+		{"Port explicit", `Port == "8443"`},
+		{"Path is the directory", `Path == "/admin"`},
+		{"File is the last segment", `File == "login"`},
+		{"BaseURL is full url, query stripped", `BaseURL == "https://sub.example.com:8443/admin/login"`},
+		{"RootURL is scheme://host", `RootURL == "https://sub.example.com:8443"`},
+		{"Query", `Query == "?q=1"`},
+		{"FQDN", `FQDN == "sub.example.com"`},
+		{"RDN", `RDN == "example.com"`},
+		{"DN", `DN == "example"`},
+		{"TLD", `TLD == "com"`},
+		{"SD", `SD == "sub"`},
+	}
+	for _, tt := range rows {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &Matcher{Type: "dsl", DSL: []string{tt.expr}}
+			if !checkMatcher(m, mc) {
+				t.Errorf("expr %q should match, got a miss", tt.expr)
+			}
+		})
+	}
+}
+
+func TestCheckMatcherDSLPortDefaultsByScheme(t *testing.T) {
+	// Port defaults to the scheme's well-known port when the URL omits it,
+	// matching nuclei so `Port == "443"` works against a plain https target.
+	cases := []struct{ url, port string }{
+		{"https://example.com/", "443"},
+		{"http://example.com/", "80"},
+	}
+	for _, c := range cases {
+		mc := &MatchContext{Resp: fakeResponse(t, 200, nil), Body: "x", URL: c.url}
+		m := &Matcher{Type: "dsl", DSL: []string{`Port == "` + c.port + `"`}}
+		if !checkMatcher(m, mc) {
+			t.Errorf("%s: Port should default to %q", c.url, c.port)
+		}
+	}
+}
+
 func TestCheckMatcherDSLExtractorVar(t *testing.T) {
 	mc := &MatchContext{
 		Resp:      fakeResponse(t, 200, nil),

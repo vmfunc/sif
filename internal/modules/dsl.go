@@ -21,6 +21,7 @@ import (
 
 	"github.com/projectdiscovery/dsl"
 	"github.com/projectdiscovery/govaluate"
+	nucleiutils "github.com/projectdiscovery/nuclei/v3/pkg/protocols/utils"
 )
 
 // maxDSLExprLen bounds a single dsl expression. govaluate's Evaluate takes no
@@ -122,6 +123,12 @@ func dslVars(mc *MatchContext) map[string]interface{} {
 		"header":         headers,
 		"duration":       mc.Duration.Seconds(),
 		"host":           hostOf(mc.URL),
+	}
+	// the capitalized nuclei url-part vars, plus the dns ones. nuclei's own
+	// generator keeps them faithful: Host is the hostname without port while
+	// Hostname carries it, Path is the directory, Port defaults by scheme.
+	for k, v := range nucleiutils.GenerateVariables(mc.URL, false, nil) {
+		vars[k] = v
 	}
 	for k, v := range mc.Extracted {
 		vars[k] = v
