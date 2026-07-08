@@ -58,11 +58,16 @@ type dnsResolver interface {
 	Close()
 }
 
-// newDNSResolver builds a resolver over the bundled pool with the given timeout.
-// It is a package var so tests can supply a fake without touching the network.
-var newDNSResolver = func(timeout time.Duration) (dnsResolver, error) {
+// newDNSResolver builds a resolver over the given pool (falling back to the
+// bundled default when it is empty) with the given timeout. It is a package var
+// so tests can supply a fake without touching the network.
+var newDNSResolver = func(resolvers []string, timeout time.Duration) (dnsResolver, error) {
+	pool := resolvers
+	if len(pool) == 0 {
+		pool = defaultDNSResolvers
+	}
 	opts := retryabledns.Options{
-		BaseResolvers: defaultDNSResolvers,
+		BaseResolvers: pool,
 		MaxRetries:    dnsMaxRetries,
 	}
 	if timeout > 0 {
@@ -118,7 +123,7 @@ func ExecuteDNSModule(ctx context.Context, target string, def *YAMLModule, opts 
 		return nil, fmt.Errorf("unsupported dns record type %q", cfg.Type)
 	}
 
-	resolver, err := newDNSResolver(opts.Timeout)
+	resolver, err := newDNSResolver(opts.Resolvers, opts.Timeout)
 	if err != nil {
 		return nil, err
 	}

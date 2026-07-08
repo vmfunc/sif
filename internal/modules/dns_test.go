@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -47,13 +48,35 @@ func withFakeDNS(t *testing.T, data *retryabledns.DNSData, queryErr error) *fake
 	t.Helper()
 	f := &fakeDNSResolver{data: data, err: queryErr}
 	orig := newDNSResolver
-	newDNSResolver = func(time.Duration) (dnsResolver, error) { return f, nil }
+	newDNSResolver = func([]string, time.Duration) (dnsResolver, error) { return f, nil }
 	t.Cleanup(func() { newDNSResolver = orig })
 	return f
 }
 
 func wordMatcher(part string, words ...string) Matcher {
 	return Matcher{Type: "word", Part: part, Words: words}
+}
+
+// TestExecuteDNSModulePassesResolvers proves the executor hands the caller's
+// resolver pool (from -resolvers via Options) to the resolver builder, rather
+// than silently using the bundled public pool.
+func TestExecuteDNSModulePassesResolvers(t *testing.T) {
+	var gotResolvers []string
+	orig := newDNSResolver
+	newDNSResolver = func(resolvers []string, _ time.Duration) (dnsResolver, error) {
+		gotResolvers = resolvers
+		return &fakeDNSResolver{data: &retryabledns.DNSData{StatusCode: "NOERROR"}}, nil
+	}
+	t.Cleanup(func() { newDNSResolver = orig })
+
+	def := dnsDef(&DNSConfig{Type: "a", Matchers: []Matcher{wordMatcher("rcode", "NOERROR")}})
+	want := []string{"127.0.0.1:5353", "10.0.0.53:53"}
+	if _, err := ExecuteDNSModule(context.Background(), "example.com", def, Options{Resolvers: want}); err != nil {
+		t.Fatalf("ExecuteDNSModule: %v", err)
+	}
+	if !reflect.DeepEqual(gotResolvers, want) {
+		t.Errorf("resolver pool = %v, want %v", gotResolvers, want)
+	}
 }
 
 func dnsDef(cfg *DNSConfig) *YAMLModule {
@@ -294,7 +317,7 @@ func TestExecuteDNSModuleResolverError(t *testing.T) {
 
 func TestExecuteDNSModuleResolverBuildError(t *testing.T) {
 	orig := newDNSResolver
-	newDNSResolver = func(time.Duration) (dnsResolver, error) { return nil, fmt.Errorf("build failed") }
+	newDNSResolver = func([]string, time.Duration) (dnsResolver, error) { return nil, fmt.Errorf("build failed") }
 	t.Cleanup(func() { newDNSResolver = orig })
 
 	def := dnsDef(&DNSConfig{Type: "a", Matchers: []Matcher{wordMatcher("rcode", "x")}})
@@ -390,7 +413,7 @@ func TestParseDNSValidation(t *testing.T) {
 }
 
 func TestNewDNSResolverBuildsClient(t *testing.T) {
-	r, err := newDNSResolver(2 * time.Second)
+	r, err := newDNSResolver(nil, 2*time.Second)
 	if err != nil {
 		t.Fatalf("newDNSResolver: %v", err)
 	}
