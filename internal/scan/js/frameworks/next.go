@@ -34,8 +34,11 @@ import (
 	"github.com/vmfunc/sif/internal/httpx"
 )
 
-// nextPagesRegex matches JavaScript file references in Next.js build manifest.
-var nextPagesRegex = regexp.MustCompile(`\[("([^"]+\.js)"(,?))`)
+// nextPagesRegex matches chunk paths in a Next.js build manifest. anchoring
+// on the opening bracket dropped every chunk but the first in a route's
+// array; matching any quoted .js literal instead would pull in non-chunk
+// strings like __rewrites destinations, so we require the static/ chunk shape.
+var nextPagesRegex = regexp.MustCompile(`"(static(?:\\u002[fF]|/)[^"]+\.js)"`)
 
 // maxManifestSize caps the build manifest read so a huge or hostile file
 // cannot exhaust memory.
@@ -76,7 +79,7 @@ func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
 	var scripts []string
 
 	for _, el := range list {
-		var script = strings.ReplaceAll(el[2], "\\u002F", "/")
+		var script = strings.ReplaceAll(el[1], "\\u002F", "/")
 		url, err := urlutil.Parse(script)
 		if err != nil {
 			continue
