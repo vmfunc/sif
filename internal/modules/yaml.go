@@ -88,7 +88,12 @@ func ParseYAMLModule(path string) (*YAMLModule, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read module file: %w", err)
 	}
+	return parseYAMLModuleBytes(data)
+}
 
+// parseYAMLModuleBytes unmarshals and validates a module definition from raw
+// bytes. ParseYAMLModule wraps it after reading the file off disk.
+func parseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 	var ym YAMLModule
 	if err := yaml.Unmarshal(data, &ym); err != nil {
 		return nil, fmt.Errorf("parse yaml: %w", err)
