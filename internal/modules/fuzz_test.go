@@ -301,10 +301,19 @@ func TestExecuteHTTPModuleCancelMidStream(t *testing.T) {
 		t.Fatal("ExecuteHTTPModule did not return promptly after mid-stream cancel")
 	}
 
-	// let any teardown goroutines settle, then check for leaks.
-	time.Sleep(200 * time.Millisecond)
-	runtime.GC()
-	if after := runtime.NumGoroutine(); after > before+2 {
-		t.Errorf("possible goroutine leak: before=%d after=%d", before, after)
+	// poll for goroutines to drain rather than a single fixed sleep, so a
+	// slow teardown on a loaded runner does not read as a leak.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		runtime.GC()
+		after := runtime.NumGoroutine()
+		if after <= before+2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Errorf("possible goroutine leak: before=%d after=%d", before, after)
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }

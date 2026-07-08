@@ -102,6 +102,11 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 	if err != nil {
 		return nil, err
 	}
+	for _, s := range sets {
+		if len(s.Values) == 0 {
+			log.Warnf("fuzz: module %s has empty payload set %q on %s; no requests sent", def.ID, s.Name, target)
+		}
+	}
 
 	// Determine thread count
 	threads := cfg.Threads
@@ -408,7 +413,7 @@ func newFuzzRequest(method, target, path string, vars map[string]string, cfg *HT
 	sub := func(s string) string { return substituteVariablesWithVars(s, target, pv, vars) }
 
 	headers := cfg.Headers
-	if len(vars) > 0 && len(cfg.Headers) > 0 {
+	if len(cfg.Headers) > 0 {
 		headers = make(map[string]string, len(cfg.Headers))
 		for k, v := range cfg.Headers {
 			headers[k] = sub(v)
