@@ -159,6 +159,41 @@ func TestWebhookPayloadShape(t *testing.T) {
 	}
 }
 
+// a finding title carrying a triple-backtick run (e.g. a scraped html <title>)
+// must not terminate the code fence early: if it does, the trailing text lands
+// outside the block and a "@everyone" rides through as a live mention.
+func TestCodeBlockFindingCannotBreakFence(t *testing.T) {
+	for _, title := range []string{"``` @everyone", "````", "a``````b"} {
+		findings := []finding.Finding{
+			{Target: "https://evil.test", Module: "cms", Severity: finding.SeverityInfo, Key: "cms:t", Title: title},
+		}
+		content := codeBlock(renderFindings(findings))
+		// the only ``` runs are the wrapper's opener and closer; any surviving in
+		// the body would split the fence open and spill the tail as live markdown.
+		if n := strings.Count(content, "```"); n != 2 {
+			t.Fatalf("title %q broke the fence: found %d ``` runs, want 2\n%s", title, n, content)
+		}
+	}
+}
+
+// slack parses its angle-bracket entities (broadcast mentions <!channel> and
+// user mentions <@U..>) even inside a code fence, so the fence cannot contain
+// them. the slack sink must html-escape &, < and > first: a title of
+// "<!channel>" must not survive as a live entity in the payload.
+func TestSlackEscapesBroadcastMention(t *testing.T) {
+	for _, title := range []string{"<!channel>", "<!everyone>", "<@U0>", "<!here> a&b"} {
+		findings := []finding.Finding{
+			{Target: "https://evil.test", Module: "cms", Severity: finding.SeverityInfo, Key: "cms:t", Title: title},
+		}
+		text := slackText(findings)
+		// codeBlock adds only backticks, so any raw < or > left in the payload is
+		// an unescaped entity that slack would parse as a live mention.
+		if strings.ContainsAny(text, "<>") {
+			t.Fatalf("title %q left a live angle bracket in slack payload:\n%s", title, text)
+		}
+	}
+}
+
 func TestProviderNon2xxIsError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
