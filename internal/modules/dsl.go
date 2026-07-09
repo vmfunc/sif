@@ -124,6 +124,11 @@ func dslVars(mc *MatchContext) map[string]interface{} {
 		"duration":       mc.Duration.Seconds(),
 		"host":           hostOf(mc.URL),
 	}
+	// a non-http module's typed builtins sit at the same tier as the vars above,
+	// so a named extractor can shadow one deliberately.
+	for k, v := range mc.Extra {
+		vars[k] = v
+	}
 	// the capitalized nuclei url-part vars, plus the dns ones. nuclei's own
 	// generator keeps them faithful: Host is the hostname without port while
 	// Hostname carries it, Path is the directory, Port defaults by scheme.

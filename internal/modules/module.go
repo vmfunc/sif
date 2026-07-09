@@ -28,6 +28,7 @@ const (
 	TypeHTTP        ModuleType = "http"
 	TypeDNS         ModuleType = "dns"
 	TypeTCP         ModuleType = "tcp"
+	TypeSSL         ModuleType = "ssl"
 	TypeScript      ModuleType = "script"
 	TypeFingerprint ModuleType = "fingerprint"
 )
@@ -121,6 +122,9 @@ type MatchContext struct {
 	Body     string
 	URL      string
 	Duration time.Duration
+	// Extra holds typed builtins a non-http module contributes, such as an ssl
+	// module's expired/self_signed bools.
+	Extra map[string]interface{}
 	// Extracted is the running variable set in a request chain, so it also
 	// carries earlier steps' values.
 	Extracted map[string]string
