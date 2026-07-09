@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -36,6 +37,45 @@ import (
 // yet implemented. Returning it (rather than an empty result) keeps callers
 // from mistaking "not implemented" for "scanned, found nothing".
 var ErrUnsupportedModuleType = errors.New("unsupported module type")
+
+// FuzzBudget is a scan-wide ceiling on total fuzz requests shared by every
+// fuzzing module's producer across every module and target in one scan run,
+// on top of each module's own FuzzMaxRequests. A nil *FuzzBudget is always
+// unlimited, so callers never need to nil-check before use.
+type FuzzBudget struct {
+	max    int64
+	sent   atomic.Int64
+	warned atomic.Bool
+}
+
+// NewFuzzBudget returns a budget shared across a scan, capped at max total
+// fuzz requests. max <= 0 means unlimited, in which case NewFuzzBudget
+// returns nil so Reserve is a no-op cap check.
+func NewFuzzBudget(maxRequests int) *FuzzBudget {
+	if maxRequests <= 0 {
+		return nil
+	}
+	return &FuzzBudget{max: int64(maxRequests)}
+}
+
+// Reserve claims one request against the budget and reports whether it fit.
+// Safe for concurrent use by any number of producers across modules and
+// targets; a nil receiver (unlimited) always reports true.
+func (b *FuzzBudget) Reserve() bool {
+	if b == nil {
+		return true
+	}
+	return b.sent.Add(1) <= b.max
+}
+
+// warnOnce logs the scan-wide exhaustion line exactly once no matter how many
+// producers hit it concurrently, so N truncated modules produce one log line
+// instead of N.
+func (b *FuzzBudget) warnOnce(moduleID, target string) {
+	if b.warned.CompareAndSwap(false, true) {
+		log.Warnf("fuzz: scan-wide budget of %d requests exhausted (module %s on %s hit it; further fuzz requests across all modules are skipped)", b.max, moduleID, target)
+	}
+}
 
 // httpRequest represents a generated HTTP request.
 type httpRequest struct {
@@ -133,6 +173,10 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 			}
 			if budget > 0 && sent >= budget {
 				log.Warnf("fuzz: module %s hit the %d-request budget on %s (further combinations skipped)", def.ID, budget, target)
+				return
+			}
+			if !opts.FuzzGlobalBudget.Reserve() {
+				opts.FuzzGlobalBudget.warnOnce(def.ID, target)
 				return
 			}
 			select {

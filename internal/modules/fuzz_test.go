@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"runtime"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -351,5 +352,156 @@ func TestStreamRequestsEmptySetYieldsNothing(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("empty payload set produced %d requests (%v), want none", len(got), reqURLs(got))
+	}
+}
+
+// fuzzBudgetModule builds a distinct HTTP fuzz module with its own payload
+// set, all sharing one target server, for the global-budget tests below.
+func fuzzBudgetModule(id string, n int) *YAMLModule {
+	vals := make([]string, n)
+	for i := range vals {
+		vals[i] = string(rune('a'+(i%26))) + string(rune('0'+(i%10))) + string(rune('A'+(i%26)))
+	}
+	return &YAMLModule{
+		ID:   id,
+		Type: TypeHTTP,
+		HTTP: &HTTPConfig{
+			Paths:    []string{"{{BaseURL}}/?p={{payload}}"},
+			Payloads: legacyPayloads(vals),
+			Matchers: []Matcher{{Type: "word", Part: "body", Words: []string{"ok"}}},
+		},
+	}
+}
+
+// TestFuzzBudgetCapsAcrossConcurrentModules proves the global budget is a
+// single shared ceiling: two modules, each with plenty of payloads and no
+// per-module cap of their own, run concurrently against one target and the
+// server sees exactly the global budget's worth of requests in total, not
+// per module. Reserve's atomic add-then-compare means exactly `max` calls
+// across both producers see success, so the total is exact, not just <=.
+func TestFuzzBudgetCapsAcrossConcurrentModules(t *testing.T) {
+	var hits int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	budget := NewFuzzBudget(30)
+	opts := Options{
+		Timeout:          testTimeout,
+		Client:           httpx.Client(testTimeout),
+		FuzzMaxRequests:  0, // unlimited per module: the global budget is the only cap in play
+		FuzzGlobalBudget: budget,
+	}
+
+	modA := fuzzBudgetModule("fz-a", 100)
+	modB := fuzzBudgetModule("fz-b", 100)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	for _, m := range []*YAMLModule{modA, modB} {
+		m := m
+		go func() {
+			defer wg.Done()
+			if _, err := ExecuteHTTPModule(context.Background(), srv.URL, m, opts); err != nil {
+				t.Errorf("ExecuteHTTPModule(%s): %v", m.ID, err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := atomic.LoadInt64(&hits); got != 30 {
+		t.Errorf("sent %d requests across both modules, want 30 (shared global budget)", got)
+	}
+}
+
+// TestFuzzBudgetExhaustionNoDeadlock is a regression guard: a global budget
+// small enough to exhaust mid-stream, shared by several concurrently running
+// modules each with their own worker pool, must not deadlock or panic any
+// module's producer/worker/collector - every ExecuteHTTPModule call must
+// still return promptly once its producer sees the budget is spent.
+func TestFuzzBudgetExhaustionNoDeadlock(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	budget := NewFuzzBudget(5)
+	opts := Options{
+		Timeout:          testTimeout,
+		Client:           httpx.Client(testTimeout),
+		Threads:          4,
+		FuzzGlobalBudget: budget,
+	}
+
+	const numModules = 6
+	mods := make([]*YAMLModule, numModules)
+	for i := range mods {
+		mods[i] = fuzzBudgetModule(string(rune('A'+i)), 50)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		var wg sync.WaitGroup
+		wg.Add(numModules)
+		for _, m := range mods {
+			m := m
+			go func() {
+				defer wg.Done()
+				if _, err := ExecuteHTTPModule(context.Background(), srv.URL, m, opts); err != nil {
+					t.Errorf("ExecuteHTTPModule(%s): %v", m.ID, err)
+				}
+			}()
+		}
+		wg.Wait()
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("modules did not return after global budget exhaustion; possible deadlock")
+	}
+}
+
+// TestFuzzBudgetNilIsUnlimited pins the nil-receiver contract (a zero-value
+// Options.FuzzGlobalBudget) so a caller that never sets it - every existing
+// test in this file - keeps seeing unlimited behavior.
+func TestFuzzBudgetNilIsUnlimited(t *testing.T) {
+	var b *FuzzBudget
+	for i := 0; i < 1000; i++ {
+		if !b.Reserve() {
+			t.Fatalf("nil budget refused reservation %d, want always true", i)
+		}
+	}
+}
+
+// TestNewFuzzBudgetUnlimited pins the nil-means-unlimited contract from both
+// ends: the constructor returns nil for a non-positive cap, and a nil budget
+// keeps reserving forever. A nil check missing from Reserve would panic on
+// every scan run with the flag set to 0.
+func TestNewFuzzBudgetUnlimited(t *testing.T) {
+	for _, max := range []int{0, -1, -1000} {
+		if b := NewFuzzBudget(max); b != nil {
+			t.Errorf("NewFuzzBudget(%d) = %+v, want nil (unlimited)", max, b)
+		}
+	}
+
+	var unlimited *FuzzBudget
+	for i := 0; i < 1000; i++ {
+		if !unlimited.Reserve() {
+			t.Fatalf("nil budget refused a reservation at attempt %d", i+1)
+		}
+	}
+
+	limited := NewFuzzBudget(2)
+	for i := 1; i <= 2; i++ {
+		if !limited.Reserve() {
+			t.Fatalf("budget of 2 refused reservation %d", i)
+		}
+	}
+	if limited.Reserve() {
+		t.Error("budget of 2 allowed a third reservation")
 	}
 }

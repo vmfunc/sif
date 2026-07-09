@@ -45,9 +45,10 @@ import (
 // App represents the main application structure for sif.
 // It encapsulates the configuration settings, target URLs, and logging information.
 type App struct {
-	settings *config.Settings
-	targets  []string
-	logFiles []string
+	settings   *config.Settings
+	targets    []string
+	logFiles   []string
+	fuzzBudget *modules.FuzzBudget // scan-wide fuzz request cap, shared read-only across every concurrent scanTarget call
 }
 
 // Version is set by main to the resolved build version and shown on the banner.
@@ -87,7 +88,7 @@ func NewModuleResult[T ScanResult](data T) ModuleResult {
 //
 // Errors if no targets are supplied through URLs or File.
 func New(settings *config.Settings) (*App, error) {
-	app := &App{settings: settings}
+	app := &App{settings: settings, fuzzBudget: modules.NewFuzzBudget(settings.FuzzGlobalMaxRequests)}
 
 	// -silent reroutes all chrome to stderr (and suppresses spinners) before the
 	// banner prints, so stdout carries nothing but findings even on the banner.
@@ -761,11 +762,12 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 			// -proxy/-H/-cookie/-rate-limit apply to module scans the same as every
 			// other scanner instead of each module dialing out on a bare client.
 			opts := modules.Options{
-				Timeout:         app.settings.Timeout,
-				Threads:         app.settings.Threads,
-				LogDir:          app.settings.LogDir,
-				Client:          httpx.Client(app.settings.Timeout),
-				FuzzMaxRequests: app.settings.FuzzMaxRequests,
+				Timeout:          app.settings.Timeout,
+				Threads:          app.settings.Threads,
+				LogDir:           app.settings.LogDir,
+				Client:           httpx.Client(app.settings.Timeout),
+				FuzzMaxRequests:  app.settings.FuzzMaxRequests,
+				FuzzGlobalBudget: app.fuzzBudget,
 			}
 
 			for _, m := range toRun {
