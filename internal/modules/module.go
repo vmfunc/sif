@@ -62,10 +62,8 @@ type Options struct {
 	Threads         int
 	LogDir          string
 	FuzzMaxRequests int
-	// FuzzGlobalBudget is a scan-wide request cap shared by every fuzzing
-	// module's producer, across every module and target in the scan run.
-	// nil means unlimited; the caller constructs one shared instance and
-	// reuses it for the whole run.
+	// FuzzGlobalBudget is a scan-wide request cap shared across every
+	// module/target; nil means unlimited.
 	FuzzGlobalBudget *FuzzBudget
 	Client           *http.Client
 }

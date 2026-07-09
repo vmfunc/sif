@@ -60,7 +60,7 @@ type HTTPConfig struct {
 	Payloads          PayloadSets       `yaml:"payloads,omitempty"`
 	Headers           map[string]string `yaml:"headers,omitempty"`
 	Body              string            `yaml:"body,omitempty"`
-	Attack            string            `yaml:"attack,omitempty"` // clusterbomb (default), pitchfork
+	Attack            string            `yaml:"attack,omitempty"` // clusterbomb (default), pitchfork, batteringram
 	Threads           int               `yaml:"threads,omitempty"`
 	DisableRedirects  bool              `yaml:"disable-redirects,omitempty"` // stop at the first response; don't follow 3xx
 	Matchers          []Matcher         `yaml:"matchers"`

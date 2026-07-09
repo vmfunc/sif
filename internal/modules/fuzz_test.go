@@ -164,6 +164,71 @@ func TestStreamRequestsMultiSetPitchfork(t *testing.T) {
 	}
 }
 
+func TestStreamRequestsBatteringram(t *testing.T) {
+	cfg := &HTTPConfig{
+		Attack: "batteringram",
+		Paths:  []string{"{{BaseURL}}/x?u={{user}}&p={{pass}}"},
+		Payloads: PayloadSets{Sets: []PayloadSet{
+			{Name: "user", Values: []string{"a", "b", "c"}},
+			{Name: "pass", Values: []string{"1", "2", "3"}},
+		}},
+	}
+	got, err := generateHTTPRequests("http://t", cfg)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	// every position gets the same value per iteration, from the first set,
+	// and it iterates the full set length rather than crossing user x pass.
+	want := []string{
+		"http://t/x?u=a&p=a", "http://t/x?u=b&p=b", "http://t/x?u=c&p=c",
+	}
+	urls := reqURLs(got)
+	sort.Strings(want)
+	if !reflect.DeepEqual(urls, want) {
+		t.Errorf("batteringram urls = %v, want %v", urls, want)
+	}
+	if len(got) != 3 {
+		t.Errorf("batteringram sent %d requests, want 3 (set length, not a cross-product)", len(got))
+	}
+}
+
+func TestStreamRequestsBatteringramCrossesPaths(t *testing.T) {
+	cfg := &HTTPConfig{
+		Attack: "batteringram",
+		Paths:  []string{"{{BaseURL}}/a?p={{payload}}", "{{BaseURL}}/b?p={{payload}}"},
+		Payloads: PayloadSets{Sets: []PayloadSet{
+			{Name: "payload", Values: []string{"1", "2"}},
+		}},
+	}
+	got, err := generateHTTPRequests("http://t", cfg)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	want := []string{
+		"http://t/a?p=1", "http://t/a?p=2", "http://t/b?p=1", "http://t/b?p=2",
+	}
+	urls := reqURLs(got)
+	sort.Strings(want)
+	if !reflect.DeepEqual(urls, want) {
+		t.Errorf("batteringram urls = %v, want %v", urls, want)
+	}
+}
+
+func TestStreamRequestsBatteringramEmptySet(t *testing.T) {
+	cfg := &HTTPConfig{
+		Attack:   "batteringram",
+		Paths:    []string{"{{BaseURL}}/"},
+		Payloads: PayloadSets{Sets: []PayloadSet{{Name: "payload", Values: nil}}},
+	}
+	got, err := generateHTTPRequests("http://t", cfg)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("empty set sent %d requests, want 0", len(got))
+	}
+}
+
 func TestStreamRequestsHeaderSubstitution(t *testing.T) {
 	cfg := &HTTPConfig{
 		Paths:   []string{"{{BaseURL}}/"},
@@ -357,6 +422,7 @@ func TestStreamRequestsEmptySetYieldsNothing(t *testing.T) {
 
 // fuzzBudgetModule builds a distinct HTTP fuzz module with its own payload
 // set, all sharing one target server, for the global-budget tests below.
+// fuzzBudgetModule builds a distinct HTTP fuzz module with its own payload set.
 func fuzzBudgetModule(id string, n int) *YAMLModule {
 	vals := make([]string, n)
 	for i := range vals {
@@ -373,12 +439,8 @@ func fuzzBudgetModule(id string, n int) *YAMLModule {
 	}
 }
 
-// TestFuzzBudgetCapsAcrossConcurrentModules proves the global budget is a
-// single shared ceiling: two modules, each with plenty of payloads and no
-// per-module cap of their own, run concurrently against one target and the
-// server sees exactly the global budget's worth of requests in total, not
-// per module. Reserve's atomic add-then-compare means exactly `max` calls
-// across both producers see success, so the total is exact, not just <=.
+// two modules with no per-module cap, run concurrently, must together send
+// exactly the global budget's worth of requests, not per module.
 func TestFuzzBudgetCapsAcrossConcurrentModules(t *testing.T) {
 	var hits int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -416,11 +478,8 @@ func TestFuzzBudgetCapsAcrossConcurrentModules(t *testing.T) {
 	}
 }
 
-// TestFuzzBudgetExhaustionNoDeadlock is a regression guard: a global budget
-// small enough to exhaust mid-stream, shared by several concurrently running
-// modules each with their own worker pool, must not deadlock or panic any
-// module's producer/worker/collector - every ExecuteHTTPModule call must
-// still return promptly once its producer sees the budget is spent.
+// a budget exhausted mid-stream, shared by several concurrent modules, must
+// not deadlock; every ExecuteHTTPModule call returns promptly.
 func TestFuzzBudgetExhaustionNoDeadlock(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("ok"))
@@ -465,9 +524,7 @@ func TestFuzzBudgetExhaustionNoDeadlock(t *testing.T) {
 	}
 }
 
-// TestFuzzBudgetNilIsUnlimited pins the nil-receiver contract (a zero-value
-// Options.FuzzGlobalBudget) so a caller that never sets it - every existing
-// test in this file - keeps seeing unlimited behavior.
+// a caller that never sets Options.FuzzGlobalBudget keeps seeing unlimited.
 func TestFuzzBudgetNilIsUnlimited(t *testing.T) {
 	var b *FuzzBudget
 	for i := 0; i < 1000; i++ {

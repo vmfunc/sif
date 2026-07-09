@@ -38,19 +38,16 @@ import (
 // from mistaking "not implemented" for "scanned, found nothing".
 var ErrUnsupportedModuleType = errors.New("unsupported module type")
 
-// FuzzBudget is a scan-wide ceiling on total fuzz requests shared by every
-// fuzzing module's producer across every module and target in one scan run,
-// on top of each module's own FuzzMaxRequests. A nil *FuzzBudget is always
-// unlimited, so callers never need to nil-check before use.
+// FuzzBudget is a scan-wide ceiling on fuzz requests shared by every
+// module's producer, on top of each module's own FuzzMaxRequests. A nil
+// *FuzzBudget is always unlimited, so callers never need to nil-check.
 type FuzzBudget struct {
 	max    int64
 	sent   atomic.Int64
 	warned atomic.Bool
 }
 
-// NewFuzzBudget returns a budget shared across a scan, capped at max total
-// fuzz requests. max <= 0 means unlimited, in which case NewFuzzBudget
-// returns nil so Reserve is a no-op cap check.
+// NewFuzzBudget returns nil (unlimited) for maxRequests <= 0.
 func NewFuzzBudget(maxRequests int) *FuzzBudget {
 	if maxRequests <= 0 {
 		return nil
@@ -59,8 +56,7 @@ func NewFuzzBudget(maxRequests int) *FuzzBudget {
 }
 
 // Reserve claims one request against the budget and reports whether it fit.
-// Safe for concurrent use by any number of producers across modules and
-// targets; a nil receiver (unlimited) always reports true.
+// Safe for concurrent use; a nil receiver always reports true.
 func (b *FuzzBudget) Reserve() bool {
 	if b == nil {
 		return true
@@ -68,9 +64,8 @@ func (b *FuzzBudget) Reserve() bool {
 	return b.sent.Add(1) <= b.max
 }
 
-// warnOnce logs the scan-wide exhaustion line exactly once no matter how many
-// producers hit it concurrently, so N truncated modules produce one log line
-// instead of N.
+// warnOnce logs the exhaustion line exactly once no matter how many
+// producers hit it concurrently.
 func (b *FuzzBudget) warnOnce(moduleID, target string) {
 	if b.warned.CompareAndSwap(false, true) {
 		log.Warnf("fuzz: scan-wide budget of %d requests exhausted (module %s on %s hit it; further fuzz requests across all modules are skipped)", b.max, moduleID, target)
@@ -364,7 +359,8 @@ func resolveSets(cfg *HTTPConfig) ([]PayloadSet, error) {
 // streamRequests lazily yields one *httpRequest per fuzz combination, so at
 // most one combination exists at a time. clusterbomb crosses paths against
 // every set as a nested odometer, rightmost fastest; pitchfork zips them by
-// index and stops at the shortest.
+// index and stops at the shortest; batteringram broadcasts one value from the
+// first set to every position, stopping at that set's length.
 func streamRequests(target string, cfg *HTTPConfig, paths []string, sets []PayloadSet) iter.Seq[*httpRequest] {
 	method := cfg.Method
 	if method == "" {
@@ -391,6 +387,24 @@ func streamRequests(target string, cfg *HTTPConfig, paths []string, sets []Paylo
 				}
 				if !yield(newFuzzRequest(method, target, paths[i], vars, cfg)) {
 					return
+				}
+			}
+			return
+		}
+
+		if strings.EqualFold(cfg.Attack, "batteringram") {
+			if len(sets) == 0 || len(sets[0].Values) == 0 {
+				return
+			}
+			for _, path := range paths {
+				for _, v := range sets[0].Values {
+					vars := make(map[string]string, len(sets))
+					for _, s := range sets {
+						vars[s.Name] = v
+					}
+					if !yield(newFuzzRequest(method, target, path, vars, cfg)) {
+						return
+					}
 				}
 			}
 			return
@@ -550,14 +564,14 @@ func loadWordlist(path string) ([]string, error) {
 	return words, nil
 }
 
-// validateAttack rejects an attack mode that is not "", "clusterbomb", or
-// "pitchfork"; an empty value defaults to clusterbomb.
+// validateAttack rejects an attack mode that is not "", "clusterbomb",
+// "pitchfork", or "batteringram"; an empty value defaults to clusterbomb.
 func validateAttack(attack string) error {
 	switch strings.ToLower(attack) {
-	case "", "clusterbomb", "pitchfork":
+	case "", "clusterbomb", "pitchfork", "batteringram":
 		return nil
 	default:
-		return fmt.Errorf("invalid attack %q (want \"clusterbomb\" or \"pitchfork\")", attack)
+		return fmt.Errorf("invalid attack %q (want \"clusterbomb\", \"pitchfork\", or \"batteringram\")", attack)
 	}
 }
 

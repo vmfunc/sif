@@ -75,12 +75,12 @@ func TestGenerateHTTPRequestsAttack(t *testing.T) {
 }
 
 func TestValidateAttack(t *testing.T) {
-	for _, ok := range []string{"", "clusterbomb", "pitchfork", "Pitchfork", "CLUSTERBOMB"} {
+	for _, ok := range []string{"", "clusterbomb", "pitchfork", "Pitchfork", "CLUSTERBOMB", "batteringram", "BatteringRam"} {
 		if err := validateAttack(ok); err != nil {
 			t.Errorf("validateAttack(%q) = %v, want nil", ok, err)
 		}
 	}
-	for _, bad := range []string{"sniper", "batteringram", "bogus"} {
+	for _, bad := range []string{"sniper", "bogus"} {
 		if err := validateAttack(bad); err == nil {
 			t.Errorf("validateAttack(%q) = nil, want error", bad)
 		}
