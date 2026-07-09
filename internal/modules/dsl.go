@@ -124,8 +124,8 @@ func dslVars(mc *MatchContext) map[string]interface{} {
 		"duration":       mc.Duration.Seconds(),
 		"host":           hostOf(mc.URL),
 	}
-	// a non-http module's typed builtins sit at the same tier as the vars above,
-	// so a named extractor can shadow one deliberately.
+	// non-http builtins, such as ssl's expired/self_signed, sit at the same tier
+	// as the vars above, so a named extractor can shadow one deliberately.
 	for k, v := range mc.Extra {
 		vars[k] = v
 	}

@@ -65,8 +65,9 @@ info:
 
 ### type (required)
 
-module type. `http` (request and match), `tcp` (raw connection probe) and
-`fingerprint` (weighted technology detection) are supported.
+module type. `http` (request and match), `tcp` (raw connection probe), `ssl`
+(tls handshake and certificate match) and `fingerprint` (weighted technology
+detection) are supported.
 
 ```yaml
 type: http
@@ -221,6 +222,61 @@ tcp:
 
 see `modules/recon/redis-unauth-exposure.yaml` for the full module.
 
+### ssl
+
+tls configuration. connects to a port, performs a tls handshake with
+certificate verification off (sif inspects the certificate itself rather than
+trusting it), and runs matchers and extractors against a summary of what was
+negotiated. the handshake accepts down to tls 1.0 so a legacy server is
+observed rather than rejected before sif ever sees it.
+
+#### port
+
+the tls port to connect to (required, 1-65535).
+
+```yaml
+ssl:
+  port: 443
+```
+
+#### servername
+
+optional sni override sent in the client hello. defaults to the target host.
+
+#### matchers, extractors and dsl vars
+
+ssl runs `word`, `regex`, `size`, `range` and `dsl` matchers (no
+`status`/`favicon`, those are http only) against a summary line of the
+negotiated connection, and `regex` extractors pull values out of it. there is
+no `part` selector. a `dsl` matcher or extractor additionally sees these vars,
+typed (`expired` and `self_signed` are real booleans, not strings):
+
+- `tls_version` - negotiated version, e.g. `"TLS 1.2"`
+- `cipher` - negotiated cipher suite name
+- `cn` - leaf certificate subject common name
+- `san` - leaf certificate DNS/IP subject-alternative-names, comma-joined
+- `not_after` - certificate expiry, RFC3339
+- `expired` - `true` once `not_after` has passed
+- `self_signed` - `true` when the leaf's own key verifies its own signature
+  and its issuer equals its subject
+
+```yaml
+ssl:
+  port: 443
+  matchers:
+    - type: dsl
+      dsl:
+        - 'expired || tls_version == "TLS 1.0" || tls_version == "TLS 1.1"'
+  extractors:
+    - type: regex
+      name: cn
+      regex:
+        - "cn: (\\S+)"
+      group: 1
+```
+
+see `modules/recon/tls-certificate-health.yaml` for the full module.
+
 ## matchers
 
 matchers determine if a response indicates a finding.
@@ -286,6 +342,12 @@ matchers:
       - 0
       - 1337
 ```
+
+**source:**
+- `size` (default) - response/banner byte length
+- `status` - the http status code (http only; rejected on tcp and ssl)
+
+`range` is supported on http, tcp and ssl (`source: size` only there).
 
 ### favicon matcher
 
@@ -378,8 +440,8 @@ matchers:
 
 this matches responses with status 200 AND containing "ref: refs/".
 
-set `matchers-condition: or` to fire when any matcher hits instead of all; it
-applies to `http` and `tcp` modules alike.
+set `matchers-condition: or` to fire when any matcher hits instead of all. it
+applies to `http`, `tcp` and `ssl` modules alike.
 
 ```yaml
 http:

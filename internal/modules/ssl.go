@@ -29,18 +29,15 @@ import (
 // timeout, so a silent host cannot block the scan forever.
 const defaultSSLTimeout = 10 * time.Second
 
-// newSSLRawConn dials the address over tcp for the tls handshake to run on. It
-// is a package var so tests can supply an in-memory pipe without touching the
-// network.
+// newSSLRawConn is a package var so tests can supply an in-memory pipe
+// instead of a real tcp dial.
 var newSSLRawConn = func(ctx context.Context, addr string, timeout time.Duration) (net.Conn, error) {
 	d := net.Dialer{Timeout: timeout}
 	return d.DialContext(ctx, "tcp", addr)
 }
 
-// validateSSL rejects, at load time, an ssl config the executor cannot run: a
-// port outside 1-65535, an unknown matchers-condition, a matcher type other
-// than word, regex, size, range, or dsl (status and favicon are http only),
-// or a range matcher with source=status (status is http only; ssl has none).
+// validateSSL rejects ssl-specific config at load time: status and favicon
+// matchers, and range-by-status, are http-only concepts ssl has no data for.
 func validateSSL(cfg *SSLConfig) error {
 	if cfg.Port < 1 || cfg.Port > 65535 {
 		return fmt.Errorf("ssl port %d out of range (use 1-65535)", cfg.Port)
@@ -88,9 +85,8 @@ func ExecuteSSLModule(ctx context.Context, target string, def *YAMLModule, opts 
 		timeout = defaultSSLTimeout
 	}
 
-	// One deadline covers the dial and the handshake: HandshakeContext honors
-	// ctx cancellation directly, so there is no separate watchdog goroutine
-	// needed the way tcp.go needs one for its context-less net.Conn read.
+	// HandshakeContext honors ctx cancellation directly, so unlike tcp.go's
+	// plain net.Conn read, no separate watchdog goroutine is needed here.
 	hctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -158,9 +154,8 @@ type sslCertInfo struct {
 	expired     bool
 }
 
-// newSSLCertInfo derives sslCertInfo from a completed handshake's state. ok is
-// false when the peer presented no certificate, which a plain tls-psk or
-// anonymous cipher suite can leave empty.
+// newSSLCertInfo returns ok=false when the peer presented no certificate,
+// which an anonymous cipher suite can leave empty.
 func newSSLCertInfo(state *tls.ConnectionState) (sslCertInfo, bool) {
 	if state == nil || len(state.PeerCertificates) == 0 {
 		return sslCertInfo{}, false
@@ -184,13 +179,10 @@ func newSSLCertInfo(state *tls.ConnectionState) (sslCertInfo, bool) {
 	}, true
 }
 
-// isSelfSignedCert reports whether cert's own public key verifies its own
-// signature and its issuer equals its subject. Deliberately uses
-// CheckSignature (bare cryptographic verification) rather than
-// CheckSignatureFrom(cert): the latter also enforces CA basic-constraints and
-// key-usage, which a typical hand-rolled self-signed leaf certificate (the
-// kind this check exists to flag) usually does not set, and would then read
-// as not self-signed.
+// isSelfSignedCert uses bare CheckSignature rather than CheckSignatureFrom:
+// the latter also enforces CA basic-constraints/key-usage, which a typical
+// hand-rolled self-signed leaf usually lacks and would then misread as not
+// self-signed.
 func isSelfSignedCert(cert *x509.Certificate) bool {
 	if !bytes.Equal(cert.RawIssuer, cert.RawSubject) {
 		return false
@@ -198,10 +190,8 @@ func isSelfSignedCert(cert *x509.Certificate) bool {
 	return cert.CheckSignature(cert.SignatureAlgorithm, cert.RawTBSCertificate, cert.Signature) == nil
 }
 
-// sslDSLVars is the ssl module's contribution to MatchContext.Extra: the
-// lowercase vars a dsl matcher/extractor references, per docs/modules.md.
-// expired and self_signed are real bools (not strings) so a bare `expired` in
-// a dsl expression works the way a bare nuclei bool var does.
+// sslDSLVars feeds MatchContext.Extra. expired and self_signed are real
+// bools (not strings) so a bare `expired` works in a dsl expression.
 func sslDSLVars(info *sslCertInfo) map[string]interface{} {
 	return map[string]interface{}{
 		"tls_version": info.versionName,
@@ -252,9 +242,8 @@ func checkSSLMatchers(matchers []Matcher, condition string, text string, mc *Mat
 	return !or
 }
 
-// checkSSLMatcher evaluates a single matcher. ssl exposes one summary text, so
-// there is no part selection for word/regex/size/range; dsl reads the typed
-// vars from mc.Extra via evalDSL, shared with the http module.
+// checkSSLMatcher: ssl exposes one summary text, so there is no part
+// selection for word/regex/size/range.
 func checkSSLMatcher(m *Matcher, text string, mc *MatchContext) bool {
 	switch m.Type {
 	case "word":

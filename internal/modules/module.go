@@ -116,7 +116,8 @@ type Matcher struct {
 
 // MatchContext carries everything a matcher can evaluate against one response,
 // so a new matcher type can read a field the classic ones ignore without
-// changing the signature of the whole engine again.
+// changing the signature of the whole engine again. Resp is nil for a non-http
+// module such as ssl, which getPart and dslVars handle rather than dereferencing.
 type MatchContext struct {
 	Resp     *http.Response
 	Body     string

@@ -104,9 +104,8 @@ type TCPConfig struct {
 	Extractors        []Extractor `yaml:"extractors,omitempty"`
 }
 
-// SSLConfig defines ssl module settings. The module dials port over tcp,
-// performs a tls handshake, and runs matchers/extractors against a summary of
-// the peer certificate; it never sends or reads application data.
+// SSLConfig dials port for a tls handshake only; it never sends or reads
+// application data.
 type SSLConfig struct {
 	Port              int         `yaml:"port"`
 	ServerName        string      `yaml:"servername,omitempty"` // SNI override; defaults to the target host

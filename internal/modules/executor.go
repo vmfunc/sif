@@ -578,9 +578,8 @@ func getPart(part string, resp *http.Response, body string) string {
 	}
 }
 
-// headersOf renders resp's headers as "K: v, v\n" lines. resp is nil for a
-// non-HTTP module reusing getPart (e.g. ssl's dsl vars), which then has no
-// headers rather than a nil-pointer dereference.
+// headersOf tolerates a nil resp (a non-HTTP module has none) rather than
+// dereferencing it.
 func headersOf(resp *http.Response) string {
 	if resp == nil {
 		return ""

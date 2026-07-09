@@ -28,9 +28,8 @@ import (
 	"time"
 )
 
-// selfSignedTestCert builds a self-signed leaf certificate (issuer == subject,
-// signed by its own key) valid over [notBefore, notAfter], for exercising the
-// expired and self-signed dsl vars.
+// selfSignedTestCert builds a self-signed leaf certificate valid over
+// [notBefore, notAfter].
 func selfSignedTestCert(t *testing.T, cn string, sans []string, notBefore, notAfter time.Time) tls.Certificate {
 	t.Helper()
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -53,9 +52,8 @@ func selfSignedTestCert(t *testing.T, cn string, sans []string, notBefore, notAf
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: priv}
 }
 
-// caSignedTestCert builds a two-certificate chain (CA + leaf) where the leaf's
-// issuer differs from its subject and the leaf itself carries no CA key usage,
-// for exercising the not-self-signed case.
+// caSignedTestCert builds a CA + leaf chain where the leaf's issuer differs
+// from its subject, for the not-self-signed case.
 func caSignedTestCert(t *testing.T, cn string, sans []string) tls.Certificate {
 	t.Helper()
 	caPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -100,13 +98,10 @@ func caSignedTestCert(t *testing.T, cn string, sans []string) tls.Certificate {
 	return tls.Certificate{Certificate: [][]byte{leafDER}, PrivateKey: leafPriv}
 }
 
-// withFakeSSL installs a fake dialer that hands the executor one net.Pipe end
-// and runs a tls server handshake with serverCfg on the other, so
-// ExecuteSSLModule performs a real tls handshake without touching the network.
-// After the handshake, the server side keeps reading and discarding: the
-// client's deferred conn.Close() sends a close_notify alert that blocks
-// (crypto/tls gives it a hard 5s write deadline) until something reads it, and
-// nothing else in this fake server ever will.
+// withFakeSSL swaps in a net.Pipe dialer so ExecuteSSLModule does a real tls
+// handshake without touching the network. The server side must keep reading
+// after the handshake: the client's close_notify on Close blocks on a 5s
+// write deadline until something reads it.
 func withFakeSSL(t *testing.T, serverCfg *tls.Config) {
 	t.Helper()
 	orig := newSSLRawConn
@@ -286,8 +281,7 @@ func TestExecuteSSLModule_SANExtraction(t *testing.T) {
 	}
 }
 
-// TestExecuteSSLModule_DialRefused proves a closed port fails closed with an
-// error instead of panicking or hanging.
+// TestExecuteSSLModule_DialRefused proves a closed port fails closed, not hangs.
 func TestExecuteSSLModule_DialRefused(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -306,9 +300,7 @@ func TestExecuteSSLModule_DialRefused(t *testing.T) {
 	}
 }
 
-// TestExecuteSSLModule_HandshakeFailurePlainTCP proves a non-tls service on
-// the port (plain http here) fails closed at the handshake instead of
-// panicking or hanging.
+// TestExecuteSSLModule_HandshakeFailurePlainTCP proves a non-tls service fails at the handshake, not hangs.
 func TestExecuteSSLModule_HandshakeFailurePlainTCP(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -334,8 +326,7 @@ func TestExecuteSSLModule_HandshakeFailurePlainTCP(t *testing.T) {
 	}
 }
 
-// TestExecuteSSLModule_ContextCanceled proves an already-canceled context
-// fails fast rather than blocking for the full timeout.
+// TestExecuteSSLModule_ContextCanceled proves an already-canceled context fails fast, not the full timeout.
 func TestExecuteSSLModule_ContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
