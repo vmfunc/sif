@@ -39,7 +39,6 @@ func init() {
 	fw.Register(&amazonS3Detector{})
 }
 
-// vercelDetector detects the Vercel hosting platform.
 type vercelDetector struct{}
 
 func (d *vercelDetector) Name() string { return "Vercel" }
@@ -56,7 +55,6 @@ func (d *vercelDetector) Detect(body string, headers http.Header) (float32, stri
 	return sigmoidConfidence(score), ""
 }
 
-// netlifyDetector detects the Netlify hosting platform.
 type netlifyDetector struct{}
 
 func (d *netlifyDetector) Name() string { return "Netlify" }
@@ -90,7 +88,6 @@ func (d *githubPagesDetector) Detect(body string, headers http.Header) (float32,
 	return sigmoidConfidence(score), ""
 }
 
-// cloudflareDetector detects the Cloudflare edge.
 type cloudflareDetector struct{}
 
 func (d *cloudflareDetector) Name() string { return "Cloudflare" }
@@ -124,7 +121,6 @@ func (d *cloudfrontDetector) Detect(body string, headers http.Header) (float32, 
 	return sigmoidConfidence(score), ""
 }
 
-// akamaiDetector detects the Akamai edge.
 type akamaiDetector struct{}
 
 func (d *akamaiDetector) Name() string { return "Akamai" }
@@ -143,7 +139,6 @@ func (d *akamaiDetector) Detect(body string, headers http.Header) (float32, stri
 	return sigmoidConfidence(score), ""
 }
 
-// flyDetector detects the Fly.io platform.
 type flyDetector struct{}
 
 func (d *flyDetector) Name() string { return "Fly.io" }

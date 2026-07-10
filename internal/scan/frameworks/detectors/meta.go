@@ -45,7 +45,6 @@ func init() {
 	fw.Register(&publiiDetector{})
 }
 
-// nextjsDetector detects Next.js framework.
 type nextjsDetector struct{}
 
 func (d *nextjsDetector) Name() string { return "Next.js" }
@@ -72,7 +71,6 @@ func (d *nextjsDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// nuxtDetector detects Nuxt.js framework.
 type nuxtDetector struct{}
 
 func (d *nuxtDetector) Name() string { return "Nuxt.js" }
@@ -97,7 +95,6 @@ func (d *nuxtDetector) Detect(body string, headers http.Header) (float32, string
 	return confidence, version
 }
 
-// sveltekitDetector detects SvelteKit framework.
 type sveltekitDetector struct{}
 
 func (d *sveltekitDetector) Name() string { return "SvelteKit" }
@@ -122,7 +119,6 @@ func (d *sveltekitDetector) Detect(body string, headers http.Header) (float32, s
 	return confidence, version
 }
 
-// gatsbyDetector detects Gatsby framework.
 type gatsbyDetector struct{}
 
 func (d *gatsbyDetector) Name() string { return "Gatsby" }
@@ -149,7 +145,6 @@ func (d *gatsbyDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// remixDetector detects Remix framework.
 type remixDetector struct{}
 
 func (d *remixDetector) Name() string { return "Remix" }
@@ -172,7 +167,6 @@ func (d *remixDetector) Detect(body string, headers http.Header) (float32, strin
 	return confidence, version
 }
 
-// astroDetector detects Astro framework.
 type astroDetector struct{}
 
 func (d *astroDetector) Name() string { return "Astro" }
@@ -205,7 +199,6 @@ func (d *astroDetector) Detect(body string, headers http.Header) (float32, strin
 // The generator detectors below anchor on the content="<brand> value: real
 // sites minify and reorder the meta, dropping the name="generator" prefix.
 
-// hugoDetector detects the Hugo static site generator.
 type hugoDetector struct{}
 
 func (d *hugoDetector) Name() string { return "Hugo" }
@@ -228,7 +221,6 @@ func (d *hugoDetector) Detect(body string, headers http.Header) (float32, string
 	return confidence, version
 }
 
-// jekyllDetector detects the Jekyll static site generator.
 type jekyllDetector struct{}
 
 func (d *jekyllDetector) Name() string { return "Jekyll" }
@@ -251,7 +243,6 @@ func (d *jekyllDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// docusaurusDetector detects the Docusaurus documentation site generator.
 type docusaurusDetector struct{}
 
 func (d *docusaurusDetector) Name() string { return "Docusaurus" }
@@ -323,7 +314,6 @@ func (d *eleventyDetector) Detect(body string, headers http.Header) (float32, st
 	return confidence, version
 }
 
-// hexoDetector detects the Hexo static site generator.
 type hexoDetector struct{}
 
 func (d *hexoDetector) Name() string { return "Hexo" }
@@ -346,7 +336,6 @@ func (d *hexoDetector) Detect(body string, headers http.Header) (float32, string
 	return confidence, version
 }
 
-// vuepressDetector detects VuePress.
 type vuepressDetector struct{}
 
 func (d *vuepressDetector) Name() string { return "VuePress" }
@@ -369,7 +358,6 @@ func (d *vuepressDetector) Detect(body string, headers http.Header) (float32, st
 	return confidence, version
 }
 
-// sphinxDetector detects the Sphinx documentation generator.
 type sphinxDetector struct{}
 
 func (d *sphinxDetector) Name() string { return "Sphinx" }
@@ -394,7 +382,6 @@ func (d *sphinxDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// nikolaDetector detects the Nikola static site generator.
 type nikolaDetector struct{}
 
 func (d *nikolaDetector) Name() string { return "Nikola" }
@@ -417,7 +404,6 @@ func (d *nikolaDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// publiiDetector detects the Publii static-site CMS.
 type publiiDetector struct{}
 
 func (d *publiiDetector) Name() string { return "Publii" }

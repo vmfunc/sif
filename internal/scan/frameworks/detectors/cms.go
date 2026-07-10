@@ -65,7 +65,6 @@ func init() {
 	fw.Register(&xwikiDetector{})
 }
 
-// wordpressDetector detects WordPress CMS.
 type wordpressDetector struct{}
 
 func (d *wordpressDetector) Name() string { return "WordPress" }
@@ -92,7 +91,6 @@ func (d *wordpressDetector) Detect(body string, headers http.Header) (float32, s
 	return confidence, version
 }
 
-// drupalDetector detects Drupal CMS.
 type drupalDetector struct{}
 
 func (d *drupalDetector) Name() string { return "Drupal" }
@@ -118,7 +116,6 @@ func (d *drupalDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// joomlaDetector detects Joomla CMS.
 type joomlaDetector struct{}
 
 func (d *joomlaDetector) Name() string { return "Joomla" }
@@ -144,7 +141,6 @@ func (d *joomlaDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// magentoDetector detects Magento CMS.
 type magentoDetector struct{}
 
 func (d *magentoDetector) Name() string { return "Magento" }
@@ -170,7 +166,6 @@ func (d *magentoDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// shopifyDetector detects Shopify platform.
 type shopifyDetector struct{}
 
 func (d *shopifyDetector) Name() string { return "Shopify" }
@@ -196,7 +191,6 @@ func (d *shopifyDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// ghostDetector detects Ghost CMS.
 type ghostDetector struct{}
 
 func (d *ghostDetector) Name() string { return "Ghost" }
@@ -221,7 +215,6 @@ func (d *ghostDetector) Detect(body string, headers http.Header) (float32, strin
 	return confidence, version
 }
 
-// typo3Detector detects the TYPO3 CMS.
 type typo3Detector struct{}
 
 func (d *typo3Detector) Name() string { return "TYPO3" }
@@ -244,7 +237,6 @@ func (d *typo3Detector) Detect(body string, headers http.Header) (float32, strin
 	return confidence, version
 }
 
-// contaoDetector detects the Contao CMS.
 type contaoDetector struct{}
 
 func (d *contaoDetector) Name() string { return "Contao" }
@@ -267,7 +259,6 @@ func (d *contaoDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// wixDetector detects sites built on the Wix website builder.
 type wixDetector struct{}
 
 func (d *wixDetector) Name() string { return "Wix" }
@@ -291,7 +282,6 @@ func (d *wixDetector) Detect(body string, headers http.Header) (float32, string)
 	return confidence, version
 }
 
-// webflowDetector detects sites built on Webflow.
 type webflowDetector struct{}
 
 func (d *webflowDetector) Name() string { return "Webflow" }
@@ -315,7 +305,6 @@ func (d *webflowDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// hubspotDetector detects pages built on the HubSpot CMS.
 type hubspotDetector struct{}
 
 func (d *hubspotDetector) Name() string { return "HubSpot" }
@@ -338,7 +327,6 @@ func (d *hubspotDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// prestashopDetector detects the PrestaShop e-commerce platform.
 type prestashopDetector struct{}
 
 func (d *prestashopDetector) Name() string { return "PrestaShop" }
@@ -361,7 +349,6 @@ func (d *prestashopDetector) Detect(body string, headers http.Header) (float32, 
 	return confidence, version
 }
 
-// sitecoreDetector detects the Sitecore platform.
 type sitecoreDetector struct{}
 
 func (d *sitecoreDetector) Name() string { return "Sitecore" }
@@ -384,7 +371,6 @@ func (d *sitecoreDetector) Detect(body string, headers http.Header) (float32, st
 	return confidence, version
 }
 
-// opencartDetector detects the OpenCart e-commerce platform.
 type opencartDetector struct{}
 
 func (d *opencartDetector) Name() string { return "OpenCart" }
@@ -431,7 +417,6 @@ func (d *dnnDetector) Detect(body string, headers http.Header) (float32, string)
 	return confidence, version
 }
 
-// liferayDetector detects the Liferay portal.
 type liferayDetector struct{}
 
 func (d *liferayDetector) Name() string { return "Liferay" }
@@ -455,7 +440,6 @@ func (d *liferayDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// squarespaceDetector detects sites built on Squarespace.
 type squarespaceDetector struct{}
 
 func (d *squarespaceDetector) Name() string { return "Squarespace" }
@@ -504,7 +488,6 @@ func (d *woocommerceDetector) Detect(body string, headers http.Header) (float32,
 	return confidence, version
 }
 
-// craftDetector detects Craft CMS.
 type craftDetector struct{}
 
 func (d *craftDetector) Name() string { return "Craft CMS" }
@@ -602,7 +585,6 @@ func (d *bloggerDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// mediawikiDetector detects MediaWiki.
 type mediawikiDetector struct{}
 
 func (d *mediawikiDetector) Name() string { return "MediaWiki" }
@@ -625,7 +607,6 @@ func (d *mediawikiDetector) Detect(body string, headers http.Header) (float32, s
 	return confidence, version
 }
 
-// discourseDetector detects the Discourse forum platform.
 type discourseDetector struct{}
 
 func (d *discourseDetector) Name() string { return "Discourse" }
@@ -648,7 +629,6 @@ func (d *discourseDetector) Detect(body string, headers http.Header) (float32, s
 	return confidence, version
 }
 
-// xenforoDetector detects the XenForo forum platform.
 type xenforoDetector struct{}
 
 func (d *xenforoDetector) Name() string { return "XenForo" }
@@ -673,7 +653,6 @@ func (d *xenforoDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// moodleDetector detects the Moodle learning platform.
 type moodleDetector struct{}
 
 func (d *moodleDetector) Name() string { return "Moodle" }
@@ -696,7 +675,6 @@ func (d *moodleDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// ploneDetector detects the Plone CMS.
 type ploneDetector struct{}
 
 func (d *ploneDetector) Name() string { return "Plone" }
@@ -742,7 +720,6 @@ func (d *gravDetector) Detect(body string, headers http.Header) (float32, string
 	return confidence, version
 }
 
-// textpatternDetector detects the Textpattern CMS.
 type textpatternDetector struct{}
 
 func (d *textpatternDetector) Name() string { return "Textpattern" }
@@ -811,7 +788,6 @@ func (d *statamicDetector) Detect(body string, headers http.Header) (float32, st
 	return confidence, version
 }
 
-// flarumDetector detects the Flarum forum platform.
 type flarumDetector struct{}
 
 func (d *flarumDetector) Name() string { return "Flarum" }
@@ -834,7 +810,6 @@ func (d *flarumDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// nodebbDetector detects the NodeBB forum platform.
 type nodebbDetector struct{}
 
 func (d *nodebbDetector) Name() string { return "NodeBB" }
@@ -857,7 +832,6 @@ func (d *nodebbDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// xwikiDetector detects the XWiki platform.
 type xwikiDetector struct{}
 
 func (d *xwikiDetector) Name() string { return "XWiki" }
@@ -904,7 +878,6 @@ func (d *boltDetector) Detect(body string, headers http.Header) (float32, string
 	return confidence, version
 }
 
-// expressionengineDetector detects ExpressionEngine.
 type expressionengineDetector struct{}
 
 func (d *expressionengineDetector) Name() string { return "ExpressionEngine" }

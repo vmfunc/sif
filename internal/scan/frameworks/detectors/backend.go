@@ -78,7 +78,6 @@ func serverVersion(headers http.Header, product string) string {
 	return rest[:end]
 }
 
-// laravelDetector detects Laravel framework.
 type laravelDetector struct {
 	fw.BaseDetector
 }
@@ -105,7 +104,6 @@ func (d *laravelDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// djangoDetector detects Django framework.
 type djangoDetector struct{}
 
 func (d *djangoDetector) Name() string { return "Django" }
@@ -135,7 +133,6 @@ func (d *djangoDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// railsDetector detects Ruby on Rails framework.
 type railsDetector struct{}
 
 func (d *railsDetector) Name() string { return "Ruby on Rails" }
@@ -163,7 +160,6 @@ func (d *railsDetector) Detect(body string, headers http.Header) (float32, strin
 	return confidence, version
 }
 
-// expressDetector detects Express.js framework.
 type expressDetector struct{}
 
 func (d *expressDetector) Name() string { return "Express.js" }
@@ -187,7 +183,6 @@ func (d *expressDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// aspnetDetector detects ASP.NET framework.
 type aspnetDetector struct{}
 
 func (d *aspnetDetector) Name() string { return "ASP.NET" }
@@ -223,7 +218,6 @@ func (d *aspnetDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// aspnetCoreDetector detects ASP.NET Core framework.
 type aspnetCoreDetector struct{}
 
 func (d *aspnetCoreDetector) Name() string { return "ASP.NET Core" }
@@ -249,7 +243,6 @@ func (d *aspnetCoreDetector) Detect(body string, headers http.Header) (float32, 
 	return confidence, version
 }
 
-// springDetector detects Spring framework.
 type springDetector struct{}
 
 func (d *springDetector) Name() string { return "Spring" }
@@ -275,7 +268,6 @@ func (d *springDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// springBootDetector detects Spring Boot framework.
 type springBootDetector struct{}
 
 func (d *springBootDetector) Name() string { return "Spring Boot" }
@@ -300,7 +292,6 @@ func (d *springBootDetector) Detect(body string, headers http.Header) (float32, 
 	return confidence, version
 }
 
-// flaskDetector detects Flask framework.
 type flaskDetector struct{}
 
 func (d *flaskDetector) Name() string { return "Flask" }
@@ -326,7 +317,6 @@ func (d *flaskDetector) Detect(body string, headers http.Header) (float32, strin
 	return confidence, version
 }
 
-// symfonyDetector detects Symfony framework.
 type symfonyDetector struct{}
 
 func (d *symfonyDetector) Name() string { return "Symfony" }
@@ -353,7 +343,6 @@ func (d *symfonyDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// phoenixDetector detects Phoenix framework.
 type phoenixDetector struct{}
 
 func (d *phoenixDetector) Name() string { return "Phoenix" }
@@ -378,7 +367,6 @@ func (d *phoenixDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// strapiDetector detects Strapi framework.
 type strapiDetector struct{}
 
 func (d *strapiDetector) Name() string { return "Strapi" }
@@ -401,7 +389,6 @@ func (d *strapiDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// adonisDetector detects AdonisJS framework.
 type adonisDetector struct{}
 
 func (d *adonisDetector) Name() string { return "AdonisJS" }
@@ -424,7 +411,6 @@ func (d *adonisDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// cakephpDetector detects CakePHP framework.
 type cakephpDetector struct{}
 
 func (d *cakephpDetector) Name() string { return "CakePHP" }
@@ -447,7 +433,6 @@ func (d *cakephpDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// codeigniterDetector detects CodeIgniter framework.
 type codeigniterDetector struct{}
 
 func (d *codeigniterDetector) Name() string { return "CodeIgniter" }
@@ -470,7 +455,6 @@ func (d *codeigniterDetector) Detect(body string, headers http.Header) (float32,
 	return confidence, version
 }
 
-// tornadoDetector detects the Tornado Python web framework.
 type tornadoDetector struct{}
 
 func (d *tornadoDetector) Name() string { return "Tornado" }
@@ -493,7 +477,6 @@ func (d *tornadoDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// cherrypyDetector detects the CherryPy Python web framework.
 type cherrypyDetector struct{}
 
 func (d *cherrypyDetector) Name() string { return "CherryPy" }
@@ -541,7 +524,6 @@ func (d *playDetector) Detect(body string, headers http.Header) (float32, string
 	return confidence, version
 }
 
-// sailsDetector detects the Sails.js Node framework.
 type sailsDetector struct{}
 
 func (d *sailsDetector) Name() string { return "Sails.js" }
@@ -564,7 +546,6 @@ func (d *sailsDetector) Detect(body string, headers http.Header) (float32, strin
 	return confidence, version
 }
 
-// beegoDetector detects the Beego Go web framework.
 type beegoDetector struct{}
 
 func (d *beegoDetector) Name() string { return "Beego" }
@@ -636,7 +617,6 @@ func (d *gwtDetector) Detect(body string, headers http.Header) (float32, string)
 	return confidence, version
 }
 
-// vaadinDetector detects the Vaadin Java framework.
 type vaadinDetector struct{}
 
 func (d *vaadinDetector) Name() string { return "Vaadin" }

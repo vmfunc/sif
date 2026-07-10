@@ -45,7 +45,6 @@ func init() {
 	fw.Register(&unpolyDetector{})
 }
 
-// reactDetector detects React framework.
 type reactDetector struct{}
 
 func (d *reactDetector) Name() string { return "React" }
@@ -72,7 +71,6 @@ func (d *reactDetector) Detect(body string, headers http.Header) (float32, strin
 	return confidence, version
 }
 
-// vueDetector detects Vue.js framework.
 type vueDetector struct{}
 
 func (d *vueDetector) Name() string { return "Vue.js" }
@@ -100,7 +98,6 @@ func (d *vueDetector) Detect(body string, headers http.Header) (float32, string)
 	return confidence, version
 }
 
-// angularDetector detects Angular framework.
 type angularDetector struct{}
 
 func (d *angularDetector) Name() string { return "Angular" }
@@ -132,7 +129,6 @@ func (d *angularDetector) Detect(body string, headers http.Header) (float32, str
 	return confidence, version
 }
 
-// svelteDetector detects Svelte framework.
 type svelteDetector struct{}
 
 func (d *svelteDetector) Name() string { return "Svelte" }
@@ -159,7 +155,6 @@ func (d *svelteDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// emberDetector detects Ember.js framework.
 type emberDetector struct{}
 
 func (d *emberDetector) Name() string { return "Ember.js" }
@@ -187,7 +182,6 @@ func (d *emberDetector) Detect(body string, headers http.Header) (float32, strin
 	return confidence, version
 }
 
-// backboneDetector detects Backbone.js framework.
 type backboneDetector struct{}
 
 func (d *backboneDetector) Name() string { return "Backbone.js" }
@@ -214,7 +208,6 @@ func (d *backboneDetector) Detect(body string, headers http.Header) (float32, st
 	return confidence, version
 }
 
-// htmxDetector detects the htmx library.
 type htmxDetector struct{}
 
 func (d *htmxDetector) Name() string { return "htmx" }
@@ -242,7 +235,6 @@ func (d *htmxDetector) Detect(body string, headers http.Header) (float32, string
 	return confidence, version
 }
 
-// alpineDetector detects Alpine.js.
 type alpineDetector struct{}
 
 func (d *alpineDetector) Name() string { return "Alpine.js" }
@@ -268,7 +260,6 @@ func (d *alpineDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// qwikDetector detects the Qwik framework.
 type qwikDetector struct{}
 
 func (d *qwikDetector) Name() string { return "Qwik" }
@@ -294,7 +285,6 @@ func (d *qwikDetector) Detect(body string, headers http.Header) (float32, string
 	return confidence, version
 }
 
-// jqueryDetector detects the jQuery library.
 type jqueryDetector struct{}
 
 func (d *jqueryDetector) Name() string { return "jQuery" }
@@ -399,7 +389,6 @@ func (d *turboDetector) Detect(body string, headers http.Header) (float32, strin
 	return confidence, version
 }
 
-// knockoutDetector detects Knockout.js.
 type knockoutDetector struct{}
 
 func (d *knockoutDetector) Name() string { return "Knockout.js" }
@@ -424,7 +413,6 @@ func (d *knockoutDetector) Detect(body string, headers http.Header) (float32, st
 	return confidence, version
 }
 
-// unpolyDetector detects the Unpoly library.
 type unpolyDetector struct{}
 
 func (d *unpolyDetector) Name() string { return "Unpoly" }
@@ -449,7 +437,6 @@ func (d *unpolyDetector) Detect(body string, headers http.Header) (float32, stri
 	return confidence, version
 }
 
-// meteorDetector detects Meteor framework.
 type meteorDetector struct{}
 
 func (d *meteorDetector) Name() string { return "Meteor" }
