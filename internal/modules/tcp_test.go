@@ -305,11 +305,12 @@ func TestExecuteTCPModuleContextCancel(t *testing.T) {
 }
 
 // fakeSlowConn is a net.Conn stand-in whose Write yields for a fixed duration
-// before returning success, and whose Read blocks until whatever deadline was
-// last armed via SetReadDeadline/SetDeadline, then returns a timeout error. It
-// reproduces a real socket closely enough to prove the cancellation race: the
-// watchdog's SetDeadline(now) trip can land during the slow Write, before
-// readTCP arms its own (later) read deadline.
+// before returning success regardless of any deadline, and whose Read blocks
+// until whatever deadline was last armed via SetReadDeadline/SetDeadline, then
+// returns a timeout error. It reproduces a real socket closely enough to prove
+// the cancellation race: a cancel landing while the slow Write is in flight
+// trips the watchdog's SetDeadline(now) before readTCP arms its own (later)
+// read deadline.
 type fakeSlowConn struct {
 	net.Conn
 	mu           sync.Mutex
@@ -347,18 +348,25 @@ func (c *fakeSlowConn) SetWriteDeadline(time.Time) error  { return nil }
 func (c *fakeSlowConn) Close() error                      { return nil }
 
 // TestExecuteTCPModuleContextCancelDuringWrite reproduces the deadline re-arm
-// race: the ctx is already cancelled before the call, so the watchdog trips
-// conn.SetDeadline(now) while the probe Write is still yielding. Before the
-// fix, readTCP's own SetReadDeadline(now+timeout) call overwrote that trip and
-// the read blocked for the full timeout instead of returning promptly.
+// race: the ctx is cancelled from another goroutine while the probe Write is
+// still yielding, so the watchdog's conn.SetDeadline(now) trip lands mid-write
+// rather than before ExecuteTCPModule is even entered. The Write then returns
+// its normal success (a fake real socket does not itself enforce the deadline
+// on a write already in flight), so execution reaches readTCP with the ctx
+// already done but no error yet surfaced. Before the fix, readTCP's own
+// SetReadDeadline(now+timeout) call overwrote the watchdog's trip and the read
+// blocked for the full timeout instead of returning promptly.
 func TestExecuteTCPModuleContextCancelDuringWrite(t *testing.T) {
-	conn := &fakeSlowConn{writeYield: 150 * time.Millisecond}
+	conn := &fakeSlowConn{writeYield: 200 * time.Millisecond}
 	orig := newTCPConn
 	newTCPConn = func(context.Context, string, time.Duration) (net.Conn, error) { return conn, nil }
 	t.Cleanup(func() { newTCPConn = orig })
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // already cancelled before ExecuteTCPModule is even called.
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
 
 	def := tcpDef(&TCPConfig{Port: 22, Data: "PING\r\n", Matchers: []Matcher{tcpWord("x")}})
 	start := time.Now()
@@ -366,7 +374,7 @@ func TestExecuteTCPModuleContextCancelDuringWrite(t *testing.T) {
 	elapsed := time.Since(start)
 
 	if elapsed > time.Second {
-		t.Errorf("returned after %v, want prompt (a pre-cancelled ctx must not be swallowed by the read-deadline re-arm)", elapsed)
+		t.Errorf("returned after %v, want prompt (a cancel landing mid-write must not be swallowed by the read-deadline re-arm)", elapsed)
 	}
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v, want context.Canceled", err)
