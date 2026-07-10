@@ -1,5 +1,3 @@
-# Jenkinsfile Exposure Detection Module
-
 id: jenkinsfile-exposure
 info:
   name: Jenkinsfile Exposure

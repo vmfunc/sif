@@ -1,5 +1,3 @@
-# Terraform Tfvars Exposure Detection Module
-
 id: terraform-tfvars-exposure
 info:
   name: Terraform Tfvars Exposure

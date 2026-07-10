@@ -1,5 +1,3 @@
-# Gitlab CI Config Exposure Detection Module
-
 id: gitlab-ci-config-exposure
 info:
   name: Gitlab CI Config Exposure

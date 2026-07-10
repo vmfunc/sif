@@ -1,5 +1,3 @@
-# Ansible Vault Exposure Detection Module
-
 id: ansible-vault-exposure
 info:
   name: Ansible Vault Exposure
