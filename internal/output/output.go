@@ -188,7 +188,7 @@ func (s *Sink) Writer() io.Writer { return s.w }
 // buffer sink reports false so spinners and progress bars stay silent.
 func (s *Sink) Interactive() bool { return s.interactive }
 
-// Info prints an informational message with [*] prefix.
+// Info logs a [*]-prefixed message; a no-op in API mode.
 func (s *Sink) Info(format string, args ...interface{}) {
 	if apiMode {
 		return
@@ -196,7 +196,7 @@ func (s *Sink) Info(format string, args ...interface{}) {
 	fmt.Fprintf(s.w, "%s %s\n", prefixInfo.Render("[*]"), fmt.Sprintf(format, args...))
 }
 
-// Success prints a success message with [+] prefix.
+// Success logs a [+]-prefixed message; a no-op in API mode.
 func (s *Sink) Success(format string, args ...interface{}) {
 	if apiMode {
 		return
@@ -204,7 +204,7 @@ func (s *Sink) Success(format string, args ...interface{}) {
 	fmt.Fprintf(s.w, "%s %s\n", prefixSuccess.Render("[+]"), fmt.Sprintf(format, args...))
 }
 
-// Warn prints a warning message with [!] prefix.
+// Warn logs a [!]-prefixed message; a no-op in API mode.
 func (s *Sink) Warn(format string, args ...interface{}) {
 	if apiMode {
 		return
@@ -212,7 +212,7 @@ func (s *Sink) Warn(format string, args ...interface{}) {
 	fmt.Fprintf(s.w, "%s %s\n", prefixWarning.Render("[!]"), fmt.Sprintf(format, args...))
 }
 
-// Error prints an error message with [-] prefix.
+// Error logs a [-]-prefixed message; a no-op in API mode.
 func (s *Sink) Error(format string, args ...interface{}) {
 	if apiMode {
 		return
@@ -220,16 +220,12 @@ func (s *Sink) Error(format string, args ...interface{}) {
 	fmt.Fprintf(s.w, "%s %s\n", prefixError.Render("[-]"), fmt.Sprintf(format, args...))
 }
 
-// Info prints an informational message with [*] prefix to the default sink.
 func Info(format string, args ...interface{}) { DefaultSink().Info(format, args...) }
 
-// Success prints a success message with [+] prefix to the default sink.
 func Success(format string, args ...interface{}) { DefaultSink().Success(format, args...) }
 
-// Warn prints a warning message with [!] prefix to the default sink.
 func Warn(format string, args ...interface{}) { DefaultSink().Warn(format, args...) }
 
-// Error prints an error message with [-] prefix to the default sink.
 func Error(format string, args ...interface{}) { DefaultSink().Error(format, args...) }
 
 // ScanStart prints a styled scan start message
@@ -248,7 +244,6 @@ func ScanComplete(scanName string, resultCount int, resultType string) {
 	fmt.Fprintf(sink, "%s %s complete (%d %s)\n", prefixInfo.Render("[*]"), scanName, resultCount, resultType)
 }
 
-// Module creates a prefixed logger for a specific module/tool on the default sink.
 func Module(name string) *ModuleLogger {
 	return DefaultSink().Module(name)
 }
