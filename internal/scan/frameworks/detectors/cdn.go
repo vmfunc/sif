@@ -41,7 +41,6 @@ func init() {
 // merely mentions "cloudflare" in its body (a badge, a blog post, a status
 // widget) must not fire, only the response the edge itself stamped.
 
-// cloudflareDetector detects the Cloudflare CDN/edge.
 type cloudflareDetector struct{}
 
 func (d *cloudflareDetector) Name() string { return "Cloudflare" }
@@ -59,7 +58,6 @@ func (d *cloudflareDetector) Detect(body string, headers http.Header) (float32, 
 	return sigmoidConfidence(base.MatchSignatures(body, headers)), ""
 }
 
-// fastlyDetector detects the Fastly CDN.
 type fastlyDetector struct{}
 
 func (d *fastlyDetector) Name() string { return "Fastly" }
@@ -79,7 +77,6 @@ func (d *fastlyDetector) Detect(body string, headers http.Header) (float32, stri
 	return sigmoidConfidence(base.MatchSignatures(body, headers)), ""
 }
 
-// akamaiDetector detects the Akamai CDN/edge.
 type akamaiDetector struct{}
 
 func (d *akamaiDetector) Name() string { return "Akamai" }
@@ -96,7 +93,6 @@ func (d *akamaiDetector) Detect(body string, headers http.Header) (float32, stri
 	return sigmoidConfidence(base.MatchSignatures(body, headers)), ""
 }
 
-// cloudfrontDetector detects AWS CloudFront.
 type cloudfrontDetector struct{}
 
 func (d *cloudfrontDetector) Name() string { return "Amazon CloudFront" }
@@ -113,7 +109,6 @@ func (d *cloudfrontDetector) Detect(body string, headers http.Header) (float32, 
 	return sigmoidConfidence(base.MatchSignatures(body, headers)), ""
 }
 
-// vercelDetector detects Vercel's edge network.
 type vercelDetector struct{}
 
 func (d *vercelDetector) Name() string { return "Vercel" }
@@ -130,7 +125,6 @@ func (d *vercelDetector) Detect(body string, headers http.Header) (float32, stri
 	return sigmoidConfidence(base.MatchSignatures(body, headers)), ""
 }
 
-// netlifyDetector detects Netlify's edge network.
 type netlifyDetector struct{}
 
 func (d *netlifyDetector) Name() string { return "Netlify" }
