@@ -1,5 +1,3 @@
-# Jellyfin Version Endpoint Exposure Detection Module
-
 id: jellyfin-version-exposure
 info:
   name: Jellyfin Version Exposure

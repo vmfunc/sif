@@ -1,5 +1,3 @@
-# Nextcloud Version Endpoint Exposure Detection Module
-
 id: nextcloud-version-exposure
 info:
   name: Nextcloud Version Exposure
