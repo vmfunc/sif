@@ -1,5 +1,3 @@
-# Forgejo Version Endpoint Exposure Detection Module
-
 id: forgejo-version-exposure
 info:
   name: Forgejo Version Exposure
