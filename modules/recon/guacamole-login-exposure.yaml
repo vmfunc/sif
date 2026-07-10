@@ -1,5 +1,3 @@
-# Apache Guacamole Login Exposure Detection Module
-
 id: guacamole-login-exposure
 info:
   name: Apache Guacamole Login Exposure

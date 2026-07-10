@@ -1,5 +1,3 @@
-# Webmin Login Exposure Detection Module
-
 id: webmin-login-exposure
 info:
   name: Webmin Login Exposure
