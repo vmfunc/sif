@@ -1,5 +1,3 @@
-# Apache Pulsar Broker Metrics Exposure Detection Module
-
 id: pulsar-metrics-exposure
 info:
   name: Apache Pulsar Broker Metrics Exposure

@@ -1,5 +1,3 @@
-# NSQ Stats API Exposure Detection Module
-
 id: nsq-stats-exposure
 info:
   name: NSQ Stats API Exposure
