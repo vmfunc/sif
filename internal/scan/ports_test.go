@@ -28,7 +28,7 @@ func TestPorts_CancelledContextAbortsListDownload(t *testing.T) {
 	release := make(chan struct{})
 
 	list := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		<-release // block until the test releases the handler
+		<-release
 		w.WriteHeader(http.StatusOK)
 	}))
 	// cleanups run LIFO: release the handler first so any in-flight request can
