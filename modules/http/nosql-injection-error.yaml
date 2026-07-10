@@ -1,5 +1,3 @@
-# NoSQL Injection Error-Based Detection Module
-
 id: nosql-injection-error
 info:
   name: NoSQL Injection (Error-Based)

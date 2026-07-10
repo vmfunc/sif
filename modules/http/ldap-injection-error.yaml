@@ -1,5 +1,3 @@
-# LDAP Injection Error-Based Detection Module
-
 id: ldap-injection-error
 info:
   name: LDAP Injection (Error-Based)

@@ -1,5 +1,3 @@
-# XPath Injection Error-Based Detection Module
-
 id: xpath-injection-error
 info:
   name: XPath Injection (Error-Based)

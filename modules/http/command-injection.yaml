@@ -1,5 +1,3 @@
-# OS Command Injection Detection Module
-
 id: command-injection
 info:
   name: OS Command Injection

@@ -1,5 +1,3 @@
-# Server-Side Template Injection Detection Module
-
 id: ssti-reflected
 info:
   name: Server-Side Template Injection
