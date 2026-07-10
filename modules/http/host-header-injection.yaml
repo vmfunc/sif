@@ -1,4 +1,3 @@
-# Host Header Injection Detection Module
 id: host-header-injection
 info:
   name: Host Header Injection

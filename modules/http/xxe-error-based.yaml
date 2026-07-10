@@ -1,4 +1,3 @@
-# XML External Entity Injection Detection Module
 id: xxe-error-based
 info:
   name: XML External Entity Injection
