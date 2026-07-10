@@ -1,5 +1,3 @@
-# Sonatype Nexus Repository Catalog Exposure Detection Module
-
 id: nexus-repository-exposure
 info:
   name: Nexus Repository Catalog Exposure

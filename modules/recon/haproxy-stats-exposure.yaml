@@ -1,5 +1,3 @@
-# HAProxy Stats Page Exposure Detection Module
-
 id: haproxy-stats-exposure
 info:
   name: HAProxy Stats Page Exposure

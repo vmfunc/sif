@@ -1,5 +1,3 @@
-# Prometheus Pushgateway Exposure Detection Module
-
 id: pushgateway-exposure
 info:
   name: Prometheus Pushgateway Exposure
