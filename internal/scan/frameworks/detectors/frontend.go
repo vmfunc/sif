@@ -352,9 +352,13 @@ func (d *stimulusDetector) Name() string { return "Stimulus" }
 
 func (d *stimulusDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "data-controller=", Weight: 0.5},
-		{Pattern: "data-action=", Weight: 0.3},
-		{Pattern: "@hotwired/stimulus", Weight: 0.4},
+		// data-controller= alone is a common enough attribute name in
+		// unrelated hand-rolled JS that it must not clear the threshold by
+		// itself; neither must data-action= alone. each needs the other (or
+		// the definitive @hotwired/stimulus import) alongside it to fire.
+		{Pattern: "data-controller=", Weight: 0.2},
+		{Pattern: "data-action=", Weight: 0.2},
+		{Pattern: "@hotwired/stimulus", Weight: 0.6},
 	}
 }
 

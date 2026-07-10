@@ -334,7 +334,9 @@ func (d *symfonyDetector) Name() string { return "Symfony" }
 func (d *symfonyDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: "X-Debug-Token", Weight: 0.4, HeaderOnly: true},
-		{Pattern: "sf_", Weight: 0.3, HeaderOnly: true},
+		// the bare "sf_" substring also matches unrelated cookie names such as
+		// "misfa_sf_token", so key on the "_sf2_" session-cookie prefix, which
+		// is specific to Symfony's own cookie naming instead.
 		{Pattern: "_sf2_", Weight: 0.3, HeaderOnly: true},
 	}
 }

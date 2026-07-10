@@ -52,6 +52,7 @@ func TestWebFrameworkDetectors_Positive(t *testing.T) {
 		{"Express powered-by", &expressDetector{}, "", hdr("X-Powered-By", "Express")},
 		{"Flask werkzeug server", &flaskDetector{}, "", hdr("Server", "Werkzeug/2.3.0 Python/3.11")},
 		{"Symfony debug token", &symfonyDetector{}, "", hdr("X-Debug-Token", "a1b2c3")},
+		{"Symfony sf2 session cookie", &symfonyDetector{}, "", hdr("Set-Cookie", "_sf2_ses=8f2a1c4e9d3b; path=/; HttpOnly")},
 		{"Spring Boot whitelabel", &springBootDetector{}, `<html><body><h1>Whitelabel Error Page</h1><p>This application has no explicit mapping for /error</p><div>There was an unexpected error (type=Not Found, status=404).</div></body></html>`, http.Header{}},
 	}
 
@@ -86,6 +87,7 @@ func TestWebFrameworkDetectors_Negative(t *testing.T) {
 		{"CherryPy domain link", &cherrypyDetector{}, "", hdr("Link", "<https://cherrypy.dev>; rel=help")},
 		{"Tornado via header", &tornadoDetector{}, "", hdr("Via", "1.1 proxy-fronting-tornadoserver")},
 		{"Symfony domain link", &symfonyDetector{}, "", hdr("Link", "<https://symfony.com/x>; rel=help")},
+		{"Symfony near-miss cookie", &symfonyDetector{}, "", hdr("Set-Cookie", "misfa_sf_token=abc123; path=/")},
 		{"Spring Boot tutorial prose", &springBootDetector{}, `<article>To fix the Whitelabel Error Page in Spring Boot, add a controller.</article>`, http.Header{}},
 		{"plain page Tornado", &tornadoDetector{}, "<html><body>hello</body></html>", hdr("Server", "nginx/1.25.3")},
 		{"plain page Play", &playDetector{}, "<html></html>", hdr("Set-Cookie", "sessionid=abc; Path=/")},
