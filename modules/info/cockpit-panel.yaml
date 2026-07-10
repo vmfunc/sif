@@ -1,5 +1,3 @@
-# Cockpit Login Panel Detection Module
-
 id: cockpit-panel
 info:
   name: Cockpit Login Panel
