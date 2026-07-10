@@ -1,5 +1,3 @@
-# Zabbix Login Panel Detection Module
-
 id: zabbix-panel
 info:
   name: Zabbix Login Panel

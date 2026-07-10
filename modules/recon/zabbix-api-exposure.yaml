@@ -1,5 +1,3 @@
-# Zabbix API Exposure Detection Module
-
 id: zabbix-api-exposure
 info:
   name: Zabbix API Exposure
