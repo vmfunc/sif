@@ -40,6 +40,7 @@ type Settings struct {
 	Git               bool
 	Whois             bool
 	Threads           int
+	Concurrency       int
 	Nuclei            bool
 	JavaScript        bool
 	Timeout           time.Duration
@@ -171,6 +172,7 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 		flagSet.DurationVarP(&settings.Timeout, "timeout", "t", 10*time.Second, "HTTP request timeout"),
 		flagSet.StringVarP(&settings.LogDir, "log", "l", "", "Directory to store logs in"),
 		flagSet.IntVar(&settings.Threads, "threads", 10, "Number of threads to run scans on"),
+		flagSet.IntVar(&settings.Concurrency, "concurrency", 1, "Number of targets to scan in parallel (>1 interleaves console output)"),
 		flagSet.StringVar(&settings.Template, "template", "", "Load scan settings from a template (preset minimal/recon/full, or a local yaml file)"),
 	)
 
@@ -239,6 +241,12 @@ func Parse() *Settings {
 	// negative value can't panic the waitgroup.
 	if settings.Threads < minThreads {
 		settings.Threads = minThreads
+	}
+
+	// concurrency bounds the target worker pool; floor it so 0/negative means
+	// sequential rather than a stalled or panicking pool.
+	if settings.Concurrency < 1 {
+		settings.Concurrency = 1
 	}
 
 	return settings

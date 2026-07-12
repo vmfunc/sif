@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif/internal/config"
@@ -322,409 +323,514 @@ func (app *App) Run() error {
 		}
 	}
 
-	for _, url := range app.targets {
-		output.Info("Starting scan on %s", output.Highlight.Render(url))
+	results, err := app.scanAllTargets(storeDir, wantReport)
+	if err != nil {
+		return err
+	}
 
-		moduleResults := make([]ModuleResult, 0, 16)
-
-		if app.settings.LogDir != "" {
-			if err := logger.CreateFile(&app.logFiles, url, app.settings.LogDir); err != nil {
-				return err
-			}
-		}
-
-		if !app.settings.NoScan {
-			scan.Scan(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			scansRun = append(scansRun, "Basic Scan")
-		}
-
-		if app.settings.Framework {
-			result, err := frameworks.DetectFramework(url, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running framework detection: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "Framework Detection")
-			}
-		}
-
-		if app.settings.Dirlist != "none" {
-			result, err := scan.Dirlist(app.settings.Dirlist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, scan.DirlistOptions{
-				MatchCodes:  app.settings.DirMatchCodes,
-				FilterCodes: app.settings.DirFilterCodes,
-				FilterSizes: app.settings.DirFilterSizes,
-				FilterWords: app.settings.DirFilterWords,
-				FilterRegex: app.settings.DirFilterRegex,
-				Calibrate:   app.settings.Calibrate,
-				Wordlist:    app.settings.DirWordlist,
-				Extensions:  app.settings.DirExtensions,
-			})
-			if err != nil {
-				log.Errorf("Error while running directory scan: %s", err)
-			} else {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "Directory Listing")
-			}
-		}
-
-		var dnsResults []string
-
-		if app.settings.Dnslist != "none" {
-			result, err := scan.Dnslist(app.settings.Dnslist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, dnsx.ParseResolvers(app.settings.Resolvers))
-			if err != nil {
-				log.Errorf("Error while running dns scan: %s", err)
-			} else {
-				moduleResults = append(moduleResults, ModuleResult{"dnslist", result})
-				dnsResults = result // Store the DNS results
-				scansRun = append(scansRun, "DNS Scan")
-			}
-
-			// Only run subdomain takeover check if DNS scan is enabled
-			if app.settings.SubdomainTakeover {
-				result, err := scan.SubdomainTakeover(url, dnsResults, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-				if err != nil {
-					log.Errorf("Error while running Subdomain Takeover Vulnerability Check: %s", err)
-				} else {
-					moduleResults = append(moduleResults, ModuleResult{"subdomain_takeover", result})
-					scansRun = append(scansRun, "Subdomain Takeover")
-				}
-			}
-		} else if app.settings.SubdomainTakeover {
-			log.Warnf("Subdomain Takeover check is enabled but DNS scan is disabled. Skipping Subdomain Takeover check.")
-		}
-
-		if app.settings.Dorking {
-			result, err := scan.Dork(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running Dork module: %s", err)
-			} else {
-				moduleResults = append(moduleResults, ModuleResult{"dork", result})
-				scansRun = append(scansRun, "Dork")
-			}
-		}
-
-		if app.settings.Ports != "none" {
-			result, err := scan.Ports(context.Background(), app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running port scan: %s", err)
-			} else {
-				moduleResults = append(moduleResults, ModuleResult{"portscan", result})
-				scansRun = append(scansRun, "Port Scan")
-			}
-		}
-
-		if app.settings.Whois {
-			scan.Whois(url, app.settings.LogDir)
-			scansRun = append(scansRun, "Whois")
-		}
-
-		if app.settings.Git {
-			result, err := scan.Git(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running Git module: %s", err)
-			} else {
-				moduleResults = append(moduleResults, ModuleResult{"git", result})
-				scansRun = append(scansRun, "Git")
-			}
-		}
-
-		if app.settings.Nuclei {
-			result, err := scan.Nuclei(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running Nuclei module: %s", err)
-			} else {
-				moduleResults = append(moduleResults, ModuleResult{"nuclei", result})
-				scansRun = append(scansRun, "Nuclei")
-			}
-		}
-
-		if app.settings.JavaScript {
-			result, err := jsscan.JavascriptScan(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running JS module: %s", err)
-			} else {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "JS")
-			}
-		}
-
-		if app.settings.CMS {
-			result, err := scan.CMS(url, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running CMS detection: %s", err)
-				scansRun = append(scansRun, "CMS")
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-			}
-		}
-
-		if app.settings.Headers {
-			result, err := scan.Headers(url, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running HTTP Header Analysis: %s", err)
-			} else {
-				moduleResults = append(moduleResults, ModuleResult{"headers", result})
-				scansRun = append(scansRun, "HTTP Headers")
-			}
-		}
-
-		if app.settings.SecurityHeaders {
-			result, err := scan.SecurityHeaders(url, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running Security Header Analysis: %s", err)
-			} else {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "Security Headers")
-			}
-		}
-
-		if app.settings.CloudStorage {
-			result, err := scan.CloudStorage(url, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running C3 Scan: %s", err)
-			} else {
-				moduleResults = append(moduleResults, ModuleResult{"cloudstorage", result})
-				scansRun = append(scansRun, "Cloud Storage")
-			}
-		}
-
-		if app.settings.Shodan {
-			result, err := scan.Shodan(url, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running Shodan lookup: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "Shodan")
-			}
-		}
-
-		if app.settings.SQL {
-			result, err := scan.SQL(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, app.settings.Calibrate)
-			if err != nil {
-				log.Errorf("Error while running SQL reconnaissance: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "SQL Recon")
-			}
-		}
-
-		if app.settings.LFI {
-			result, err := scan.LFI(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running LFI reconnaissance: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "LFI Recon")
-			}
-		}
-
-		if app.settings.JWT {
-			result, err := scan.JWT(url, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running JWT analysis: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "JWT")
-			}
-		}
-
-		if app.settings.OpenAPI {
-			result, err := scan.OpenAPI(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running OpenAPI probe: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "OpenAPI")
-			}
-		}
-
-		if app.settings.Favicon {
-			result, err := scan.Favicon(url, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running favicon fingerprint: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "Favicon")
-			}
-		}
-
-		if app.settings.CORS {
-			result, err := scan.CORS(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running CORS probe: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "CORS")
-			}
-		}
-
-		if app.settings.Redirect {
-			result, err := scan.Redirect(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running open redirect probe: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "Open Redirect")
-			}
-		}
-
-		if app.settings.XSS {
-			result, err := scan.XSS(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running reflected XSS probe: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "Reflected XSS")
-			}
-		}
-
-		if app.settings.Crawl {
-			result, err := scan.Crawl(url, app.settings.CrawlDepth, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running web crawl: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "Crawl")
-			}
-		}
-
-		if app.settings.Passive {
-			result, err := scan.Passive(url, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running passive discovery: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "Passive")
-			}
-		}
-
-		if app.settings.Probe {
-			result, err := scan.Probe(url, app.settings.Timeout, app.settings.LogDir)
-			if err != nil {
-				log.Errorf("Error while running probe: %s", err)
-			} else if result != nil {
-				moduleResults = append(moduleResults, NewModuleResult(result))
-				scansRun = append(scansRun, "Probe")
-			}
-		}
-
-		// Load and run modules
-		if app.settings.AllModules || app.settings.Modules != "" || app.settings.ModuleTags != "" {
-			loader, err := modules.NewLoader()
-			if err != nil {
-				log.Warnf("Failed to create module loader: %v", err)
-			} else {
-				if err := loader.LoadAll(); err != nil {
-					log.Warnf("Failed to load modules: %v", err)
-				}
-
-				// Register built-in Go modules
-				builtin.Register()
-
-				// Determine which modules to run
-				var toRun []modules.Module
-				switch {
-				case app.settings.AllModules:
-					toRun = modules.All()
-				case app.settings.ModuleTags != "":
-					for _, tag := range strings.Split(app.settings.ModuleTags, ",") {
-						toRun = append(toRun, modules.ByTag(strings.TrimSpace(tag))...)
-					}
-				case app.settings.Modules != "":
-					for _, id := range strings.Split(app.settings.Modules, ",") {
-						if m, ok := modules.Get(strings.TrimSpace(id)); ok {
-							toRun = append(toRun, m)
-						} else {
-							log.Warnf("Module not found: %s", id)
-						}
-					}
-				}
-
-				seen := make(map[string]bool, len(toRun))
-				deduped := make([]modules.Module, 0, len(toRun))
-				for _, m := range toRun {
-					if id := m.Info().ID; !seen[id] {
-						seen[id] = true
-						deduped = append(deduped, m)
-					}
-				}
-				toRun = deduped
-
-				// Execute modules
-				opts := modules.Options{
-					Timeout: app.settings.Timeout,
-					Threads: app.settings.Threads,
-					LogDir:  app.settings.LogDir,
-				}
-
-				for _, m := range toRun {
-					switch m.Info().ID {
-					case "nuclei-scan":
-						if app.settings.Nuclei {
-							continue
-						}
-					case "framework-detection":
-						if app.settings.Framework {
-							continue
-						}
-					case "shodan-lookup":
-						if app.settings.Shodan {
-							continue
-						}
-					case "whois-lookup":
-						if app.settings.Whois {
-							continue
-						}
-					}
-					modLog := output.Module(m.Info().ID)
-					modLog.Start()
-					result, err := m.Execute(context.Background(), url, opts)
-					if err != nil {
-						modLog.Error("failed: %v", err)
-						continue
-					}
-					if result != nil && len(result.Findings) > 0 {
-						moduleResults = append(moduleResults, NewModuleResult(result))
-						modLog.Complete(len(result.Findings), "findings")
-					} else {
-						modLog.Complete(0, "findings")
-					}
-				}
-			}
-		}
-
-		if app.settings.ApiMode {
-			result := UrlResult{
-				Url:     url,
-				Results: moduleResults,
-			}
-
-			marshalled, err := json.Marshal(result)
-			if err != nil {
-				log.Errorf("failed to marshal result: %s", err)
-				continue
-			}
-			fmt.Println(string(marshalled))
-		}
-
-		targetFindings := collectFindings(url, moduleResults)
-		allFindings = append(allFindings, targetFindings...)
-
-		// diff mode is per-target: load this target's last snapshot, surface only
-		// the delta, then overwrite the snapshot so the next run diffs against now.
-		// storeDir is "" when diff is off or the dir couldn't resolve, in which
-		// case this is a no-op and behavior is unchanged.
-		if storeDir != "" {
-			app.diffTarget(storeDir, url, targetFindings)
-		}
-
-		// the report carries raw blobs and is only built when an export flag is
-		// set, so the common path skips the marshalling entirely.
+	// merge per-target results in input order so the run-wide view is identical
+	// regardless of the order workers finished under -concurrency.
+	for _, ts := range results {
+		scansRun = append(scansRun, ts.scansRun...)
+		app.logFiles = append(app.logFiles, ts.logFiles...)
+		allFindings = append(allFindings, ts.findings...)
 		if wantReport {
-			reportResults = append(reportResults, collectReportResults(url, moduleResults)...)
+			reportResults = append(reportResults, ts.reportResults...)
 		}
 	}
 
+	return app.finishRun(scansRun, allFindings, reportResults, wantReport)
+}
+
+// targetScan holds one target's isolated scan output: its findings, report rows,
+// scan labels and log files, which the run loop merges in target order.
+type targetScan struct {
+	findings      []finding.Finding
+	reportResults []report.Result
+	scansRun      []string
+	logFiles      []string
+}
+
+// scanAllTargets scans every target and returns the per-target results in input
+// order. With concurrency 1 it runs sequentially, behaviour-identical to a plain
+// loop. Above 1 it runs a bounded worker pool: scanTarget is self-contained
+// (isolated accumulators, no run-wide writes), so the only shared surface is the
+// console, which output.SetConcurrent serializes and de-animates. Results are
+// indexed by target position, so the caller merges them in a stable order no
+// matter which worker finished first.
+func (app *App) scanAllTargets(storeDir string, wantReport bool) ([]targetScan, error) {
+	results := make([]targetScan, len(app.targets))
+
+	concurrency := app.settings.Concurrency
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	if concurrency > len(app.targets) {
+		concurrency = len(app.targets)
+	}
+
+	if concurrency <= 1 {
+		for i, url := range app.targets {
+			ts, err := app.scanTarget(url, storeDir, wantReport)
+			if err != nil {
+				return nil, err
+			}
+			results[i] = ts
+		}
+		return results, nil
+	}
+
+	output.SetConcurrent(true)
+
+	errs := make([]error, len(app.targets))
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+	for i, url := range app.targets {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, url string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			// a panic in one target's scan (a module bug, a nil deref deep in a
+			// third-party client) must not take down every other worker's
+			// in-flight scan; convert it into that target's error instead.
+			defer func() {
+				if r := recover(); r != nil {
+					errs[i] = fmt.Errorf("panic scanning %s: %v", url, r)
+				}
+			}()
+			results[i], errs[i] = app.scanTarget(url, storeDir, wantReport)
+		}(i, url)
+	}
+	wg.Wait()
+
+	for _, err := range errs {
+		if err != nil {
+			return nil, err
+		}
+	}
+	return results, nil
+}
+
+// scanTarget runs the full scanner set for one target and returns its isolated
+// accumulators without mutating run-wide state.
+func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, error) {
+	var scansRun []string
+	var logFiles []string
+
+	output.Info("Starting scan on %s", output.Highlight.Render(url))
+
+	moduleResults := make([]ModuleResult, 0, 16)
+
+	if app.settings.LogDir != "" {
+		if err := logger.CreateFile(&logFiles, url, app.settings.LogDir); err != nil {
+			return targetScan{}, err
+		}
+	}
+
+	if !app.settings.NoScan {
+		scan.Scan(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		scansRun = append(scansRun, "Basic Scan")
+	}
+
+	if app.settings.Framework {
+		result, err := frameworks.DetectFramework(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running framework detection: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "Framework Detection")
+		}
+	}
+
+	if app.settings.Dirlist != "none" {
+		result, err := scan.Dirlist(app.settings.Dirlist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, scan.DirlistOptions{
+			MatchCodes:  app.settings.DirMatchCodes,
+			FilterCodes: app.settings.DirFilterCodes,
+			FilterSizes: app.settings.DirFilterSizes,
+			FilterWords: app.settings.DirFilterWords,
+			FilterRegex: app.settings.DirFilterRegex,
+			Calibrate:   app.settings.Calibrate,
+			Wordlist:    app.settings.DirWordlist,
+			Extensions:  app.settings.DirExtensions,
+		})
+		if err != nil {
+			log.Errorf("Error while running directory scan: %s", err)
+		} else {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "Directory Listing")
+		}
+	}
+
+	var dnsResults []string
+
+	if app.settings.Dnslist != "none" {
+		result, err := scan.Dnslist(app.settings.Dnslist, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, dnsx.ParseResolvers(app.settings.Resolvers))
+		if err != nil {
+			log.Errorf("Error while running dns scan: %s", err)
+		} else {
+			moduleResults = append(moduleResults, ModuleResult{"dnslist", result})
+			dnsResults = result // Store the DNS results
+			scansRun = append(scansRun, "DNS Scan")
+		}
+
+		// Only run subdomain takeover check if DNS scan is enabled
+		if app.settings.SubdomainTakeover {
+			result, err := scan.SubdomainTakeover(url, dnsResults, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+			if err != nil {
+				log.Errorf("Error while running Subdomain Takeover Vulnerability Check: %s", err)
+			} else {
+				moduleResults = append(moduleResults, ModuleResult{"subdomain_takeover", result})
+				scansRun = append(scansRun, "Subdomain Takeover")
+			}
+		}
+	} else if app.settings.SubdomainTakeover {
+		log.Warnf("Subdomain Takeover check is enabled but DNS scan is disabled. Skipping Subdomain Takeover check.")
+	}
+
+	if app.settings.Dorking {
+		result, err := scan.Dork(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running Dork module: %s", err)
+		} else {
+			moduleResults = append(moduleResults, ModuleResult{"dork", result})
+			scansRun = append(scansRun, "Dork")
+		}
+	}
+
+	if app.settings.Ports != "none" {
+		result, err := scan.Ports(context.Background(), app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running port scan: %s", err)
+		} else {
+			moduleResults = append(moduleResults, ModuleResult{"portscan", result})
+			scansRun = append(scansRun, "Port Scan")
+		}
+	}
+
+	if app.settings.Whois {
+		scan.Whois(url, app.settings.LogDir)
+		scansRun = append(scansRun, "Whois")
+	}
+
+	if app.settings.Git {
+		result, err := scan.Git(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running Git module: %s", err)
+		} else {
+			moduleResults = append(moduleResults, ModuleResult{"git", result})
+			scansRun = append(scansRun, "Git")
+		}
+	}
+
+	if app.settings.Nuclei {
+		result, err := scan.Nuclei(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running Nuclei module: %s", err)
+		} else {
+			moduleResults = append(moduleResults, ModuleResult{"nuclei", result})
+			scansRun = append(scansRun, "Nuclei")
+		}
+	}
+
+	if app.settings.JavaScript {
+		result, err := jsscan.JavascriptScan(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running JS module: %s", err)
+		} else {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "JS")
+		}
+	}
+
+	if app.settings.CMS {
+		result, err := scan.CMS(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running CMS detection: %s", err)
+			scansRun = append(scansRun, "CMS")
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+		}
+	}
+
+	if app.settings.Headers {
+		result, err := scan.Headers(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running HTTP Header Analysis: %s", err)
+		} else {
+			moduleResults = append(moduleResults, ModuleResult{"headers", result})
+			scansRun = append(scansRun, "HTTP Headers")
+		}
+	}
+
+	if app.settings.SecurityHeaders {
+		result, err := scan.SecurityHeaders(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running Security Header Analysis: %s", err)
+		} else {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "Security Headers")
+		}
+	}
+
+	if app.settings.CloudStorage {
+		result, err := scan.CloudStorage(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running C3 Scan: %s", err)
+		} else {
+			moduleResults = append(moduleResults, ModuleResult{"cloudstorage", result})
+			scansRun = append(scansRun, "Cloud Storage")
+		}
+	}
+
+	if app.settings.Shodan {
+		result, err := scan.Shodan(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running Shodan lookup: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "Shodan")
+		}
+	}
+
+	if app.settings.SQL {
+		result, err := scan.SQL(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir, app.settings.Calibrate)
+		if err != nil {
+			log.Errorf("Error while running SQL reconnaissance: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "SQL Recon")
+		}
+	}
+
+	if app.settings.LFI {
+		result, err := scan.LFI(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running LFI reconnaissance: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "LFI Recon")
+		}
+	}
+
+	if app.settings.JWT {
+		result, err := scan.JWT(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running JWT analysis: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "JWT")
+		}
+	}
+
+	if app.settings.OpenAPI {
+		result, err := scan.OpenAPI(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running OpenAPI probe: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "OpenAPI")
+		}
+	}
+
+	if app.settings.Favicon {
+		result, err := scan.Favicon(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running favicon fingerprint: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "Favicon")
+		}
+	}
+
+	if app.settings.CORS {
+		result, err := scan.CORS(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running CORS probe: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "CORS")
+		}
+	}
+
+	if app.settings.Redirect {
+		result, err := scan.Redirect(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running open redirect probe: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "Open Redirect")
+		}
+	}
+
+	if app.settings.XSS {
+		result, err := scan.XSS(url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running reflected XSS probe: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "Reflected XSS")
+		}
+	}
+
+	if app.settings.Crawl {
+		result, err := scan.Crawl(url, app.settings.CrawlDepth, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running web crawl: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "Crawl")
+		}
+	}
+
+	if app.settings.Passive {
+		result, err := scan.Passive(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running passive discovery: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "Passive")
+		}
+	}
+
+	if app.settings.Probe {
+		result, err := scan.Probe(url, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running probe: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "Probe")
+		}
+	}
+
+	// Load and run modules
+	if app.settings.AllModules || app.settings.Modules != "" || app.settings.ModuleTags != "" {
+		loader, err := modules.NewLoader()
+		if err != nil {
+			log.Warnf("Failed to create module loader: %v", err)
+		} else {
+			if err := loader.LoadAll(); err != nil {
+				log.Warnf("Failed to load modules: %v", err)
+			}
+
+			// Register built-in Go modules
+			builtin.Register()
+
+			// Determine which modules to run
+			var toRun []modules.Module
+			switch {
+			case app.settings.AllModules:
+				toRun = modules.All()
+			case app.settings.ModuleTags != "":
+				for _, tag := range strings.Split(app.settings.ModuleTags, ",") {
+					toRun = append(toRun, modules.ByTag(strings.TrimSpace(tag))...)
+				}
+			case app.settings.Modules != "":
+				for _, id := range strings.Split(app.settings.Modules, ",") {
+					if m, ok := modules.Get(strings.TrimSpace(id)); ok {
+						toRun = append(toRun, m)
+					} else {
+						log.Warnf("Module not found: %s", id)
+					}
+				}
+			}
+
+			seen := make(map[string]bool, len(toRun))
+			deduped := make([]modules.Module, 0, len(toRun))
+			for _, m := range toRun {
+				if id := m.Info().ID; !seen[id] {
+					seen[id] = true
+					deduped = append(deduped, m)
+				}
+			}
+			toRun = deduped
+
+			// Execute modules
+			opts := modules.Options{
+				Timeout: app.settings.Timeout,
+				Threads: app.settings.Threads,
+				LogDir:  app.settings.LogDir,
+			}
+
+			for _, m := range toRun {
+				switch m.Info().ID {
+				case "nuclei-scan":
+					if app.settings.Nuclei {
+						continue
+					}
+				case "framework-detection":
+					if app.settings.Framework {
+						continue
+					}
+				case "shodan-lookup":
+					if app.settings.Shodan {
+						continue
+					}
+				case "whois-lookup":
+					if app.settings.Whois {
+						continue
+					}
+				}
+				modLog := output.Module(m.Info().ID)
+				modLog.Start()
+				result, err := m.Execute(context.Background(), url, opts)
+				if err != nil {
+					modLog.Error("failed: %v", err)
+					continue
+				}
+				if result != nil && len(result.Findings) > 0 {
+					moduleResults = append(moduleResults, NewModuleResult(result))
+					modLog.Complete(len(result.Findings), "findings")
+				} else {
+					modLog.Complete(0, "findings")
+				}
+			}
+		}
+	}
+
+	if app.settings.ApiMode {
+		result := UrlResult{
+			Url:     url,
+			Results: moduleResults,
+		}
+
+		marshalled, err := json.Marshal(result)
+		if err != nil {
+			log.Errorf("failed to marshal result: %s", err)
+			return targetScan{scansRun: scansRun, logFiles: logFiles}, nil
+		}
+		fmt.Println(string(marshalled))
+	}
+
+	targetFindings := collectFindings(url, moduleResults)
+
+	// diff mode is per-target: load this target's last snapshot, surface only
+	// the delta, then overwrite the snapshot so the next run diffs against now.
+	// storeDir is "" when diff is off or the dir couldn't resolve, in which
+	// case this is a no-op and behavior is unchanged.
+	if storeDir != "" {
+		app.diffTarget(storeDir, url, targetFindings)
+	}
+
+	// the report carries raw blobs and is only built when an export flag is
+	// set, so the common path skips the marshalling entirely.
+	var reportResults []report.Result
+	if wantReport {
+		reportResults = collectReportResults(url, moduleResults)
+	}
+
+	return targetScan{
+		findings:      targetFindings,
+		reportResults: reportResults,
+		scansRun:      scansRun,
+		logFiles:      logFiles,
+	}, nil
+}
+
+// finishRun performs the run-wide steps after every target has been scanned:
+// notify, the silent findings stream, report files and the summary. It consumes
+// the merged accumulators so per-target scanning stays isolated in scanTarget.
+func (app *App) finishRun(scansRun []string, allFindings []finding.Finding, reportResults []report.Result, wantReport bool) error {
 	// the normalized findings are the handoff point for notify/diff; surface the
 	// count now so the path is live and observable without changing output.
 	log.Debugf("normalized %d findings across %d targets", len(allFindings), len(app.targets))
