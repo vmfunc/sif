@@ -25,6 +25,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif/internal/httpx"
 	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/output"
 	"github.com/vmfunc/sif/internal/pool"
 	"github.com/vmfunc/sif/internal/styles"
 )
@@ -74,7 +75,7 @@ var takeoverProviders = map[string]string{
 // SubdomainTakeover checks dnsResults for dangling subdomains pointing at
 // unclaimed third-party services.
 func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, threads int, logdir string) ([]SubdomainTakeoverResult, error) {
-	fmt.Println(styles.Separator.Render("Starting " + styles.Status.Render("Subdomain Takeover Vulnerability Check") + "..."))
+	output.ScanStart("Subdomain Takeover Vulnerability Check")
 
 	sanitizedURL := stripScheme(url)
 

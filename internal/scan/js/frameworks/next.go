@@ -24,7 +24,6 @@ package frameworks
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -33,6 +32,7 @@ import (
 
 	urlutil "github.com/projectdiscovery/utils/url"
 	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/output"
 )
 
 // nextPagesRegex matches JavaScript file references in Next.js build manifest.
@@ -50,7 +50,7 @@ func GetPagesRouterScripts(scriptUrl string, timeout time.Duration) ([]string, e
 
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, scriptUrl, http.NoBody)
 	if err != nil {
-		fmt.Println(err)
+		output.Error("%v", err)
 		return nil, err
 	}
 
@@ -58,14 +58,14 @@ func GetPagesRouterScripts(scriptUrl string, timeout time.Duration) ([]string, e
 	// hang the whole scan; a zero timeout would read with no deadline.
 	resp, err := httpx.Client(timeout).Do(req)
 	if err != nil {
-		fmt.Println(err)
+		output.Error("%v", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestSize))
 	if err != nil {
-		fmt.Println(err)
+		output.Error("%v", err)
 		return nil, err
 	}
 	// the manifest ships minified on one line; strip line breaks so the regex

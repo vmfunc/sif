@@ -24,6 +24,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif/internal/httpx"
 	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/output"
 	"github.com/vmfunc/sif/internal/styles"
 )
 
@@ -57,7 +58,7 @@ type CloudStorageResult struct {
 }
 
 func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStorageResult, error) {
-	fmt.Println(styles.Separator.Render("Starting " + styles.Status.Render("Cloud Storage Misconfiguration Scan") + "..."))
+	output.ScanStart("Cloud Storage Misconfiguration Scan")
 
 	sanitizedURL := stripScheme(url)
 
