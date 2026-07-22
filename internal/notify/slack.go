@@ -15,6 +15,7 @@ package notify
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/vmfunc/sif/internal/finding"
 )
@@ -34,12 +35,36 @@ type slackPayload struct {
 }
 
 func (s *slackProvider) send(ctx context.Context, client *http.Client, findings []finding.Finding) error {
-	payload := slackPayload{Text: codeBlock(renderFindings(findings))}
+	payload := slackPayload{Text: codeBlock(escapeSlackText(renderFindings(findings)))}
 	return postJSON(ctx, client, s.webhook, payload)
 }
 
+// escapeSlackText entity-escapes slack's three control characters (& first, so
+// the later replacements don't double-escape). slack resolves a bare
+// "<...|...>" as a link/mention regardless of surrounding code-fence text, so
+// an unescaped title would otherwise render as a live masked link.
+func escapeSlackText(body string) string {
+	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+	return r.Replace(body)
+}
+
 // codeBlock wraps body in a triple-backtick fence; both slack and discord render
-// it fixed-width, which preserves the column-aligned finding lines.
+// it fixed-width, which preserves the column-aligned finding lines. body runs
+// through sanitizeFence first so attacker-controlled finding content (a title
+// pulled from the scanned target) can't close the fence early and inject
+// markdown/mentions outside it.
 func codeBlock(body string) string {
-	return "```\n" + body + "```"
+	return "```\n" + sanitizeFence(body) + "```"
+}
+
+// sanitizeFence separates every backtick in body from the next with a
+// zero-width space. the text still reads as backticks to a human but no two
+// are ever adjacent, so neither slack nor discord sees a fence boundary and
+// attacker content can't close the code block we wrap it in.
+//
+// breaking exact triples instead would leave a trailing bare backtick, and any
+// run of length \u2261 2 mod 3 (5, 8, 11...) would reform a contiguous triple.
+func sanitizeFence(body string) string {
+	const zwsp = "\u200b" // zero-width space
+	return strings.ReplaceAll(body, "`", "`"+zwsp)
 }
