@@ -1,5 +1,3 @@
-# Gitea favicon fingerprint
-
 id: favicon-gitea
 info:
   name: Gitea Favicon Fingerprint
@@ -18,6 +16,9 @@ http:
   matchers:
     - type: status
       status: [200]
+    # /favicon.ico serves /assets/img/favicon.png. gitea reskinned it, so both
+    # live generations are listed; hashes are or'd.
     - type: favicon
       hash:
-        - -1893514588 # Gitea default favicon
+        - -754147112  # v1.15 through v1.24
+        - -1668137428 # v1.25 onward
