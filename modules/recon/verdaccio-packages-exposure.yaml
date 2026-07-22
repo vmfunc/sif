@@ -1,0 +1,49 @@
+id: verdaccio-packages-exposure
+info:
+  name: Verdaccio Packages Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Verdaccio private npm registry that lets anyone enumerate every locally published package through its web api
+  tags: [verdaccio, npm, registry, package-registry, information-disclosure, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/-/verdaccio/data/packages"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: header
+      regex:
+        - '(?i)content-type:\s*application/json'
+
+    - type: regex
+      part: body
+      regex:
+        - '^\s*\['
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: verdaccio_package
+      part: body
+      regex:
+        - '"name"\s*:\s*"([^"]+)"'
+      group: 1

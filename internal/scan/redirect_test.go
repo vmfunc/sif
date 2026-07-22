@@ -152,6 +152,15 @@ func TestPointsAtSentinel(t *testing.T) {
 		{"opaque scheme not off-site", "mailto:" + redirectSentinel, false},
 		{"sentinel only in path", "https://safe.example.com/" + redirectSentinel, false},
 		{"sentinel only in query", "https://safe.example.com/?to=" + redirectSentinel, false},
+		{"leading space before scheme-relative", "  //" + redirectSentinel, true},
+		{"leading tab before scheme-relative", "\t//" + redirectSentinel, true},
+		{"tab injected inside scheme", "htt\tps://" + redirectSentinel, true},
+		{"trailing newline", "//" + redirectSentinel + "\n", true},
+		{"cr injected inside scheme", "ht\rtps://" + redirectSentinel, true},
+		// stripping leading/trailing whitespace must not turn a same-site target off-site
+		{"leading space same-site path", "  /login", false},
+		// a mid-string space is not a tab/newline, so it stays and the host stays same-site
+		{"mid-string space keeps host same-site", "https://safe.example.com/a b/" + redirectSentinel, false},
 	}
 
 	for _, tt := range tests {

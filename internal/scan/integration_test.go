@@ -371,11 +371,14 @@ func TestIntegrationSecurityTrails(t *testing.T) {
 }
 
 func TestIntegrationCloudStorage(t *testing.T) {
-	// the fixture returns 200 only for the planted bucket, so any candidate that
-	// matches it is reported public.
+	// the fixture serves a real ListBucketResult listing only for the planted
+	// bucket, so any candidate that matches it is reported public; a bare 200
+	// with no listing body is (correctly) not enough to flag one.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/example" {
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>example</Name><Contents><Key>f</Key></Contents></ListBucketResult>`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)

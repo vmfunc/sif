@@ -1,0 +1,37 @@
+# Metaflow Metadata Service Exposure Detection Module
+
+id: metaflow-metadata-exposure
+info:
+  name: Metaflow Metadata Service Exposure
+  author: sif
+  severity: medium
+  description: Detects a Metaflow metadata service reachable without auth, disclosing every registered flow's name, owner and creation time over its rest api
+  tags: [metaflow, mlops, data-orchestration, pipeline, api, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/flows"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"flow_id\""
+        - "\"user_name\""
+        - "\"ts_epoch\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: metaflow_flow_id
+      part: body
+      regex:
+        - '"flow_id"\s*:\s*"([^"]+)"'
+      group: 1

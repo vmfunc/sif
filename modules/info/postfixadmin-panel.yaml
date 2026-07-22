@@ -1,0 +1,42 @@
+# PostfixAdmin Login Panel Detection Module
+
+id: postfixadmin-panel
+info:
+  name: PostfixAdmin Login Panel
+  author: sif
+  severity: info
+  description: Detects an exposed PostfixAdmin mail admin login panel
+  tags: [postfixadmin, mail, mailserver, admin, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/login.php"
+    - "{{BaseURL}}/postfixadmin/login.php"
+
+  matchers:
+    - type: word
+      part: body
+      condition: and
+      words:
+        - 'name="fUsername"'
+        - 'name="fPassword"'
+
+    - type: regex
+      part: body
+      regex:
+        - "(?i)postfix\\s*admin"
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: postfixadmin_version
+      part: body
+      regex:
+        - "Postfix Admin ([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)"
+      group: 1

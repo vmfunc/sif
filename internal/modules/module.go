@@ -103,6 +103,8 @@ type Matcher struct {
 	// unbounded on that side; at least one must be set. range only.
 	Min *int `yaml:"min,omitempty"`
 	Max *int `yaml:"max,omitempty"`
+	// CaseInsensitive folds word matching to lower-case when set (word matcher only).
+	CaseInsensitive bool `yaml:"case-insensitive,omitempty"`
 }
 
 // Extractor defines data extraction from responses.

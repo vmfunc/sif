@@ -274,6 +274,13 @@ func pointsAtSentinel(location string) bool {
 		return false
 	}
 
+	// a location like " //host" or "htt\tps://host" still navigates off-site
+	// in a browser even though it fails net/url's stricter parse.
+	location = stripURLWhitespace(location)
+	if location == "" {
+		return false
+	}
+
 	// browsers treat backslashes in the authority as forward slashes
 	normalized := strings.ReplaceAll(location, "\\", "/")
 
@@ -297,6 +304,14 @@ func pointsAtSentinel(location string) bool {
 	}
 
 	return false
+}
+
+// stripURLWhitespace mirrors the whatwg url parser's whitespace pass: trim
+// leading/trailing c0 control or space, then strip every tab, cr and lf
+// wherever they occur.
+func stripURLWhitespace(s string) string {
+	s = strings.TrimFunc(s, func(r rune) bool { return r <= ' ' })
+	return strings.NewReplacer("\t", "", "\r", "", "\n", "").Replace(s)
 }
 
 // stripPort drops a trailing :port so host comparisons ignore it.

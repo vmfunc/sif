@@ -34,6 +34,29 @@ func FaviconHash(data []byte) int32 {
 	return int32(murmur3.Sum32(encoded)) //nolint:gosec // shodan stores the signed reinterpretation on purpose
 }
 
+// faviconTech maps a known shodan favicon hash to the tech that ships it.
+// these are stable default icons for panels/frameworks/c2; a hit is a strong
+// fingerprint. kept small on purpose - high-signal defaults, not an exhaustive db.
+var faviconTech = map[int32]string{
+	116323821:   "Apache Tomcat",
+	81586312:    "Spring Boot (default whitelabel)",
+	-235701012:  "Jenkins",
+	-1255347784: "GitLab",
+	1278322581:  "Grafana",
+	743365239:   "Kibana",
+	-1462443472: "phpMyAdmin",
+	999357577:   "Cobalt Strike (default beacon)",
+	-1521704893: "Metasploit",
+	-1893514588: "Gitea",
+}
+
+// LookupFaviconTech returns the tech that ships the given shodan favicon hash and
+// whether the hash is known.
+func LookupFaviconTech(hash int32) (string, bool) {
+	tech, ok := faviconTech[hash]
+	return tech, ok
+}
+
 // encodeFaviconBase64 mirrors python's base64.encodebytes: standard base64 with
 // a newline inserted every 76 output characters and a trailing newline. this is
 // the exact byte stream shodan feeds to mmh3, so it must match byte-for-byte.

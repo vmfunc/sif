@@ -1,0 +1,44 @@
+# InvokeAI Runtime Config Exposure Detection Module
+
+id: invokeai-runtime-config-exposure
+info:
+  name: InvokeAI Runtime Config Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed InvokeAI instance whose runtime-config api discloses host filesystem paths and generation settings without authentication; InvokeAI has no login gate on this route by default, unlike its admin-only config write endpoint
+  tags: [invokeai, ai, image, stable-diffusion, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1/app/runtime_config"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"set_fields\""
+
+    - type: word
+      part: body
+      words:
+        - "\"legacy_conf_dir\""
+
+    - type: word
+      part: body
+      words:
+        - "\"custom_nodes_dir\""
+
+  extractors:
+    - type: regex
+      name: invokeai_models_dir
+      part: body
+      regex:
+        - '"models_dir"\s*:\s*"([^"]+)"'
+      group: 1

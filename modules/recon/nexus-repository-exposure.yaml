@@ -1,0 +1,39 @@
+id: nexus-repository-exposure
+info:
+  name: Nexus Repository Catalog Exposure
+  author: sif
+  severity: high
+  description: Detects a Sonatype Nexus Repository Manager with anonymous access left enabled, letting an unauthenticated caller enumerate the full repository catalog through the rest api
+  tags: [nexus, sonatype, repository, artifact, registry, api, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/service/rest/v1/repositories"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"format\""
+        - "\"type\""
+      condition: and
+
+    - type: regex
+      part: body
+      regex:
+        - '"url"\s*:\s*"https?://[^"]*/repository/'
+
+  extractors:
+    - type: regex
+      name: nexus_repository_names
+      part: body
+      regex:
+        - '"name"\s*:\s*"([^"]+)"'
+      group: 1

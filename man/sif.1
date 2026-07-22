@@ -177,6 +177,12 @@ number of concurrent workers (default 10). values below 1 are clamped to 1.
 .BR \-\-template " \fIname\fR"
 sif runtime template to use.
 .TP
+.BR \-config " \fIpath\fR"
+load flags from a yaml config file (default ~/.config/sif/config.yaml). mutually exclusive with \-\-template.
+.TP
+.BR \-profile " \fIname\fR"
+select a named profile block from the config file.
+.TP
 .BR \-proxy " \fIurl\fR"
 route every request through a proxy. accepts http, https or socks5 urls.
 .TP

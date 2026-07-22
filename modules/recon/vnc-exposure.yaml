@@ -1,0 +1,26 @@
+# VNC Service Exposure Detection Module
+
+id: vnc-exposure
+info:
+  name: VNC Service Exposure
+  author: sif
+  severity: medium
+  description: Detects a network-reachable VNC server by the RFB ProtocolVersion handshake it sends on connect (RFC 6143), confirming a remote-desktop service is exposed and disclosing the protocol version before authentication
+  tags: [vnc, rfb, remote-access, tcp, exposure, recon]
+
+type: tcp
+
+tcp:
+  port: 5900
+
+  matchers:
+    - type: regex
+      regex:
+        - "^RFB [0-9]{3}\\.[0-9]{3}"
+
+  extractors:
+    - type: regex
+      name: rfb_version
+      regex:
+        - "^RFB ([0-9]{3}\\.[0-9]{3})"
+      group: 1

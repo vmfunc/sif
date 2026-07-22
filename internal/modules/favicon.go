@@ -60,7 +60,11 @@ func faviconEvidence(matchers []Matcher, body string) (string, bool) {
 	if !favicon {
 		return "", false
 	}
-	return fmt.Sprintf("favicon mmh3=%d", fingerprint.FaviconHash([]byte(body))), true
+	hash := fingerprint.FaviconHash([]byte(body))
+	if tech, ok := fingerprint.LookupFaviconTech(hash); ok {
+		return fmt.Sprintf("favicon mmh3=%d tech=%s", hash, tech), true
+	}
+	return fmt.Sprintf("favicon mmh3=%d", hash), true
 }
 
 // validateMatchers fails favicon matchers that would silently never fire (no

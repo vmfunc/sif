@@ -277,17 +277,6 @@ func TestExecuteDNSModuleUnsupported(t *testing.T) {
 	}
 }
 
-func TestExecuteTCPModuleUnsupported(t *testing.T) {
-	def := &YAMLModule{ID: "tcp-mod", Type: TypeTCP, TCP: &TCPConfig{Port: 22}}
-	result, err := ExecuteTCPModule(context.Background(), "example.com", def, Options{})
-	if result != nil {
-		t.Errorf("result = %v, want nil for unsupported type", result)
-	}
-	if !errors.Is(err, ErrUnsupportedModuleType) {
-		t.Fatalf("err = %v, want ErrUnsupportedModuleType", err)
-	}
-}
-
 // TestWrapperExecuteRoutesByType confirms the Module wrapper dispatches each
 // type to the right executor and propagates the unsupported-type sentinel.
 func TestWrapperExecuteRoutesByType(t *testing.T) {
@@ -299,11 +288,19 @@ func TestWrapperExecuteRoutesByType(t *testing.T) {
 		}
 	})
 
-	t.Run("tcp routes to unsupported", func(t *testing.T) {
-		def := &YAMLModule{ID: "t", Type: TypeTCP, TCP: &TCPConfig{}}
+	t.Run("tcp routes to executor", func(t *testing.T) {
+		withFakeTCP(t, "SSH-2.0-OpenSSH_9.6")
+		def := &YAMLModule{ID: "t", Type: TypeTCP, TCP: &TCPConfig{
+			Port:     22,
+			Matchers: []Matcher{{Type: "word", Words: []string{"SSH-2.0"}}},
+		}}
 		w := newYAMLModuleWrapper(def, "t.yaml")
-		if _, err := w.Execute(context.Background(), "t", Options{}); !errors.Is(err, ErrUnsupportedModuleType) {
-			t.Fatalf("err = %v, want ErrUnsupportedModuleType", err)
+		res, err := w.Execute(context.Background(), "host", Options{})
+		if err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+		if len(res.Findings) != 1 {
+			t.Fatalf("findings = %d, want 1", len(res.Findings))
 		}
 	})
 
