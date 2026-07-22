@@ -86,6 +86,8 @@ type Settings struct {
 	Notify            bool   // -notify: ship findings to configured providers
 	NotifySeverity    string // -notify-severity: minimum severity to send (info..critical)
 	NotifyConfig      string // -notify-config: path to a notify-compatible yaml file
+	ConfigFile        string // -config: path to a yaml config file ("" = default ~/.config/sif/config.yaml)
+	Profile           string // -profile: named profile overlay from the config file
 }
 
 // minThreads is the floor for the worker count. Threads feeds wg.Add across the
@@ -177,6 +179,11 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 		flagSet.StringVar(&settings.Template, "template", "", "Load scan settings from a template (preset minimal/recon/full, or a local yaml file)"),
 	)
 
+	flagSet.CreateGroup("config", "Config",
+		flagSet.StringVar(&settings.ConfigFile, "config", "", "Load flags from a yaml config file (default ~/.config/sif/config.yaml)"),
+		flagSet.StringVar(&settings.Profile, "profile", "", "Select a named profile from the config file"),
+	)
+
 	flagSet.CreateGroup("http", "HTTP",
 		flagSet.StringVar(&settings.Proxy, "proxy", "", "Proxy for all requests (http/https/socks5 url)"),
 		flagSet.StringSliceVarP(&settings.Header, "header", "H", nil, "Custom header to send (repeatable or comma-separated, \"Key: Value\")", goflags.CommaSeparatedStringSliceOptions),
@@ -218,19 +225,20 @@ func Parse() *Settings {
 	settings := &Settings{}
 	flagSet := registerFlags(settings)
 
-	// -template presets a batch of scans from a yaml file or named preset; point
-	// goflags at it before Parse so it merges as config (cli flags still win) and
-	// replaces the ambient config for this run.
-	templatePath, cleanup, err := templateConfigPath(os.Args[1:])
+	// -config/-profile/-template all resolve to a single flat yaml config path
+	// for goflags to merge, so point it there before Parse (cli flags still
+	// win). unset, this returns "" and goflags falls back to its own ambient
+	// default config path, unchanged from before this feature existed.
+	configPath, cleanup, err := resolveConfigInput(os.Args[1:])
 	if err != nil {
-		log.Fatalf("Could not load template: %s", err)
+		log.Fatalf("Could not load config: %s", err)
 	}
-	if templatePath != "" {
-		flagSet.SetConfigFilePath(templatePath)
+	if configPath != "" {
+		flagSet.SetConfigFilePath(configPath)
 	}
 
-	// Parse merges the template config synchronously, so a temp preset file can
-	// be removed right after, before any fatal exit (no leaking defer).
+	// Parse merges the config synchronously, so a temp overlay file can be
+	// removed right after, before any fatal exit (no leaking defer).
 	parseErr := flagSet.Parse()
 	if cleanup != nil {
 		cleanup()
