@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	googlesearch "github.com/rocketlaunchr/google-search"
 )
 
 func TestCheckSubdomainTakeover_GitHubPages(t *testing.T) {
@@ -20,7 +22,7 @@ func TestCheckSubdomainTakeover_GitHubPages(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	host := strings.TrimPrefix(server.URL, "http://")
 
-	vulnerable, service := checkSubdomainTakeover(host, client)
+	vulnerable, service, _ := checkSubdomainTakeover(host, client)
 
 	if !vulnerable {
 		t.Error("expected subdomain to be vulnerable")
@@ -40,7 +42,7 @@ func TestCheckSubdomainTakeover_NotVulnerable(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	host := strings.TrimPrefix(server.URL, "http://")
 
-	vulnerable, service := checkSubdomainTakeover(host, client)
+	vulnerable, service, _ := checkSubdomainTakeover(host, client)
 
 	if vulnerable {
 		t.Error("expected subdomain to not be vulnerable")
@@ -60,7 +62,7 @@ func TestCheckSubdomainTakeover_Heroku(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	host := strings.TrimPrefix(server.URL, "http://")
 
-	vulnerable, service := checkSubdomainTakeover(host, client)
+	vulnerable, service, _ := checkSubdomainTakeover(host, client)
 
 	if !vulnerable {
 		t.Error("expected subdomain to be vulnerable")
@@ -80,7 +82,7 @@ func TestCheckSubdomainTakeover_AmazonS3(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	host := strings.TrimPrefix(server.URL, "http://")
 
-	vulnerable, service := checkSubdomainTakeover(host, client)
+	vulnerable, service, _ := checkSubdomainTakeover(host, client)
 
 	if !vulnerable {
 		t.Error("expected subdomain to be vulnerable")
@@ -94,7 +96,7 @@ func TestCheckSubdomainTakeover_ConnectionError(t *testing.T) {
 	client := &http.Client{Timeout: 1 * time.Second}
 
 	// Use invalid host to simulate connection error
-	vulnerable, service := checkSubdomainTakeover("invalid.host.that.does.not.exist.local", client)
+	vulnerable, service, _ := checkSubdomainTakeover("invalid.host.that.does.not.exist.local", client)
 
 	if vulnerable {
 		t.Error("expected subdomain to not be vulnerable on connection error")
@@ -273,16 +275,22 @@ func TestSubdomainTakeoverResult(t *testing.T) {
 }
 
 func TestDorkResult(t *testing.T) {
+	// the Url field must hold the URL the dork actually found, not the dork
+	// query that produced it. the query belongs in Dork.
 	result := DorkResult{
-		Url:   "site:example.com filetype:pdf",
-		Count: 42,
+		Url:   "https://example.com/leaked.pdf",
+		Dork:  "site:example.com filetype:pdf",
+		Count: 2,
 	}
 
-	if result.Url != "site:example.com filetype:pdf" {
-		t.Errorf("expected url 'site:example.com filetype:pdf', got '%s'", result.Url)
+	if result.Url != "https://example.com/leaked.pdf" {
+		t.Errorf("expected url 'https://example.com/leaked.pdf', got '%s'", result.Url)
 	}
-	if result.Count != 42 {
-		t.Errorf("expected count 42, got %d", result.Count)
+	if result.Dork != "site:example.com filetype:pdf" {
+		t.Errorf("expected dork 'site:example.com filetype:pdf', got '%s'", result.Dork)
+	}
+	if result.Count != 2 {
+		t.Errorf("expected count 2, got %d", result.Count)
 	}
 }
 
@@ -297,6 +305,39 @@ func TestHeaderResult(t *testing.T) {
 	}
 	if result.Value != "application/json" {
 		t.Errorf("expected value 'application/json', got '%s'", result.Value)
+	}
+}
+
+func TestGroupDorkResults(t *testing.T) {
+	dork := "site:example.com filetype:pdf"
+	results := []googlesearch.Result{
+		{URL: "https://example.com/a.pdf"},
+		{URL: "https://example.com/b.pdf"},
+		{URL: "https://example.com/a.pdf"}, // duplicate, must be counted not re-listed
+		{URL: ""},                          // must be dropped, nothing to report
+	}
+
+	got := groupDorkResults(dork, results)
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 unique urls, got %d: %+v", len(got), got)
+	}
+
+	// guard against Url regressing back to holding the dork query itself.
+	for _, r := range got {
+		if r.Url == dork {
+			t.Errorf("Url must not be the dork query, got %q", r.Url)
+		}
+		if r.Dork != dork {
+			t.Errorf("expected Dork %q, got %q", dork, r.Dork)
+		}
+	}
+
+	if got[0].Url != "https://example.com/a.pdf" || got[0].Count != 2 {
+		t.Errorf("expected a.pdf with count 2, got %+v", got[0])
+	}
+	if got[1].Url != "https://example.com/b.pdf" || got[1].Count != 1 {
+		t.Errorf("expected b.pdf with count 1, got %+v", got[1])
 	}
 }
 

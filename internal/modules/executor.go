@@ -72,6 +72,18 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 		}
 	}
 
+	// disable-redirects only applies to this module's requests; opts.Client may
+	// be the shared httpx client reused by every other module in the run, so a
+	// module-scoped policy shallow-copies it (keeping the pooled Transport)
+	// rather than mutating CheckRedirect on the shared instance.
+	if cfg.DisableRedirects {
+		scoped := *client
+		scoped.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+		client = &scoped
+	}
+
 	// Generate requests based on paths and payloads
 	requests, err := generateHTTPRequests(target, cfg)
 	if err != nil {
@@ -371,7 +383,7 @@ func checkMatcher(m *Matcher, resp *http.Response, body string) bool {
 		return false
 
 	case "word":
-		return checkWords(getPart(m.Part, resp, body), m.Words, m.Condition)
+		return checkWords(getPart(m.Part, resp, body), m.Words, m.Condition, m.CaseInsensitive)
 
 	case "regex":
 		return checkRegex(getPart(m.Part, resp, body), m.Regex, m.Condition)
@@ -424,10 +436,19 @@ func getPart(part string, resp *http.Response, body string) string {
 }
 
 // checkWords checks if any/all words are found.
-func checkWords(content string, words []string, condition string) bool {
+func checkWords(content string, words []string, condition string, caseInsensitive bool) bool {
+	if caseInsensitive {
+		content = strings.ToLower(content)
+	}
+	fold := func(w string) string {
+		if caseInsensitive {
+			return strings.ToLower(w)
+		}
+		return w
+	}
 	if condition == "or" {
 		for _, word := range words {
-			if strings.Contains(content, word) {
+			if strings.Contains(content, fold(word)) {
 				return true
 			}
 		}
@@ -435,7 +456,7 @@ func checkWords(content string, words []string, condition string) bool {
 	}
 	// Default to AND
 	for _, word := range words {
-		if !strings.Contains(content, word) {
+		if !strings.Contains(content, fold(word)) {
 			return false
 		}
 	}
@@ -487,7 +508,7 @@ func runExtractors(extractors []Extractor, resp *http.Response, body string) map
 					continue
 				}
 				matches := re.FindStringSubmatch(part)
-				if len(matches) > e.Group {
+				if e.Group >= 0 && len(matches) > e.Group {
 					result[e.Name] = matches[e.Group]
 					break
 				}
@@ -530,11 +551,4 @@ func truncateEvidence(s string) string {
 // than reporting an empty (but successful-looking) result.
 func ExecuteDNSModule(_ context.Context, _ string, def *YAMLModule, _ Options) (*Result, error) {
 	return nil, fmt.Errorf("dns module %q: %w", def.ID, ErrUnsupportedModuleType)
-}
-
-// ExecuteTCPModule runs a TCP-based module (not yet implemented).
-// returns ErrUnsupportedModuleType so the caller logs a clear failure rather
-// than reporting an empty (but successful-looking) result.
-func ExecuteTCPModule(_ context.Context, _ string, def *YAMLModule, _ Options) (*Result, error) {
-	return nil, fmt.Errorf("tcp module %q: %w", def.ID, ErrUnsupportedModuleType)
 }

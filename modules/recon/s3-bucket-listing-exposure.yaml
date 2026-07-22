@@ -1,0 +1,54 @@
+# S3-Compatible Bucket Listing Exposure Detection Module
+
+id: s3-bucket-listing-exposure
+info:
+  name: S3-Compatible Bucket Listing Exposure
+  author: sif
+  severity: high
+  description: Detects an anonymously listable S3-compatible object store (aws s3, digitalocean spaces, minio and other s3-api-compatible backends) that returns a full object listing without authentication
+  tags: [s3, spaces, minio, bucket, storage, cloud, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+    - "{{BaseURL}}/?list-type=2"
+
+  threads: 3
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '<ListBucketResult[^>]*xmlns="http://s3\.amazonaws\.com/doc/2006-03-01/"'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<Error>"
+        - "AccessDenied"
+        - "NoSuchBucket"
+        - "AllAccessDisabled"
+
+  extractors:
+    - type: regex
+      name: bucket_name
+      part: body
+      regex:
+        - '<Name>([^<]+)</Name>'
+      group: 1
+
+    - type: regex
+      name: object_key
+      part: body
+      regex:
+        - '<Key>([^<]+)</Key>'
+      group: 1

@@ -99,7 +99,9 @@ func (d *angularDetector) Name() string { return "Angular" }
 
 func (d *angularDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "ng-version", Weight: 0.5},
+		// require the attribute-assignment form, not the bare word, so prose
+		// discussing ng-version can't match; weighted to clear the threshold alone.
+		{Pattern: `ng-version="`, Weight: 1.2},
 		{Pattern: "ng-app", Weight: 0.4},
 		{Pattern: "ng-controller", Weight: 0.4},
 		{Pattern: "angular.js", Weight: 0.4},
@@ -128,9 +130,11 @@ type svelteDetector struct{}
 func (d *svelteDetector) Name() string { return "Svelte" }
 
 func (d *svelteDetector) Signatures() []fw.Signature {
+	// "svelte-" alone cleared the detection threshold on prose merely naming a
+	// package (svelte-native, svelte-check). the remaining patterns only show
+	// up in an actual svelte bundle.
 	return []fw.Signature{
 		{Pattern: "__svelte", Weight: 0.5},
-		{Pattern: "svelte-", Weight: 0.4},
 		{Pattern: "svelte/internal", Weight: 0.4},
 	}
 }

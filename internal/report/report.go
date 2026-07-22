@@ -18,9 +18,13 @@ package report
 import "encoding/json"
 
 // Result is one module's output for one target. Data is whatever the scanner
-// returned, carried as raw json so report stays free of scan types.
+// returned, carried as raw json so report stays free of scan types. Severity is
+// the normalized rank ("critical".."info", or "" when the source carries none),
+// passed in as a plain string so report keeps its independence from the finding
+// package; the sarif writer maps it onto a sarif level.
 type Result struct {
-	Target string
-	Module string
-	Data   json.RawMessage
+	Target   string
+	Module   string
+	Severity string
+	Data     json.RawMessage
 }

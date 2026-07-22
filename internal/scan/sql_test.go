@@ -15,6 +15,7 @@ package scan
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 )
 
@@ -276,5 +277,114 @@ func TestSQLDatabaseErrorDetection(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+// TestCheckDatabaseErrors_SharedTemplateNotFlagged proves a db error string
+// present on every response, including non-injection paths, is not reported.
+func TestCheckDatabaseErrors_SharedTemplateNotFlagged(t *testing.T) {
+	const sharedTemplate = "<html>Debug: mysql_fetch_array() failed on this handler</html>"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(sharedTemplate))
+	}))
+	defer server.Close()
+
+	client := server.Client()
+	result := &SQLResult{}
+	seen := make(map[string]bool)
+	var mu sync.Mutex
+
+	// fetched directly rather than through checkDatabaseErrors: this test only
+	// covers suppression of later probes, not the homepage's own content.
+	resp, err := client.Get(server.URL + "/")
+	if err != nil {
+		t.Fatalf("failed to fetch baseline: %v", err)
+	}
+	defer resp.Body.Close()
+	baselineBody := sharedTemplate
+
+	checkDatabaseErrors(client, server.URL+"/login", server.URL, result, "", &mu, seen, baselineBody)
+	checkDatabaseErrors(client, server.URL+"/?id=1'", server.URL, result, "", &mu, seen, baselineBody)
+
+	if len(result.DatabaseErrors) != 0 {
+		t.Errorf("expected no differential database errors, got %d: %+v", len(result.DatabaseErrors), result.DatabaseErrors)
+	}
+}
+
+// TestCheckDatabaseErrors_DifferentialErrorFlagged proves the fix does not
+// suppress a real, injection-caused disclosure: only the probed path shows
+// the error string, the baseline page does not.
+func TestCheckDatabaseErrors_DifferentialErrorFlagged(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if r.URL.RawQuery == "id=1'" {
+			w.Write([]byte("MySQL Error: You have an error in your SQL syntax"))
+			return
+		}
+		w.Write([]byte("Welcome to our website"))
+	}))
+	defer server.Close()
+
+	client := server.Client()
+	result := &SQLResult{}
+	seen := make(map[string]bool)
+	var mu sync.Mutex
+
+	baseline := checkDatabaseErrors(client, server.URL+"/", server.URL, result, "", &mu, seen, "")
+	checkDatabaseErrors(client, server.URL+"/?id=1'", server.URL, result, "", &mu, seen, baseline)
+
+	if len(result.DatabaseErrors) != 1 {
+		t.Fatalf("expected 1 differential database error, got %d: %+v", len(result.DatabaseErrors), result.DatabaseErrors)
+	}
+	if result.DatabaseErrors[0].DatabaseType != "MySQL" {
+		t.Errorf("expected database type 'MySQL', got '%s'", result.DatabaseErrors[0].DatabaseType)
+	}
+}
+
+// TestCheckDatabaseErrors_PerPatternDifferential proves the baseline skip is
+// per-pattern, not global: a differential postgresql leak must still be
+// reported even though the response also carries a shared, baseline mysql string.
+func TestCheckDatabaseErrors_PerPatternDifferential(t *testing.T) {
+	const sharedMySQL = "<!-- rendered by mysql_fetch_array helper -->"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if r.URL.RawQuery == "id=1'" {
+			_, _ = w.Write([]byte(sharedMySQL + "\npg_query() failed: ERROR: unterminated quoted string"))
+			return
+		}
+		_, _ = w.Write([]byte(sharedMySQL + "\nWelcome"))
+	}))
+	defer server.Close()
+
+	client := server.Client()
+	result := &SQLResult{}
+	seen := make(map[string]bool)
+	var mu sync.Mutex
+
+	baseline := checkDatabaseErrors(client, server.URL+"/", server.URL, result, "", &mu, seen, "")
+	// homepage has no baseline of its own, so its mysql marker is reported once.
+	if len(result.DatabaseErrors) != 1 || result.DatabaseErrors[0].DatabaseType != "MySQL" {
+		t.Fatalf("expected homepage to report its own mysql marker once, got %+v", result.DatabaseErrors)
+	}
+
+	checkDatabaseErrors(client, server.URL+"/?id=1'", server.URL, result, "", &mu, seen, baseline)
+
+	var gotPostgres, gotProbedMySQL bool
+	for _, e := range result.DatabaseErrors {
+		if e.URL == server.URL+"/?id=1'" && e.DatabaseType == "PostgreSQL" {
+			gotPostgres = true
+		}
+		if e.URL == server.URL+"/?id=1'" && e.DatabaseType == "MySQL" {
+			gotProbedMySQL = true
+		}
+	}
+	if !gotPostgres {
+		t.Errorf("per-pattern differential failed: postgresql leak on the probed path was suppressed (critical false negative): %+v", result.DatabaseErrors)
+	}
+	if gotProbedMySQL {
+		t.Errorf("shared mysql pattern should have been suppressed on the probed path, but was reported: %+v", result.DatabaseErrors)
 	}
 }

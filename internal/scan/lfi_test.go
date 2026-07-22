@@ -337,6 +337,65 @@ func TestLFI_ReflectedPayloadIsNotEvidence(t *testing.T) {
 	}
 }
 
+func TestLFI_StaticPageContentIsNotEvidence(t *testing.T) {
+	// a page that always returns the same body regardless of query params,
+	// e.g. a blog post explaining /etc/passwd format. the content matches
+	// the evidence pattern for every single request, not because a payload
+	// caused a file to be included.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "<html>example: root:x:0:0:root:/root:/bin/bash explained here</html>")
+	}))
+	defer srv.Close()
+
+	result, err := LFI(srv.URL, 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("LFI: %v", err)
+	}
+	if result != nil && len(result.Vulnerabilities) > 0 {
+		t.Errorf("static page content present regardless of payload should not be flagged as LFI, got %d hits (e.g. %+v)", len(result.Vulnerabilities), result.Vulnerabilities[0])
+	}
+}
+
+func TestLFI_BaselinePatternDoesNotPoisonOtherPatterns(t *testing.T) {
+	// baseline carries a static php snippet, but the passwd leak only appears
+	// under a traversal payload. suppression must be per evidence class, not global.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body := "<html><?php // shared static snippet ?></html>"
+		for _, vs := range r.URL.Query() {
+			for _, v := range vs {
+				if strings.Contains(v, "etc/passwd") {
+					body += "\nroot:x:0:0:root:/root:/bin/bash"
+				}
+			}
+		}
+		fmt.Fprint(w, body)
+	}))
+	defer srv.Close()
+
+	result, err := LFI(srv.URL, 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("LFI: %v", err)
+	}
+	if result == nil {
+		t.Fatal("passwd disclosure under payload should still be detected despite a static php baseline")
+	}
+	var sawPasswd, sawPHP bool
+	for _, v := range result.Vulnerabilities {
+		switch v.Evidence {
+		case "/etc/passwd content":
+			sawPasswd = true
+		case "PHP source code":
+			sawPHP = true
+		}
+	}
+	if !sawPasswd {
+		t.Errorf("passwd leak (evidence class absent from baseline) should still fire, got %+v", result.Vulnerabilities)
+	}
+	if sawPHP {
+		t.Errorf("static php present in baseline should be suppressed, got %+v", result.Vulnerabilities)
+	}
+}
+
 func TestLFI_GenuineBase64PHPStillDetected(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Query().Get("file"), "convert.base64-encode") {

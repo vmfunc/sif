@@ -33,12 +33,13 @@ import (
 // match) rather than a whole module's blob, so consumers diff and notify at
 // item granularity.
 type Finding struct {
-	Target   string   // the url/host the scan ran against
-	Module   string   // the ResultType() of the source scanner
-	Severity Severity // ranked severity, SeverityUnknown when the source has none
-	Key      string   // stable identity for dedup/diff: module + ":" + identifier
-	Title    string   // short human label
-	Raw      string   // short evidence string, not the full body
+	Target     string   // the url/host the scan ran against
+	Module     string   // the ResultType() of the source scanner
+	Severity   Severity // ranked severity, SeverityUnknown when the source has none
+	Key        string   // stable identity for dedup/diff: module + ":" + identifier
+	Title      string   // short human label
+	Raw        string   // short evidence string, not the full body
+	Confidence float32  // detection confidence 0..1; zero when the source has none
 }
 
 // Line renders a finding as one stable, terse, machine-friendly line for the
@@ -562,7 +563,7 @@ func flattenDork(target string, rs []scan.DorkResult) []Finding {
 			Module:   "dork",
 			Severity: sevRecon,
 			Key:      key("dork", d.Url),
-			Title:    "dork hit",
+			Title:    fmt.Sprintf("dork hit [%s]", d.Dork),
 			Raw:      d.Url,
 		})
 	}
@@ -577,10 +578,17 @@ func flattenTakeover(target string, rs []scan.SubdomainTakeoverResult) []Finding
 		if !t.Vulnerable {
 			continue
 		}
+		// a "potential" result only matched a body fingerprint and could not be
+		// checked against the cname (lookup unavailable), so it does not earn
+		// the same severity as a cname-confirmed takeover.
+		sev := sevTakeover
+		if t.Confidence == "potential" {
+			sev = SeverityMedium
+		}
 		out = append(out, Finding{
 			Target:   target,
 			Module:   "subdomain_takeover",
-			Severity: sevTakeover,
+			Severity: sev,
 			Key:      key("subdomain_takeover", t.Subdomain),
 			Title:    "takeover: " + t.Subdomain,
 			Raw:      t.Service,
@@ -603,12 +611,13 @@ func flattenFramework(target string, r *frameworks.FrameworkResult) []Finding {
 		raw = fmt.Sprintf("%s, %d cves", raw, len(r.CVEs))
 	}
 	return []Finding{{
-		Target:   target,
-		Module:   "framework",
-		Severity: sev,
-		Key:      key("framework", r.Name),
-		Title:    r.Name + " detected",
-		Raw:      raw,
+		Target:     target,
+		Module:     "framework",
+		Severity:   sev,
+		Key:        key("framework", r.Name),
+		Title:      r.Name + " detected",
+		Raw:        raw,
+		Confidence: r.Confidence,
 	}}
 }
 

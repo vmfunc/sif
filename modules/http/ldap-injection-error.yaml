@@ -1,0 +1,52 @@
+id: ldap-injection-error
+info:
+  name: LDAP Injection (Error-Based)
+  author: sif
+  severity: high
+  description: Detects LDAP injection via LDAP filter and directory error messages
+  tags: [ldap, injection, directory, owasp-top10]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?user={{payload}}"
+    - "{{BaseURL}}/?username={{payload}}"
+    - "{{BaseURL}}/?uid={{payload}}"
+    - "{{BaseURL}}/?search={{payload}}"
+    - "{{BaseURL}}/?q={{payload}}"
+    - "{{BaseURL}}/?name={{payload}}"
+
+  payloads:
+    - "*"
+    - ")(cn=*"
+    - "*)(uid=*"
+    - "admin)(&"
+    - "*)(|(uid=*"
+    - "*()|"
+
+  threads: 10
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - "javax\\.naming\\.NameNotFoundException"
+        - "javax\\.naming\\.directory"
+        - "com\\.sun\\.jndi\\.ldap"
+        - "LDAPException"
+        - "Invalid DN syntax"
+        - "Bad search filter"
+        - "ldap_search"
+        - "supplied argument is not a valid ldap"
+        - "Protocol error occurred"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: ldap_error
+      part: body
+      regex:
+        - "(LDAPException|javax\\.naming\\.[A-Za-z.]+|com\\.sun\\.jndi\\.ldap|Invalid DN syntax)"
+      group: 1

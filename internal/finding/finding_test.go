@@ -174,7 +174,7 @@ func coverageCases() []coverageCase {
 			wantItems: 1,
 		},
 		{
-			value:     scan.DorkResults{{Url: "http://x/leak", Count: 1}},
+			value:     scan.DorkResults{{Url: "http://x/leak", Dork: "site:x filetype:pdf", Count: 1}},
 			typed:     scan.DorkResults{},
 			module:    "dork",
 			wantItems: 1,
@@ -254,6 +254,27 @@ func TestFlattenCoversEveryResultType(t *testing.T) {
 				t.Errorf("module %q: Key %q not prefixed with module", tc.module, f.Key)
 			}
 		}
+	}
+}
+
+// TestFlattenFrameworkCarriesConfidence asserts the detector's confidence rides
+// onto the framework finding, while a scanner with no confidence stays at zero.
+func TestFlattenFrameworkCarriesConfidence(t *testing.T) {
+	fw := Flatten(target, "framework", &frameworks.FrameworkResult{Name: "Laravel", Version: "9.0", Confidence: 0.82})
+	if len(fw) != 1 {
+		t.Fatalf("framework: got %d findings, want 1", len(fw))
+	}
+	if fw[0].Confidence != 0.82 {
+		t.Errorf("framework confidence = %v, want 0.82", fw[0].Confidence)
+	}
+
+	// a scanner without a confidence signal leaves the field at its zero value.
+	hdr := Flatten(target, "headers", []scan.HeaderResult{{Name: "Server", Value: "nginx"}})
+	if len(hdr) != 1 {
+		t.Fatalf("headers: got %d findings, want 1", len(hdr))
+	}
+	if hdr[0].Confidence != 0 {
+		t.Errorf("headers confidence = %v, want 0", hdr[0].Confidence)
 	}
 }
 

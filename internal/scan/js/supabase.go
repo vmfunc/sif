@@ -203,15 +203,16 @@ func ScanSupabase(jsContent string, jsUrl string, timeout time.Duration) ([]supa
 		var auth string
 		if resp.StatusCode == http.StatusOK {
 			body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
-			if err != nil {
-				resp.Body.Close()
-				return nil, err
-			}
 			resp.Body.Close()
+			if err != nil {
+				supabaselog.Errorf("Failed to read signup response for %s: %s", *supabaseJwt.ProjectId, err)
+				continue
+			}
 
 			var authResp supabaseAuthResponse
 			if err := json.Unmarshal(body, &authResp); err != nil {
-				return nil, err
+				supabaselog.Errorf("Failed to parse signup response for %s: %s", *supabaseJwt.ProjectId, err)
+				continue
 			}
 
 			auth = authResp.AccessToken
@@ -225,11 +226,13 @@ func ScanSupabase(jsContent string, jsUrl string, timeout time.Duration) ([]supa
 
 		openAPI, err := getSupabaseOpenAPI(*supabaseJwt.ProjectId, jwt, &auth, timeout)
 		if err != nil {
-			return nil, err
+			supabaselog.Errorf("Failed to fetch openapi spec for %s: %s", *supabaseJwt.ProjectId, err)
+			continue
 		}
 
 		if openAPI.Paths == nil {
-			return nil, errors.New("paths not found in supabase openapi")
+			supabaselog.Errorf("No paths found in supabase openapi for %s", *supabaseJwt.ProjectId)
+			continue
 		}
 
 		for path := range openAPI.Paths {
