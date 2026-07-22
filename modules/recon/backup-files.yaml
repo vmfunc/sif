@@ -43,3 +43,17 @@ http:
         - "SECRET_KEY"
         - "database_password"
       condition: or
+
+    # a 200 soft-404 that serves the site's html shell trips the generic tokens
+    # above (SECRET_KEY/APP_KEY appear in docs prose); suppress a response that
+    # opens as an html document.
+    #
+    # anchored, and only on the two document-opening tags. a cms dump is full of
+    # markup: wp_posts.post_content holds rendered html and page builders stash
+    # whole documents in serialized postmeta, so an unanchored guard covering
+    # head/title/body silently drops the dumps this module exists to catch.
+    - type: regex
+      part: body
+      negative: true
+      regex:
+        - '(?i)^\s*<(!doctype|html)[ >]'
