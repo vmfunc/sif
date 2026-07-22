@@ -1,0 +1,55 @@
+id: jenkinsfile-exposure
+info:
+  name: Jenkinsfile Exposure
+  author: sif
+  severity: low
+  description: Detects an exposed Jenkinsfile pipeline definition that leaks build stages, agent labels and deploy steps
+  tags: [jenkins, ci, cd, pipeline, groovy, info-disclosure, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/Jenkinsfile"
+    - "{{BaseURL}}/jenkinsfile"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "pipeline {"
+        - "node {"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "stages {"
+        - "stage("
+        - "steps {"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: jenkinsfile_agent
+      part: body
+      regex:
+        - 'agent\s*\{?\s*(\w+)'
+      group: 1
