@@ -746,10 +746,14 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 			toRun = deduped
 
 			// Execute modules
+			// Execute modules. Client routes through the shared httpx transport so
+			// -proxy/-H/-cookie/-rate-limit apply to module scans the same as every
+			// other scanner instead of each module dialing out on a bare client.
 			opts := modules.Options{
 				Timeout: app.settings.Timeout,
 				Threads: app.settings.Threads,
 				LogDir:  app.settings.LogDir,
+				Client:  httpx.Client(app.settings.Timeout),
 			}
 
 			for _, m := range toRun {
