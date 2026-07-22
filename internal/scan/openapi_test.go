@@ -268,6 +268,94 @@ func TestOpenAPI_YAMLSpec(t *testing.T) {
 	}
 }
 
+// a spec with a $ref path item (a shared item defined elsewhere, valid since
+// openapi 3.1) sitting next to a normal operation. /pet can't be resolved without
+// fetching the referenced document, but /users must still be enumerated: the
+// $ref entry must not fail the whole document's decode.
+const openapiJSONWithRef = `{
+  "openapi": "3.1.0",
+  "info": {"title": "Ref API", "version": "1.0"},
+  "paths": {
+    "/pet": {"$ref": "#/components/pathItems/Pet"},
+    "/users": {"get": {"summary": "list"}}
+  }
+}`
+
+// TestOpenAPI_RefPathItemDoesNotDropSpec locks a real regression: the old
+// map[string]rawOps decoded every path item as a strict operation-set struct, so
+// a $ref path item (its value is a plain string, not an object) failed both the
+// json and yaml unmarshal for the *entire* document, and an otherwise valid,
+// enumerable spec was silently rejected as "not a spec".
+func TestOpenAPI_RefPathItemDoesNotDropSpec(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/openapi.json" {
+			_, _ = w.Write([]byte(openapiJSONWithRef))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	result, err := OpenAPI(srv.URL, 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("OpenAPI: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected a result despite the $ref path item, got nil")
+	}
+	if _, ok := hasEndpoint(result, "/users", http.MethodGet); !ok {
+		t.Errorf("expected /users GET to be enumerated, got %+v", result.Endpoints)
+	}
+}
+
+// a globally-secured spec whose operation carries a security key that isn't a
+// list (here null). the interface{} extraction must treat this as absent and let
+// the operation inherit the enforced global requirement, exactly as the old typed
+// decoder did, not read it as an empty (public) block and fabricate a high finding.
+const openapiJSONNullOpSecurity = `{
+  "openapi": "3.0.1",
+  "info": {"title": "Null Sec API", "version": "1.0"},
+  "security": [{"bearerAuth": []}],
+  "paths": {
+    "/weird": {"get": {"summary": "malformed security", "security": null}}
+  }
+}`
+
+// TestOpenAPI_NonListOpSecurityInheritsGlobal locks the empty-vs-absent boundary
+// against a false positive: a non-array security value must inherit the global
+// requirement (authenticated, medium), not decode to an empty block (anonymous,
+// high). the pre-interface{} struct decoded null to a nil pointer and inherited;
+// the extraction has to preserve that or every malformed security key becomes a
+// spurious high-severity unauthenticated finding.
+func TestOpenAPI_NonListOpSecurityInheritsGlobal(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/openapi.json" {
+			_, _ = w.Write([]byte(openapiJSONNullOpSecurity))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	result, err := OpenAPI(srv.URL, 5*time.Second, 4, "")
+	if err != nil {
+		t.Fatalf("OpenAPI: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected a result, got nil")
+	}
+	ep, ok := hasEndpoint(result, "/weird", http.MethodGet)
+	if !ok {
+		t.Fatal("expected /weird GET to be enumerated")
+	}
+	if ep.Unauth {
+		t.Error("a non-list security value should inherit the global requirement, not read as public")
+	}
+	if result.Severity != openapiSevMedium {
+		t.Errorf("expected medium severity, got %q", result.Severity)
+	}
+}
+
 // TestOpenAPI_NoSpecExposed confirms a server with no spec at any candidate path
 // produces no result.
 func TestOpenAPI_NoSpecExposed(t *testing.T) {

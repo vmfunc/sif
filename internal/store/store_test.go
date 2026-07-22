@@ -127,12 +127,102 @@ func TestLoadCorruptSnapshotErrors(t *testing.T) {
 	// would silently re-flag every finding as new on every run.
 	dir := t.TempDir()
 	const target = "https://corrupt.test"
-	path := filepath.Join(dir, sanitize(target)+snapshotExt)
+	path := pathFor(dir, target)
 	if err := os.WriteFile(path, []byte("{not json"), snapshotFileMode); err != nil {
 		t.Fatalf("seeding corrupt snapshot: %v", err)
 	}
 	if _, err := Load(dir, target); err == nil {
 		t.Fatal("Load corrupt snapshot: want error, got nil")
+	}
+}
+
+func TestPathForDistinctTargetsNeverCollide(t *testing.T) {
+	// see pathFor's doc comment (store.go) for why this used to collide.
+	dir := t.TempDir()
+	tests := [][2]string{
+		{"https://a.com/x", "https://a.com//x"},
+		{"https://a.com/x", "https://a_com/x"},
+		{"host:8443/path", "host_8443_path"},
+	}
+	for _, tt := range tests {
+		a, b := tt[0], tt[1]
+		if sanitize(a) != sanitize(b) {
+			t.Fatalf("test premise broken: sanitize(%q)=%q != sanitize(%q)=%q, pick a colliding pair", a, sanitize(a), b, sanitize(b))
+		}
+		pa, pb := pathFor(dir, a), pathFor(dir, b)
+		if pa == pb {
+			t.Errorf("pathFor collided for distinct targets %q and %q: both %q", a, b, pa)
+		}
+	}
+}
+
+func TestSaveDistinctCollidingTargetsRoundTripIndependently(t *testing.T) {
+	dir := t.TempDir()
+	a, b := "https://a.com/x", "https://a.com//x"
+	if sanitize(a) != sanitize(b) {
+		t.Fatalf("test premise broken: sanitize no longer collides for %q and %q", a, b)
+	}
+
+	findingsA := []finding.Finding{{Target: a, Module: "headers", Severity: finding.SeverityInfo, Key: "a", Title: "a"}}
+	findingsB := []finding.Finding{{Target: b, Module: "headers", Severity: finding.SeverityInfo, Key: "b", Title: "b"}}
+
+	if err := Save(dir, a, findingsA); err != nil {
+		t.Fatalf("Save a: %v", err)
+	}
+	if err := Save(dir, b, findingsB); err != nil {
+		t.Fatalf("Save b: %v", err)
+	}
+
+	gotA, err := Load(dir, a)
+	if err != nil {
+		t.Fatalf("Load a: %v", err)
+	}
+	gotB, err := Load(dir, b)
+	if err != nil {
+		t.Fatalf("Load b: %v", err)
+	}
+	if !reflect.DeepEqual(gotA, findingsA) {
+		t.Errorf("Load(a) = %#v, want %#v (b's save must not have clobbered a)", gotA, findingsA)
+	}
+	if !reflect.DeepEqual(gotB, findingsB) {
+		t.Errorf("Load(b) = %#v, want %#v", gotB, findingsB)
+	}
+}
+
+func TestSaveWritesAtomicallyViaTempAndRename(t *testing.T) {
+	// Save must never leave a stray temp file behind, and a reader must never
+	// observe a partially-written snapshot: it either sees the old file (not
+	// yet renamed) or the fully-written new one, never a half-written one at
+	// the final path.
+	dir := t.TempDir()
+	const target = "https://atomic.test"
+
+	if err := Save(dir, target, sampleFindings()); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("dir has %d entries after Save, want exactly 1 (no leftover temp file): %v", len(entries), entries)
+	}
+	if entries[0].Name() != filepath.Base(pathFor(dir, target)) {
+		t.Fatalf("unexpected file left in state dir: %q", entries[0].Name())
+	}
+
+	// a second Save (overwrite path) must also leave exactly one file, proving
+	// the temp file it wrote for the update got renamed/cleaned up too.
+	if err := Save(dir, target, nil); err != nil {
+		t.Fatalf("second Save: %v", err)
+	}
+	entries, err = os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir after second Save: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("dir has %d entries after overwrite, want exactly 1: %v", len(entries), entries)
 	}
 }
 

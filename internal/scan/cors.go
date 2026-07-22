@@ -52,19 +52,25 @@ var corsOrigins = []struct {
 	origin   string // crafted Origin header, {host} -> target host
 	note     string // why this case is interesting
 	reflects bool   // true when a literal echo of this origin is exploitable
+	// httpsOnly is set for origins that are only a genuine bypass when the
+	// target itself is https; against a plain http target the crafted origin
+	// is the target's own real origin, so reflecting it isn't a bug.
+	httpsOnly bool
 }{
 	// arbitrary attacker origin - the classic "reflects anything" bug
-	{corsEvilOrigin, "arbitrary origin reflected", true},
+	{corsEvilOrigin, "arbitrary origin reflected", true, false},
 	// the literal null origin (sandboxed iframes, redirects, file://) is forgeable
-	{"null", "null origin allowed", true},
+	{"null", "null origin allowed", true, false},
 	// suffix bypass: attacker registers {host}.evil.com, naive endswith checks pass
-	{"https://{host}.evil.com", "suffix bypass (attacker subdomain)", true},
+	{"https://{host}.evil.com", "suffix bypass (attacker subdomain)", true, false},
 	// prefix bypass: attacker registers evil-{host}, naive startswith checks pass
-	{"https://evil-{host}", "prefix bypass", true},
+	{"https://evil-{host}", "prefix bypass", true, false},
 	// embedded bypass: {host} appears inside an attacker domain
-	{"https://evil.com.{host}", "embedded-host bypass", true},
-	// scheme downgrade: http origin trusted lets a mitm read cross-origin data
-	{"http://{host}", "http scheme downgrade trusted", true},
+	{"https://evil.com.{host}", "embedded-host bypass", true, false},
+	// scheme downgrade: http origin trusted lets a mitm read cross-origin data.
+	// only a real downgrade if the target itself is https; against a plain
+	// http target this origin equals the target's own origin.
+	{"http://{host}", "http scheme downgrade trusted", true, true},
 }
 
 // CORS probes the target for cross-origin resource sharing misconfigurations.
@@ -91,6 +97,7 @@ func CORS(targetURL string, timeout time.Duration, threads int, logdir string) (
 		return nil, fmt.Errorf("parse url: %w", err)
 	}
 	host := parsedURL.Host
+	isHTTPS := parsedURL.Scheme == "https"
 
 	client := httpx.Client(timeout)
 	// don't follow redirects: cors is judged on the host we asked about, so a
@@ -104,9 +111,14 @@ func CORS(targetURL string, timeout time.Duration, threads int, logdir string) (
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	// one origin per worker item; the set is small so a buffered channel is plenty
+	// one origin per worker item; the set is small so a buffered channel is plenty.
+	// skip httpsOnly origins against a non-https target: the crafted origin
+	// would just be the target's own real origin, not a bypass.
 	originChan := make(chan int, len(corsOrigins))
 	for i := 0; i < len(corsOrigins); i++ {
+		if corsOrigins[i].httpsOnly && !isHTTPS {
+			continue
+		}
 		originChan <- i
 	}
 	close(originChan)

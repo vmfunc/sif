@@ -120,11 +120,14 @@ type magentoDetector struct{}
 func (d *magentoDetector) Name() string { return "Magento" }
 
 func (d *magentoDetector) Signatures() []fw.Signature {
+	// "Magento" matched mere prose, and "mage/" matched the "image/" mime
+	// type, together clearing the threshold on unrelated pages. key on
+	// structural markers that only appear when Magento actually rendered.
 	return []fw.Signature{
-		{Pattern: "Magento", Weight: 0.4},
 		{Pattern: "/static/frontend/", Weight: 0.4},
-		{Pattern: "mage/", Weight: 0.3},
+		{Pattern: "data-mage-init", Weight: 0.4},
 		{Pattern: "Mage.Cookies", Weight: 0.3},
+		{Pattern: "Magento_", Weight: 0.3},
 	}
 }
 

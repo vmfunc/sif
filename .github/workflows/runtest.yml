@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [main]
   workflow_call:
+  merge_group:
 
 permissions:
   contents: read
@@ -16,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: set up go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: "1.25"
       - name: build sif

@@ -40,21 +40,7 @@ func templateConfigPath(args []string) (string, func(), error) {
 // templateFlagValue pulls the -template value out of raw args; the config path
 // has to be known before Parse, so it cannot come from the parsed flag itself.
 func templateFlagValue(args []string) string {
-	for i, arg := range args {
-		if arg == "-template" || arg == "--template" {
-			if i+1 < len(args) {
-				return args[i+1]
-			}
-			return ""
-		}
-		if v, ok := strings.CutPrefix(arg, "-template="); ok {
-			return v
-		}
-		if v, ok := strings.CutPrefix(arg, "--template="); ok {
-			return v
-		}
-	}
-	return ""
+	return rawFlagValue(args, "template")
 }
 
 // resolveTemplate turns the -template value into a config file path. an existing

@@ -1,0 +1,27 @@
+# Redis Unauthenticated Access Detection Module
+
+id: redis-unauth-exposure
+info:
+  name: Redis Unauthenticated Access
+  author: sif
+  severity: high
+  description: Detects a Redis server that answers INFO without authentication, leaking server details and confirming unauthenticated data access (an auth-required server replies -NOAUTH and never reaches redis_version)
+  tags: [redis, database, tcp, unauth, exposure, recon]
+
+type: tcp
+
+tcp:
+  port: 6379
+  data: "INFO\r\n"
+
+  matchers:
+    - type: word
+      words:
+        - "redis_version:"
+
+  extractors:
+    - type: regex
+      name: redis_version
+      regex:
+        - "redis_version:([0-9.]+)"
+      group: 1

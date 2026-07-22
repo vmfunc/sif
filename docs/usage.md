@@ -405,6 +405,10 @@ threads: 20
 
 flags passed on the command line take precedence over the template, so `--template recon -xss` runs the recon preset with an added xss probe.
 
+### --config, --profile
+
+`--config PATH` loads flags from a yaml config file instead of the ambient `~/.config/sif/config.yaml`. `--profile NAME` selects a named overlay from that file's `profiles` block. see [configuration](configuration.md#config-file-and-profiles) for the schema and precedence. `-config` and `-template` cannot be combined.
+
 ## http options
 
 these apply to every outbound request across all scanners (proxy, custom headers, cookie and rate limiting share one client). a scanner that sets a header explicitly still wins over the global default.

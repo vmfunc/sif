@@ -61,6 +61,7 @@ type HTTPConfig struct {
 	Body              string            `yaml:"body,omitempty"`
 	Attack            string            `yaml:"attack,omitempty"` // clusterbomb (default), pitchfork
 	Threads           int               `yaml:"threads,omitempty"`
+	DisableRedirects  bool              `yaml:"disable-redirects,omitempty"` // stop at the first response; don't follow 3xx
 	Matchers          []Matcher         `yaml:"matchers"`
 	MatchersCondition string            `yaml:"matchers-condition,omitempty"` // and (default), or
 	Extractors        []Extractor       `yaml:"extractors,omitempty"`
@@ -94,10 +95,11 @@ type DNSConfig struct {
 
 // TCPConfig defines TCP module settings
 type TCPConfig struct {
-	Port       int         `yaml:"port"`
-	Data       string      `yaml:"data,omitempty"`
-	Matchers   []Matcher   `yaml:"matchers"`
-	Extractors []Extractor `yaml:"extractors,omitempty"`
+	Port              int         `yaml:"port"`
+	Data              string      `yaml:"data,omitempty"`
+	Matchers          []Matcher   `yaml:"matchers"`
+	MatchersCondition string      `yaml:"matchers-condition,omitempty"` // and (default), or
+	Extractors        []Extractor `yaml:"extractors,omitempty"`
 }
 
 // ParseYAMLModule parses a YAML file into a module definition
@@ -106,7 +108,12 @@ func ParseYAMLModule(path string) (*YAMLModule, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read module file: %w", err)
 	}
+	return ParseYAMLModuleBytes(data)
+}
 
+// ParseYAMLModuleBytes parses and validates a module definition from raw bytes,
+// so the loader can read modules from an embedded fs.FS as well as from disk.
+func ParseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 	var ym YAMLModule
 	if err := yaml.Unmarshal(data, &ym); err != nil {
 		return nil, fmt.Errorf("parse yaml: %w", err)
@@ -138,6 +145,11 @@ func ParseYAMLModule(path string) (*YAMLModule, error) {
 			if err := validateMatchers(step.Matchers); err != nil {
 				return nil, fmt.Errorf("module %q request %d: %w", ym.ID, i, err)
 			}
+		}
+	}
+	if ym.TCP != nil {
+		if err := validateTCP(ym.TCP); err != nil {
+			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
 		}
 	}
 	var matchers []Matcher
