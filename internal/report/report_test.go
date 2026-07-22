@@ -14,6 +14,8 @@ package report
 
 import (
 	"encoding/json"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -72,6 +74,46 @@ func TestSARIF_ValidAndContainsFindings(t *testing.T) {
 	// rules list each module id once, deduped across targets
 	if len(run.Tool.Driver.Rules) != 3 {
 		t.Errorf("expected 3 deduped rules, got %d: %+v", len(run.Tool.Driver.Rules), run.Tool.Driver.Rules)
+	}
+}
+
+func TestSARIF_RulesAreSorted(t *testing.T) {
+	// rules are collected from a map internally, so without an explicit sort
+	// the emitted order is whatever the map iteration happened to produce.
+	// several distinct module ids make an accidentally-sorted iteration
+	// vanishingly unlikely, so this pins the fix rather than relying on luck.
+	results := []Result{
+		{Target: "https://t", Module: "zeta", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "mike", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "alpha", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "yankee", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "bravo", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "delta", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "kilo", Data: json.RawMessage(`{}`)},
+	}
+
+	var firstIDs []string
+	for run := 0; run < 5; run++ {
+		out, err := SARIF(results)
+		if err != nil {
+			t.Fatalf("SARIF: %v", err)
+		}
+		var doc sarifLog
+		if err := json.Unmarshal(out, &doc); err != nil {
+			t.Fatalf("invalid json: %v", err)
+		}
+		ids := make([]string, len(doc.Runs[0].Tool.Driver.Rules))
+		for i, r := range doc.Runs[0].Tool.Driver.Rules {
+			ids[i] = r.ID
+		}
+		if !sort.StringsAreSorted(ids) {
+			t.Fatalf("run %d: driver.rules not sorted: %v", run, ids)
+		}
+		if run == 0 {
+			firstIDs = ids
+		} else if !reflect.DeepEqual(firstIDs, ids) {
+			t.Fatalf("driver.rules order changed across runs: %v vs %v", firstIDs, ids)
+		}
 	}
 }
 
@@ -190,6 +232,24 @@ func TestMarkdown_GroupsByTarget(t *testing.T) {
 	probeIdx := strings.Index(out, "### probe")
 	if corsIdx < aHeader || corsIdx > bHeader || probeIdx < aHeader || probeIdx > bHeader {
 		t.Errorf("expected a's modules grouped under a, cors=%d probe=%d (a=%d b=%d)", corsIdx, probeIdx, aHeader, bHeader)
+	}
+}
+
+func TestMarkdown_StripsNewlinesFromTargetHeader(t *testing.T) {
+	// same newline-injection guard as sanitizeHeading (markdown.go); this exercises the malicious-input case.
+	results := []Result{
+		{Target: "https://evil.example.com\n## injected", Module: "probe", Data: json.RawMessage(`{"status_code":200}`)},
+	}
+	out := string(Markdown(results))
+
+	lines := strings.Split(out, "\n")
+	for _, line := range lines {
+		if line == "## injected" {
+			t.Errorf("target newline produced a standalone injected heading:\n%s", out)
+		}
+	}
+	if strings.Contains(out, "\r") {
+		t.Errorf("markdown output must not contain carriage returns:\n%q", out)
 	}
 }
 

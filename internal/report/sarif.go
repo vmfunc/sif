@@ -15,6 +15,7 @@ package report
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 )
 
 // sarif format/version constants pinned to the 2.1.0 schema so the output is
@@ -121,9 +122,18 @@ func SARIF(results []Result) ([]byte, error) {
 	}
 
 	// rules must list each id exactly once; build it from the set so duplicate
-	// modules across targets don't duplicate the rule.
-	rules := make([]sarifRule, 0, len(ruleSet))
+	// modules across targets don't duplicate the rule. the set itself ranges
+	// in random map order, so sort the ids first: otherwise driver.rules
+	// would come out in a different order on every run, making the sarif
+	// output byte-unstable across identical scans.
+	ruleIDs := make([]string, 0, len(ruleSet))
 	for id := range ruleSet {
+		ruleIDs = append(ruleIDs, id)
+	}
+	sort.Strings(ruleIDs)
+
+	rules := make([]sarifRule, 0, len(ruleIDs))
+	for _, id := range ruleIDs {
 		rules = append(rules, sarifRule{ID: id})
 	}
 
