@@ -40,7 +40,7 @@ func Markdown(results []Result) []byte {
 	for i := 0; i < len(order); i++ {
 		target := order[i]
 		b.WriteString("## ")
-		b.WriteString(target)
+		b.WriteString(sanitizeHeading(target))
 		b.WriteString("\n\n")
 
 		mods := byTarget[target]
@@ -49,7 +49,7 @@ func Markdown(results []Result) []byte {
 
 		for j := 0; j < len(mods); j++ {
 			b.WriteString("### ")
-			b.WriteString(mods[j].Module)
+			b.WriteString(sanitizeHeading(mods[j].Module))
 			b.WriteString("\n\n")
 			b.WriteString("```json\n")
 			b.WriteString(prettyJSON(mods[j].Data))
@@ -58,6 +58,17 @@ func Markdown(results []Result) []byte {
 	}
 
 	return []byte(b.String())
+}
+
+// sanitizeHeading strips CR/LF from operator-supplied text (targets, module
+// ids) before it's written into a markdown heading line. both target and
+// module id can come from scan input, so an embedded newline followed by
+// "## ..." would otherwise render as a standalone, injected heading.
+func sanitizeHeading(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", " ")
+	s = strings.ReplaceAll(s, "\r", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	return s
 }
 
 // prettyJSON re-indents the raw finding for readability; if it doesn't parse as

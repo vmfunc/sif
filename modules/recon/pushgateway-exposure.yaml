@@ -1,0 +1,39 @@
+id: pushgateway-exposure
+info:
+  name: Prometheus Pushgateway Exposure
+  author: sif
+  severity: medium
+  description: Detects a Prometheus Pushgateway reachable without authentication, which by design accepts arbitrary metric pushes and deletes from anyone who can reach it and can serve whatever business or infra metrics other jobs have already pushed
+  tags: [pushgateway, prometheus, monitoring, metrics, api, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1/status"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"build_information\""
+        - "\"start_time\""
+      condition: and
+
+    - type: regex
+      part: body
+      regex:
+        - '"status"\s*:\s*"success"'
+
+  extractors:
+    - type: regex
+      name: pushgateway_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

@@ -25,6 +25,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif/internal/httpx"
 	"github.com/vmfunc/sif/internal/logger"
+	"github.com/vmfunc/sif/internal/output"
 	"github.com/vmfunc/sif/internal/pool"
 	"github.com/vmfunc/sif/internal/styles"
 )
@@ -35,6 +36,10 @@ type SubdomainTakeoverResult struct {
 	Subdomain  string `json:"subdomain"`
 	Vulnerable bool   `json:"vulnerable"`
 	Service    string `json:"service,omitempty"`
+	// Confidence is "confirmed" when the cname chain resolves to the same
+	// provider as the matched signature, or "potential" when only the body
+	// fingerprint matched and the cname could not be checked against it.
+	Confidence string `json:"confidence,omitempty"`
 }
 
 // takeoverProviders maps a takeoverable third-party's cname apex to its service
@@ -70,7 +75,7 @@ var takeoverProviders = map[string]string{
 // SubdomainTakeover checks dnsResults for dangling subdomains pointing at
 // unclaimed third-party services.
 func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, threads int, logdir string) ([]SubdomainTakeoverResult, error) {
-	fmt.Println(styles.Separator.Render("Starting " + styles.Status.Render("Subdomain Takeover Vulnerability Check") + "..."))
+	output.ScanStart("Subdomain Takeover Vulnerability Check")
 
 	sanitizedURL := stripScheme(url)
 
@@ -92,11 +97,12 @@ func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, t
 	resultsChan := make(chan SubdomainTakeoverResult, len(dnsResults))
 
 	pool.Each(dnsResults, threads, func(subdomain string) {
-		vulnerable, service := checkSubdomainTakeover(subdomain, client)
+		vulnerable, service, confidence := checkSubdomainTakeover(subdomain, client)
 		result := SubdomainTakeoverResult{
 			Subdomain:  subdomain,
 			Vulnerable: vulnerable,
 			Service:    service,
+			Confidence: confidence,
 		}
 		resultsChan <- result
 
@@ -117,6 +123,26 @@ func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, t
 	}
 
 	return results, nil
+}
+
+// lookupCNAME resolves a subdomain's cname. it is a var so tests can stub out
+// dns resolution instead of depending on a live resolver.
+var lookupCNAME = func(ctx context.Context, host string) (string, error) {
+	return net.DefaultResolver.LookupCNAME(ctx, host)
+}
+
+// serviceCorrelatable reports whether service has at least one cname apex in
+// takeoverProviders, i.e. whether a cname lookup can ever confirm or contradict
+// a body match for it. many body signatures (tumblr, intercom, and other
+// custom-domain providers) have no apex entry, so a cname can neither back nor
+// disprove them and must not be used to drop the finding.
+func serviceCorrelatable(service string) bool {
+	for _, s := range takeoverProviders {
+		if s == service {
+			return true
+		}
+	}
+	return false
 }
 
 // danglingProvider reports whether cname points off-host at a known
@@ -140,10 +166,10 @@ func danglingProvider(subdomain, cname string) (string, bool) {
 	return "", false
 }
 
-func checkSubdomainTakeover(subdomain string, client *http.Client) (bool, string) {
+func checkSubdomainTakeover(subdomain string, client *http.Client) (bool, string, string) {
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "http://"+subdomain, http.NoBody)
 	if err != nil {
-		return false, ""
+		return false, "", ""
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -152,20 +178,20 @@ func checkSubdomainTakeover(subdomain string, client *http.Client) (bool, string
 		// records, so "any cname" is not a signal - the cname must resolve to a
 		// known takeoverable provider and not be the host itself.
 		if strings.Contains(err.Error(), "no such host") {
-			cname, lookupErr := net.DefaultResolver.LookupCNAME(context.TODO(), subdomain)
+			cname, lookupErr := lookupCNAME(context.TODO(), subdomain)
 			if lookupErr == nil {
 				if service, ok := danglingProvider(subdomain, cname); ok {
-					return true, service + " (Dangling CNAME)"
+					return true, service + " (Dangling CNAME)", "confirmed"
 				}
 			}
 		}
-		return false, ""
+		return false, "", ""
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
 	if err != nil {
-		return false, ""
+		return false, "", ""
 	}
 	bodyString := string(body)
 
@@ -201,10 +227,40 @@ func checkSubdomainTakeover(subdomain string, client *http.Client) (bool, string
 	}
 
 	for service, signature := range signatures {
-		if strings.Contains(bodyString, signature) {
-			return true, service
+		if !strings.Contains(bodyString, signature) {
+			continue
 		}
+
+		// a body fingerprint alone only proves the page renders a provider's
+		// unclaimed-domain copy - it says nothing about whether this host is
+		// actually delegated to that provider. a real github/s3/etc 404 page can
+		// show up on infrastructure with no dangling cname at all (a claimed page
+		// that happens to echo the same wording, or an unrelated host quoting
+		// it), so confirm the cname resolves to the SAME provider before calling
+		// it a takeover. a cname that resolves to something else (or to the host
+		// itself) contradicts the signature and must not be flagged.
+		cname, lookupErr := lookupCNAME(context.TODO(), subdomain)
+		if lookupErr == nil {
+			if cnameService, ok := danglingProvider(subdomain, cname); ok && cnameService == service {
+				return true, service, "confirmed"
+			}
+			// a resolving cname only contradicts the body match for providers we
+			// can actually correlate (an apex in takeoverProviders). rejecting
+			// those is the fp fix. for a provider with no apex to check against
+			// (tumblr and other custom-domain services), the cname proves
+			// nothing either way, so keep the body-only signal as low-confidence
+			// instead of silently dropping a real takeover.
+			if serviceCorrelatable(service) {
+				continue
+			}
+			return true, service, "potential"
+		}
+
+		// cname lookup unavailable (resolver error, no records to compare):
+		// keep the body-only signal but mark it low-confidence rather than
+		// treating an unverified match as a confirmed takeover.
+		return true, service, "potential"
 	}
 
-	return false, ""
+	return false, "", ""
 }

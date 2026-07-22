@@ -1,0 +1,53 @@
+# OpenAPI/Swagger Specification Exposure Detection Module
+
+id: openapi-spec-exposure
+info:
+  name: OpenAPI/Swagger Specification Exposure
+  author: sif
+  severity: low
+  description: Detects a publicly readable openapi/swagger specification that discloses the full api surface
+  tags: [openapi, swagger, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/openapi.json"
+    - "{{BaseURL}}/v3/api-docs"
+    - "{{BaseURL}}/v2/api-docs"
+    - "{{BaseURL}}/swagger.json"
+    - "{{BaseURL}}/api-docs"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      condition: or
+      regex:
+        - '"openapi"\s*:\s*"3(\.[0-9]+)+"'
+        - '"swagger"\s*:\s*"2(\.[0-9]+)+"'
+
+    - type: word
+      part: body
+      words:
+        - "\"paths\""
+
+  extractors:
+    - type: regex
+      name: api_title
+      part: body
+      regex:
+        - '"title"\s*:\s*"([^"]+)"'
+      group: 1
+
+    - type: regex
+      name: api_version
+      part: body
+      regex:
+        - '"openapi"\s*:\s*"([0-9.]+)"'
+        - '"swagger"\s*:\s*"([0-9.]+)"'
+      group: 1

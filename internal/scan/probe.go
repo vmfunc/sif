@@ -15,6 +15,7 @@ package scan
 import (
 	"context"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"regexp"
@@ -133,13 +134,14 @@ func Probe(targetURL string, timeout time.Duration, logdir string) (*ProbeResult
 }
 
 // extractTitle returns the trimmed text of the first <title> in body, or "" when
-// there isn't one.
+// there isn't one. html entities are decoded so the title matches the rendered
+// page rather than carrying raw "&amp;"-style markup.
 func extractTitle(body []byte) string {
 	m := titleRe.FindSubmatch(body)
 	if len(m) < 2 {
 		return ""
 	}
-	return strings.TrimSpace(string(m[1]))
+	return strings.TrimSpace(html.UnescapeString(string(m[1])))
 }
 
 // ResultType identifies probe results for the result registry.

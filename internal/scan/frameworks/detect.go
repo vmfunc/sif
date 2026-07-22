@@ -289,8 +289,13 @@ func getVulnerabilities(framework, version string) ([]string, []string) {
 }
 
 // versionAffected reports whether version falls under an affected-version
-// entry. the entry is a version prefix, matched only on dotted boundaries, so
-// "4.2" covers 4.2 and 4.2.1 but not 4.20.
+// entry. matching is on dotted component boundaries in either direction, so
+// "4.2" covers 4.2 and 4.2.1 but not 4.20, and a coarser version covers the
+// listed sub-versions. the latter matters because some detectors only recover
+// a bare major (Drupal's generator emits "10"); without it a bare major never
+// matches a dotted affected entry and the CVE is silently missed.
 func versionAffected(version, affected string) bool {
-	return version == affected || strings.HasPrefix(version, affected+".")
+	return version == affected ||
+		strings.HasPrefix(version, affected+".") ||
+		strings.HasPrefix(affected, version+".")
 }

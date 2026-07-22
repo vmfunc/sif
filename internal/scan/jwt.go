@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -375,14 +376,27 @@ func decodeJWTSegment(seg string) (map[string]any, error) {
 }
 
 // numericClaim pulls a numeric claim out of the payload. json numbers decode to
-// float64, so that's the only shape we accept.
+// float64, but some jwt libraries (older php/java stacks in particular) encode
+// NumericDate as a quoted string, so a string that parses as a number counts too.
+// otherwise a stringly-typed exp reads as absent and a genuinely expired token
+// slips through as "missing exp" instead of "expired".
 func numericClaim(payload map[string]any, key string) (float64, bool) {
 	v, ok := payload[key]
 	if !ok {
 		return 0, false
 	}
-	f, ok := v.(float64)
-	return f, ok
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case string:
+		f, err := strconv.ParseFloat(n, 64)
+		if err != nil {
+			return 0, false
+		}
+		return f, true
+	default:
+		return 0, false
+	}
 }
 
 // isHMACAlg reports whether alg is one of the HMAC family (HS256/HS384/HS512).

@@ -1,0 +1,54 @@
+# Directory Listing (Autoindex) Detection Module
+
+id: directory-listing-exposure
+info:
+  name: Directory Listing Exposure
+  author: sif
+  severity: medium
+  description: Detects a browsable directory index (nginx autoindex, apache mod_autoindex, IIS directory browsing, python http.server or caddy file_server) that leaks the file inventory of a directory
+  tags: [exposure, misconfiguration, recon, info-leak]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+    - "{{BaseURL}}/uploads/"
+    - "{{BaseURL}}/files/"
+    - "{{BaseURL}}/backup/"
+    - "{{BaseURL}}/backups/"
+    - "{{BaseURL}}/images/"
+    - "{{BaseURL}}/assets/"
+    - "{{BaseURL}}/static/"
+    - "{{BaseURL}}/media/"
+    - "{{BaseURL}}/downloads/"
+    - "{{BaseURL}}/data/"
+
+  threads: 5
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    # each alternative pairs the "index of" style heading with the listing's
+    # own furniture (a real parent-directory anchor or apache column sort-link),
+    # markup a browsable index emits but prose never does. a blog that merely
+    # renders the phrase "index of /something" in its title and h1 has no such
+    # anchor, so it does not match.
+    - type: regex
+      part: body
+      condition: or
+      regex:
+        # nginx autoindex: <h1>Index of /path</h1> ... <a href="../">../</a>
+        - "(?is)<h1>\\s*index of\\s+/[^<]*</h1>.*?<a href=\"\\.\\./?\">\\.\\./?</a>"
+        # apache mod_autoindex: <h1>Index of /path</h1> ... a Parent Directory anchor or a ?C=N;O= sort-link
+        - "(?is)<h1>\\s*index of\\s+/[^<]*</h1>.*?<a href=\"[^\"]*\">\\s*parent directory\\s*</a>"
+        - "(?is)<h1>\\s*index of\\s+/[^<]*</h1>.*?<a href=\"\\?c=[ns];o="
+        # python http.server (SimpleHTTPRequestHandler.list_directory)
+        - "(?is)<title>\\s*directory listing for\\s+/[^<]*</title>.*?<h1>\\s*directory listing for\\s+/"
+        # IIS directory browsing: the parent-dir link must be an actual anchor, not a bare mention
+        - "(?is)<a href=\"[^\"]*\">\\s*\\[to parent directory\\]\\s*</a>"
+        # caddy file_server browse template: fixed breadcrumbs furniture + listing container
+        - "(?is)<div class=\"breadcrumbs\">folder path</div>.*?class='listing"

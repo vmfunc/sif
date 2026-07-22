@@ -229,6 +229,17 @@ func parseHeaders(raw []string) (map[string]string, error) {
 	return headers, nil
 }
 
+// sensitiveHeaders mirrors net/http's own redirect header policy (see
+// shouldCopyHeaderOnRedirect / copyHeaders in net/http/client.go): these are
+// the headers the stdlib strips itself when a redirect crosses hosts, so
+// injecting them back in at the transport layer would defeat that stripping.
+var sensitiveHeaders = map[string]bool{
+	"Cookie":           true,
+	"Cookie2":          true,
+	"Authorization":    true,
+	"Www-Authenticate": true,
+}
+
 // roundTripper paces and decorates each request before delegating to base.
 type roundTripper struct {
 	base       *http.Transport
@@ -240,14 +251,23 @@ type roundTripper struct {
 }
 
 func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	// req.Response is only populated when req was built to follow a redirect
+	// (see net/http's Request.Response doc comment); its Request is the prior
+	// hop, so a host mismatch here means this hop crossed hosts.
+	crossHostRedirect := req.Response != nil && req.Response.Request != nil &&
+		req.Response.Request.URL.Host != req.URL.Host
+
 	// only set what the caller hasn't already; a scanner that explicitly sets a
 	// header (e.g. an api key) must win over the global default.
 	for key, value := range rt.headers {
+		if crossHostRedirect && sensitiveHeaders[http.CanonicalHeaderKey(key)] {
+			continue
+		}
 		if req.Header.Get(key) == "" {
 			req.Header.Set(key, value)
 		}
 	}
-	if rt.cookie != "" && req.Header.Get("Cookie") == "" {
+	if rt.cookie != "" && !crossHostRedirect && req.Header.Get("Cookie") == "" {
 		req.Header.Set("Cookie", rt.cookie)
 	}
 	if rt.userAgent != "" && req.Header.Get("User-Agent") == "" {

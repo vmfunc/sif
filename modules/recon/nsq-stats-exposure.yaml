@@ -1,0 +1,47 @@
+id: nsq-stats-exposure
+info:
+  name: NSQ Stats API Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed nsqd HTTP API through its unauthenticated stats endpoint. nsqd ships without any authentication mechanism, so the same reachable API also exposes topic/channel pause, delete and publish endpoints
+  tags: [nsq, nsqd, messaging, streaming, api, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/stats?format=json"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"topics\""
+
+    - type: regex
+      part: body
+      regex:
+        - '"health"\s*:\s*"OK"'
+
+    - type: word
+      part: body
+      words:
+        - "\"start_time\""
+
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+
+  extractors:
+    - type: regex
+      name: nsq_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

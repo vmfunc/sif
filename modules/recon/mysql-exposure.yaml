@@ -1,0 +1,30 @@
+# MySQL/MariaDB Network Exposure Detection Module
+
+id: mysql-exposure
+info:
+  name: MySQL/MariaDB Network Exposure
+  author: sif
+  severity: medium
+  description: Detects a network-reachable MySQL or MariaDB server by its initial handshake packet, which advertises an authentication plugin and the server version in cleartext before any login (a database port open to the network is an attack surface regardless of credentials)
+  tags: [mysql, mariadb, database, tcp, exposure, recon]
+
+type: tcp
+
+tcp:
+  port: 3306
+
+  matchers-condition: or
+  matchers:
+    - type: word
+      words:
+        - "mysql_native_password"
+    - type: word
+      words:
+        - "caching_sha2_password"
+
+  extractors:
+    - type: regex
+      name: mysql_version
+      regex:
+        - "([0-9]+\\.[0-9]+\\.[0-9]+[0-9A-Za-z.\\-]*)"
+      group: 1

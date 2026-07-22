@@ -1,0 +1,37 @@
+# Laravel Telescope Dashboard Exposure Detection Module
+
+id: laravel-telescope-exposure
+info:
+  name: Laravel Telescope Dashboard Exposure
+  author: sif
+  severity: high
+  description: Detects an exposed Laravel Telescope debug dashboard that reveals requests, queries, exceptions, and dumped variables
+  tags: [laravel, telescope, debug, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/telescope"
+    - "{{BaseURL}}/telescope/requests"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - '<title>Telescope'
+        - 'id="telescope" v-cloak'
+      condition: and
+
+  extractors:
+    - type: regex
+      name: app_name
+      part: body
+      regex:
+        - '<title>Telescope - ([^<]+)</title>'
+      group: 1

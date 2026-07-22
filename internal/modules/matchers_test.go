@@ -197,22 +197,27 @@ func TestCheckWords(t *testing.T) {
 	const content = "alpha beta gamma"
 
 	tests := []struct {
-		name      string
-		words     []string
-		condition string
-		expect    bool
+		name       string
+		content    string
+		words      []string
+		condition  string
+		caseInsens bool
+		expect     bool
 	}{
-		{name: "and all present", words: []string{"alpha", "gamma"}, condition: "and", expect: true},
-		{name: "and missing", words: []string{"alpha", "delta"}, condition: "and", expect: false},
-		{name: "or present", words: []string{"delta", "beta"}, condition: "or", expect: true},
-		{name: "or absent", words: []string{"delta", "epsilon"}, condition: "or", expect: false},
-		{name: "empty under and matches vacuously", words: nil, condition: "and", expect: true},
-		{name: "empty under or matches nothing", words: nil, condition: "or", expect: false},
+		{name: "and all present", content: content, words: []string{"alpha", "gamma"}, condition: "and", expect: true},
+		{name: "and missing", content: content, words: []string{"alpha", "delta"}, condition: "and", expect: false},
+		{name: "or present", content: content, words: []string{"delta", "beta"}, condition: "or", expect: true},
+		{name: "or absent", content: content, words: []string{"delta", "epsilon"}, condition: "or", expect: false},
+		{name: "empty under and matches vacuously", content: content, words: nil, condition: "and", expect: true},
+		{name: "empty under or matches nothing", content: content, words: nil, condition: "or", expect: false},
+		{name: "case mismatch fails by default", content: "AdMiN panel", words: []string{"admin"}, condition: "or", expect: false},
+		{name: "case-insensitive folds both sides", content: "AdMiN panel", words: []string{"admin"}, condition: "or", caseInsens: true, expect: true},
+		{name: "case-insensitive folds mixed needle", content: "admin panel", words: []string{"AdMiN"}, condition: "or", caseInsens: true, expect: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := checkWords(content, tt.words, tt.condition); got != tt.expect {
+			if got := checkWords(tt.content, tt.words, tt.condition, tt.caseInsens); got != tt.expect {
 				t.Errorf("checkWords = %v, want %v", got, tt.expect)
 			}
 		})
@@ -330,6 +335,14 @@ func TestRunExtractors(t *testing.T) {
 			name: "group index out of range is skipped",
 			extractors: []Extractor{
 				{Type: "regex", Name: "session", Part: "body", Regex: []string{`"session":"([^"]+)"`}, Group: 5},
+			},
+			wantNil: true,
+		},
+		{
+			// a negative group must be skipped, not panic on matches[-1].
+			name: "negative group is skipped",
+			extractors: []Extractor{
+				{Type: "regex", Name: "session", Part: "body", Regex: []string{`"session":"([^"]+)"`}, Group: -1},
 			},
 			wantNil: true,
 		},

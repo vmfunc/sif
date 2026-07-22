@@ -1,0 +1,36 @@
+# Zimbra Collaboration Suite Webmail Detection Module
+
+id: zimbra-webmail
+info:
+  name: Zimbra Collaboration Suite Webmail
+  author: sif
+  severity: info
+  description: Detects a Zimbra Collaboration Suite webmail install by requesting the unauthenticated static ZmSettings.js client bootstrap and extracts the deployed CLIENT_VERSION build string
+  tags: [zimbra, webmail, groupware, mail, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/js/zimbraMail/share/model/ZmSettings.js"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "Zimbra Collaboration Suite Web Client"
+        - "CLIENT_VERSION"
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: zimbra_version
+      part: body
+      regex:
+        - '"CLIENT_VERSION"\s*,\s*\{[^}]*defaultValue:"([^"@][^"]*)"'
+      group: 1

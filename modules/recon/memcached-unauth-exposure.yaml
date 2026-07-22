@@ -1,0 +1,27 @@
+# Memcached Unauthenticated Access Detection Module
+
+id: memcached-unauth-exposure
+info:
+  name: Memcached Unauthenticated Access
+  author: sif
+  severity: high
+  description: Detects a Memcached server that answers the version command without authentication, confirming unauthenticated access to the cache (a reachable memcached is also a known UDP/TCP reflection-amplification vector)
+  tags: [memcached, cache, database, tcp, unauth, exposure, recon]
+
+type: tcp
+
+tcp:
+  port: 11211
+  data: "version\r\n"
+
+  matchers:
+    - type: word
+      words:
+        - "VERSION "
+
+  extractors:
+    - type: regex
+      name: memcached_version
+      regex:
+        - "VERSION ([0-9.]+)"
+      group: 1

@@ -13,6 +13,7 @@
 package scan
 
 import (
+	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -162,6 +163,76 @@ func TestCORS_JudgesRequestedHostNotRedirectTarget(t *testing.T) {
 	}
 	if result != nil && len(result.Findings) > 0 {
 		t.Errorf("expected no findings: the reflection is on the redirect target, not the requested host; got %+v", result.Findings)
+	}
+}
+
+// TestCORS_NoDowngradeFindingOnPlainHTTPTarget pins the scheme-downgrade probe:
+// httptest.NewServer targets are plain http, so an "http://{host}" origin is
+// not a downgrade at all, it is the target's own real origin. reflecting it
+// back is normal same-origin behavior, not a misconfiguration.
+func TestCORS_NoDowngradeFindingOnPlainHTTPTarget(t *testing.T) {
+	srv := reflectingCORS()
+	defer srv.Close()
+
+	result, err := CORS(srv.URL, 5*time.Second, 3, "")
+	if err != nil {
+		t.Fatalf("CORS: %v", err)
+	}
+	if result == nil {
+		return
+	}
+	for _, f := range result.Findings {
+		if f.Note == "http scheme downgrade trusted" {
+			t.Errorf("expected no downgrade finding against a plain http target, got %+v", f)
+		}
+	}
+}
+
+// TestCORS_DowngradeFiresOnHTTPSTarget is the counterpart to the plain-http
+// case: against an https target that reflects an http origin with credentials,
+// an on-path attacker can read authenticated data, so the downgrade probe must
+// still fire high. this pins the gate to the target scheme, not the origin
+// scheme, so the false-positive fix cannot silently become a false negative.
+func TestCORS_DowngradeFiresOnHTTPSTarget(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if origin := r.Header.Get("Origin"); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	// CORS builds its client from the unconfigured httpx transport, which is
+	// http.DefaultTransport; trust the self-signed test cert for this test only.
+	orig := http.DefaultTransport
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // trusts the local test cert only
+	http.DefaultTransport = tr
+	defer func() { http.DefaultTransport = orig }()
+
+	result, err := CORS(srv.URL, 5*time.Second, 3, "")
+	if err != nil {
+		t.Fatalf("CORS: %v", err)
+	}
+	if result == nil {
+		t.Fatalf("expected findings on https reflecting server, got nil")
+	}
+	var sawDowngrade bool
+	for _, f := range result.Findings {
+		if f.Note != "http scheme downgrade trusted" {
+			continue
+		}
+		sawDowngrade = true
+		if f.Severity != "high" {
+			t.Errorf("expected high severity for https-trusts-http with creds, got %s", f.Severity)
+		}
+		if !f.AllowCredentials {
+			t.Errorf("expected credentials flagged on downgrade finding, got %+v", f)
+		}
+	}
+	if !sawDowngrade {
+		t.Errorf("expected a downgrade finding against an https target, got %+v", result.Findings)
 	}
 }
 

@@ -63,6 +63,27 @@ enable verbose logging:
 
 sif also reads an ambient config at `~/.config/sif/config.yaml` (created on first run) keyed by the same flag names. passing `-template` uses that template as the config for the run instead of the ambient file.
 
+### config file and profiles
+
+`-config PATH` points sif at a yaml config file instead of the ambient `~/.config/sif/config.yaml`. its top-level keys are flag long-names, applied as file defaults, the same schema the ambient file uses. see [config-example.yaml](../config-example.yaml).
+
+`-profile NAME` selects a `profiles.NAME` block from that config file and overlays its keys on top of the top-level defaults before the run starts:
+
+```yaml
+threads: 20
+
+profiles:
+  quick:
+    probe: true
+    dirlist: small
+```
+
+```bash
+./sif -u https://example.com -config ./config-example.yaml -profile quick
+```
+
+precedence, highest wins: an explicit cli flag, then the selected profile, then the file's top-level defaults, then sif's built-in defaults. selecting a profile that does not exist in the file is a hard error listing the profiles that do. `-config` and `-template` are mutually exclusive, since both point sif at the same underlying config slot.
+
 ## user modules
 
 place custom modules in:
