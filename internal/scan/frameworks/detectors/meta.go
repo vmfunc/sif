@@ -117,10 +117,12 @@ type gatsbyDetector struct{}
 func (d *gatsbyDetector) Name() string { return "Gatsby" }
 
 func (d *gatsbyDetector) Signatures() []fw.Signature {
+	// "gatsby-" alone cleared the detection threshold on prose merely naming a
+	// plugin (a migration guide, a plugin comparison). the remaining patterns
+	// are structural markers that only appear when gatsby rendered the page.
 	return []fw.Signature{
 		{Pattern: "___gatsby", Weight: 0.5},
-		{Pattern: "gatsby-", Weight: 0.4},
-		{Pattern: "page-data.json", Weight: 0.3},
+		{Pattern: "/page-data/", Weight: 0.3},
 	}
 }
 
