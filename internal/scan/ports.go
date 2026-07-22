@@ -47,7 +47,7 @@ func Ports(ctx context.Context, scope string, url string, timeout time.Duration,
 	var ports []int
 	switch scope {
 	case "common":
-		req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, commonPorts, http.NoBody)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, commonPorts, http.NoBody)
 		if err != nil {
 			log.Error("Error creating request: %s", err)
 			return nil, err

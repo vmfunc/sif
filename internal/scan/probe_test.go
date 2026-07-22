@@ -108,6 +108,7 @@ func TestProbe_ExtractTitle(t *testing.T) {
 		{"trimmed", "<title>  spaced  </title>", "spaced"},
 		{"attrs", `<title lang="en">attr</title>`, "attr"},
 		{"multiline", "<title>line one\nline two</title>", "line one\nline two"},
+		{"entities", "<title>Tom &amp; Jerry &#8211; Home</title>", "Tom & Jerry – Home"},
 		{"none", "<html><body>no title</body></html>", ""},
 	}
 	for _, tt := range tests {

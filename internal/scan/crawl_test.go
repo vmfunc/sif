@@ -13,8 +13,10 @@
 package scan
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -154,5 +156,135 @@ func TestCrawl_ResultType(t *testing.T) {
 	r := &CrawlResult{}
 	if r.ResultType() != "crawl" {
 		t.Errorf("ResultType = %q, want crawl", r.ResultType())
+	}
+}
+
+// an in-scope page 302-redirecting to a separate host must not be followed:
+// colly's own CheckRedirect only re-checks AllowedDomains, which matches on
+// hostname alone, so a same-host redirect to a different port (as an
+// internal service or metadata endpoint reachable on the same host would be)
+// slipped through until Crawl installed its own host:port-strict check.
+func TestCrawl_RedirectRejectsOffScopeHost(t *testing.T) {
+	var offScopeHits int64
+	offScope := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&offScopeHits, 1)
+		_, _ = w.Write([]byte("should never be fetched"))
+	}))
+	defer offScope.Close()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/go" {
+			http.Redirect(w, r, offScope.URL+"/secret", http.StatusFound)
+			return
+		}
+		_, _ = fmt.Fprint(w, `<a href="/go">follow me</a>`)
+	})
+	target := httptest.NewServer(mux)
+	defer target.Close()
+
+	if _, err := Crawl(target.URL, 3, 5*time.Second, ""); err != nil {
+		t.Fatalf("Crawl: %v", err)
+	}
+
+	if got := atomic.LoadInt64(&offScopeHits); got != 0 {
+		t.Errorf("redirect escaped scope: off-scope host fetched %d time(s)", got)
+	}
+}
+
+// a redirect that stays on the same host:port must still be followed; the
+// scope check must not break ordinary same-site redirects (e.g. login
+// bounces, trailing-slash normalization).
+func TestCrawl_RedirectFollowsSameHost(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	mux.HandleFunc("/go", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/landed", http.StatusFound)
+	})
+	mux.HandleFunc("/landed", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`leaf`))
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, `<a href="/go">follow me</a>`)
+	})
+	target := httptest.NewServer(mux)
+	defer target.Close()
+
+	result, err := Crawl(target.URL, 3, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("Crawl: %v", err)
+	}
+
+	if !urlsContain(result.URLs, target.URL+"/go") {
+		t.Errorf("expected same-host redirect source /go to be recorded, got %v", result.URLs)
+	}
+}
+
+// a hostile page fanning out to far more links than any real page would must
+// not turn a bounded-depth crawl into an unbounded one. child pages are
+// leaves with no links of their own, so this exercises maxCrawlRequests
+// rather than the (unbounded, by design) link count off a single page.
+func TestCrawl_BoundsRequestFanout(t *testing.T) {
+	fanout := maxCrawlRequests + 500
+	var hits int64
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		if r.URL.Path != "/" {
+			_, _ = w.Write([]byte("leaf"))
+			return
+		}
+		for i := 0; i < fanout; i++ {
+			_, _ = fmt.Fprintf(w, `<a href="/p/%d">l</a>`, i)
+		}
+	})
+	target := httptest.NewServer(mux)
+	defer target.Close()
+
+	if _, err := Crawl(target.URL, 1, 30*time.Second, ""); err != nil {
+		t.Fatalf("Crawl: %v", err)
+	}
+
+	// +1 for the root page itself; the rest must be capped at maxCrawlRequests.
+	if got, want := atomic.LoadInt64(&hits), int64(maxCrawlRequests+1); got > want {
+		t.Errorf("expected at most %d requests (request cap), server received %d", want, got)
+	}
+}
+
+// robots.txt is intentionally NOT honored: sif is a recon/pentest crawler and
+// Disallow rules are not a scope boundary it should respect. This pins the
+// intentional behavior so it isn't "fixed" into a partial robots.txt
+// implementation by accident later.
+func TestCrawl_DoesNotHonorRobots(t *testing.T) {
+	var secretHits int64
+	mux := http.NewServeMux()
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/secret" {
+			atomic.AddInt64(&secretHits, 1)
+			_, _ = w.Write([]byte("leaf"))
+			return
+		}
+		_, _ = fmt.Fprint(w, `<a href="/secret">s</a>`)
+	})
+	target := httptest.NewServer(mux)
+	defer target.Close()
+
+	if _, err := Crawl(target.URL, 2, 5*time.Second, ""); err != nil {
+		t.Fatalf("Crawl: %v", err)
+	}
+	if got := atomic.LoadInt64(&secretHits); got == 0 {
+		t.Errorf("expected Disallow:/ path to be fetched (robots.txt is not honored), got %d hits", got)
 	}
 }

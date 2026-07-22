@@ -1,0 +1,55 @@
+id: gitlab-ci-config-exposure
+info:
+  name: Gitlab CI Config Exposure
+  author: sif
+  severity: low
+  description: Detects an exposed gitlab-ci pipeline definition that leaks build stages, deploy scripts and internal registry or host references
+  tags: [gitlab, ci, cd, pipeline, info-disclosure, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/.gitlab-ci.yml"
+    - "{{BaseURL}}/.gitlab-ci.yaml"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "script:"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "stages:"
+        - "before_script:"
+        - "after_script:"
+        - "artifacts:"
+        - "rules:"
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "<!DOCTYPE"
+        - "<!doctype"
+        - "<html"
+        - "<HTML"
+        - "<head>"
+        - "<title>"
+
+  extractors:
+    - type: regex
+      name: ci_image
+      part: body
+      regex:
+        - 'image:\s*["'']?([^\s"'']+)'
+      group: 1

@@ -1,0 +1,34 @@
+# Redis Commander Panel Detection Module
+
+id: redis-commander-panel
+info:
+  name: Redis Commander Panel
+  author: sif
+  severity: high
+  description: Detects an exposed Redis Commander admin panel serving its key browser without authentication
+  tags: [redis-commander, redis, database, panel, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "scripts/redisCommander.js"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - "Redis Commander:"
+        - "RedisCommandLogo.png"
+        - 'id="keyTreeActions"'

@@ -116,6 +116,112 @@ func TestCreateFile(t *testing.T) {
 	Close()
 }
 
+// TestCreateFileURLWithPathDoesNotFail proves a target with a URL path (e.g.
+// http://127.0.0.1:8931/) gets a writable log file. Before the fix, the
+// scheme-stripped sanitized URL kept the '/' verbatim, so CreateFile tried to
+// open "<dir>/127.0.0.1:8931/.log", a path whose parent directory was never
+// created, and OpenFile failed, aborting the whole target's scan.
+func TestCreateFileURLWithPathDoesNotFail(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	var logFiles []string
+	url := "http://127.0.0.1:8931/"
+	if err := CreateFile(&logFiles, url, tmpDir); err != nil {
+		t.Fatalf("CreateFile with path-bearing url: %v", err)
+	}
+
+	if err := Flush(); err != nil {
+		t.Fatalf("Flush failed: %v", err)
+	}
+
+	if len(logFiles) != 1 {
+		t.Fatalf("expected 1 log file, got %d", len(logFiles))
+	}
+
+	if filepath.Dir(logFiles[0]) != tmpDir {
+		t.Fatalf("expected log file directly under %q, got %q", tmpDir, logFiles[0])
+	}
+
+	content, err := os.ReadFile(logFiles[0])
+	if err != nil {
+		t.Fatalf("log file not readable: %v", err)
+	}
+	if !strings.Contains(string(content), "sif log file for "+url) {
+		t.Errorf("expected header content, got %q", content)
+	}
+
+	Close()
+}
+
+// TestCreateFileURLWithMultiSlashAndQueryDoesNotFail covers a messier target:
+// multiple path segments (and a doubled slash) plus query characters. None of
+// it should ever produce a nested directory or a failed OpenFile.
+func TestCreateFileURLWithMultiSlashAndQueryDoesNotFail(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	var logFiles []string
+	url := "https://example.com:8443//a/b/c?x=1&y=2"
+	if err := CreateFile(&logFiles, url, tmpDir); err != nil {
+		t.Fatalf("CreateFile with multi-slash/query url: %v", err)
+	}
+
+	if err := Flush(); err != nil {
+		t.Fatalf("Flush failed: %v", err)
+	}
+
+	if len(logFiles) != 1 {
+		t.Fatalf("expected 1 log file, got %d", len(logFiles))
+	}
+	if filepath.Dir(logFiles[0]) != tmpDir {
+		t.Fatalf("expected log file directly under %q, got %q", tmpDir, logFiles[0])
+	}
+	if _, err := os.Stat(logFiles[0]); err != nil {
+		t.Fatalf("log file not created: %v", err)
+	}
+
+	Close()
+}
+
+// TestWriteURLWithPathUsesSameFlatFile proves Write (used for every line after
+// the header) resolves to the exact same path CreateFile wrote the header to,
+// for a URL with a path component. Before the fix, both functions kept the raw
+// '/' verbatim and would have hit the same missing-subdirectory error.
+func TestWriteURLWithPathUsesSameFlatFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	sanitizedURL := "127.0.0.1:8931/some/path"
+
+	if err := WriteHeader(sanitizedURL, tmpDir, "test"); err != nil {
+		t.Fatalf("WriteHeader with path-bearing url: %v", err)
+	}
+	if err := Write(sanitizedURL, tmpDir, "line two\n"); err != nil {
+		t.Fatalf("Write with path-bearing url: %v", err)
+	}
+	if err := Flush(); err != nil {
+		t.Fatalf("Flush failed: %v", err)
+	}
+
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected exactly 1 flat log file under %q, got %d entries", tmpDir, len(entries))
+	}
+	if entries[0].IsDir() {
+		t.Fatalf("expected a flat file, got a directory: %s", entries[0].Name())
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, entries[0].Name()))
+	if err != nil {
+		t.Fatalf("reading log file: %v", err)
+	}
+	if !strings.Contains(string(content), "line two") {
+		t.Errorf("Write did not land in the same file WriteHeader created: %q", content)
+	}
+
+	Close()
+}
+
 func TestConcurrentWrites(t *testing.T) {
 	tmpDir := t.TempDir()
 

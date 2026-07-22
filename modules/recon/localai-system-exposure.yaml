@@ -1,0 +1,39 @@
+# LocalAI System Info Exposure Detection Module
+
+id: localai-system-exposure
+info:
+  name: LocalAI System Info Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed LocalAI instance whose /system api discloses loaded backends and currently loaded models without an api key; LocalAI ships with no api key configured by default, and the /system path is only auth-gated when an operator explicitly turns authentication on
+  tags: [localai, llm, ai, inference, api, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/system"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "\"backends\""
+
+    - type: word
+      part: body
+      words:
+        - "\"loaded_models\""
+
+  extractors:
+    - type: regex
+      name: localai_loaded_model
+      part: body
+      regex:
+        - '"loaded_models"\s*:\s*\[\s*\{\s*"id"\s*:\s*"([^"]+)"'
+      group: 1

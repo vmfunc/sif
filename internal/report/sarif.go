@@ -15,6 +15,7 @@ package report
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 )
 
 // sarif format/version constants pinned to the 2.1.0 schema so the output is
@@ -73,9 +74,29 @@ type sarifArtifactLocation struct {
 	URI string `json:"uri"`
 }
 
-// sarifLevel is the default severity for findings; sif results don't carry a
-// uniform severity field, so "warning" is the neutral middle ground.
-const sarifLevel = "warning"
+// sarif levels this writer emits. the 2.1.0 spec also defines "none", but every
+// sif result is at least informational, so the floor here is "note".
+const (
+	sarifError   = "error"
+	sarifWarning = "warning"
+	sarifNote    = "note"
+)
+
+// sarifLevelFor maps a normalized finding severity onto a sarif level. an empty
+// or unrecognized severity falls back to "warning", the neutral middle ground
+// that preserves the old behavior for results that carry no severity.
+func sarifLevelFor(severity string) string {
+	switch severity {
+	case "critical", "high":
+		return sarifError
+	case "low", "info":
+		return sarifNote
+	case "medium":
+		return sarifWarning
+	default:
+		return sarifWarning
+	}
+}
 
 // SARIF serializes results to a minimal valid sarif 2.1.0 log. Each module
 // result becomes one sarif result tagged with its module id (the rule) and the
@@ -90,7 +111,7 @@ func SARIF(results []Result) ([]byte, error) {
 
 		sarifResults = append(sarifResults, sarifResult{
 			RuleID:  res.Module,
-			Level:   sarifLevel,
+			Level:   sarifLevelFor(res.Severity),
 			Message: sarifMessage{Text: messageFor(res)},
 			Locations: []sarifLocation{{
 				PhysicalLocation: sarifPhysicalLocation{
@@ -101,9 +122,18 @@ func SARIF(results []Result) ([]byte, error) {
 	}
 
 	// rules must list each id exactly once; build it from the set so duplicate
-	// modules across targets don't duplicate the rule.
-	rules := make([]sarifRule, 0, len(ruleSet))
+	// modules across targets don't duplicate the rule. the set itself ranges
+	// in random map order, so sort the ids first: otherwise driver.rules
+	// would come out in a different order on every run, making the sarif
+	// output byte-unstable across identical scans.
+	ruleIDs := make([]string, 0, len(ruleSet))
 	for id := range ruleSet {
+		ruleIDs = append(ruleIDs, id)
+	}
+	sort.Strings(ruleIDs)
+
+	rules := make([]sarifRule, 0, len(ruleIDs))
+	for _, id := range ruleIDs {
 		rules = append(rules, sarifRule{ID: id})
 	}
 

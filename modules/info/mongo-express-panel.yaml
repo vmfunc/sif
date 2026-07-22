@@ -1,0 +1,42 @@
+# Mongo Express Panel Detection Module
+
+id: mongo-express-panel
+info:
+  name: Mongo Express Panel
+  author: sif
+  severity: high
+  description: Detects an exposed Mongo Express MongoDB admin panel serving its database list without authentication
+  tags: [mongo-express, mongodb, database, panel, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "globalThis.ME_SETTINGS"
+
+    # the ME_SETTINGS global and the title/logo also render on the unauth
+    # connection form, so require the database-list heading too: it is served
+    # only once a live listing is rendered, which is the exposure this flags.
+    - type: word
+      part: body
+      words:
+        - ">Databases</h4>"
+
+  extractors:
+    - type: regex
+      name: mongodb_version
+      part: body
+      regex:
+        - '<strong>MongoDB Version</strong></td>\s*<td>([0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+      group: 1

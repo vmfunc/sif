@@ -715,3 +715,131 @@ func TestSleepCtxCancelled(t *testing.T) {
 		t.Error("sleepCtx on a cancelled context should return its error, not block")
 	}
 }
+
+// hostMappingTransport clones the default transport but resolves the given
+// hostnames to the supplied local listener addresses, so a test can force a
+// redirect across two genuinely distinct hostnames (not just distinct ports
+// on 127.0.0.1, which net/http's redirect header stripping treats as the
+// same host and never strips).
+func hostMappingTransport(t *testing.T, hostToAddr map[string]string) *http.Transport {
+	t.Helper()
+	dialer := &net.Dialer{}
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	base.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		if mapped, ok := hostToAddr[host]; ok {
+			addr = mapped
+		}
+		return dialer.DialContext(ctx, network, addr)
+	}
+	return base
+}
+
+// exercises the crossHostRedirect fix in roundTripper.RoundTrip (httpx.go).
+func TestRedirectStripsSensitiveHeadersCrossHost(t *testing.T) {
+	var attackerSeen, targetSeen http.Header
+
+	attacker := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		attackerSeen = r.Header.Clone()
+	}))
+	defer attacker.Close()
+
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		targetSeen = r.Header.Clone()
+		if r.URL.Path == "/redirect" {
+			w.Header().Set("Location", "http://attacker.evil/loot")
+			w.WriteHeader(http.StatusFound)
+		}
+	}))
+	defer target.Close()
+
+	base := hostMappingTransport(t, map[string]string{
+		"target.test":   target.Listener.Addr().String(),
+		"attacker.evil": attacker.Listener.Addr().String(),
+	})
+
+	rt := &roundTripper{
+		base:      base,
+		cookie:    "session=secret",
+		headers:   map[string]string{"Authorization": "Bearer topsecret"},
+		userAgent: "sif-scanner",
+	}
+	client := &http.Client{Transport: rt}
+
+	resp, err := client.Get("http://target.test/redirect")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	DrainClose(resp)
+
+	if targetSeen == nil {
+		t.Fatal("target never received the initial request")
+	}
+	if targetSeen.Get("Cookie") != "session=secret" {
+		t.Errorf("target Cookie = %q, want it injected on the first hop", targetSeen.Get("Cookie"))
+	}
+	if targetSeen.Get("Authorization") != "Bearer topsecret" {
+		t.Errorf("target Authorization = %q, want it injected on the first hop", targetSeen.Get("Authorization"))
+	}
+
+	if attackerSeen == nil {
+		t.Fatal("redirect never reached the attacker host")
+	}
+	if got := attackerSeen.Get("Cookie"); got != "" {
+		t.Errorf("attacker Cookie = %q, want empty (cross-host redirect must not leak it)", got)
+	}
+	if got := attackerSeen.Get("Authorization"); got != "" {
+		t.Errorf("attacker Authorization = %q, want empty (cross-host redirect must not leak it)", got)
+	}
+	if got := attackerSeen.Get("User-Agent"); got != "sif-scanner" {
+		t.Errorf("attacker User-Agent = %q, want sif-scanner (non-sensitive headers still inject)", got)
+	}
+}
+
+// TestRedirectPreservesSensitiveHeadersSameHost is the control: a same-host
+// redirect must keep behaving exactly as before the fix.
+func TestRedirectPreservesSensitiveHeadersSameHost(t *testing.T) {
+	var finalSeen http.Header
+
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/redirect":
+			w.Header().Set("Location", "http://target.test/dest")
+			w.WriteHeader(http.StatusFound)
+		case "/dest":
+			finalSeen = r.Header.Clone()
+		}
+	}))
+	defer target.Close()
+
+	base := hostMappingTransport(t, map[string]string{
+		"target.test": target.Listener.Addr().String(),
+	})
+
+	rt := &roundTripper{
+		base:      base,
+		cookie:    "session=secret",
+		headers:   map[string]string{"Authorization": "Bearer topsecret"},
+		userAgent: "sif-scanner",
+	}
+	client := &http.Client{Transport: rt}
+
+	resp, err := client.Get("http://target.test/redirect")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	DrainClose(resp)
+
+	if finalSeen == nil {
+		t.Fatal("redirect never reached /dest")
+	}
+	if finalSeen.Get("Cookie") != "session=secret" {
+		t.Errorf("same-host Cookie = %q, want session=secret (same-host redirects keep it)", finalSeen.Get("Cookie"))
+	}
+	if finalSeen.Get("Authorization") != "Bearer topsecret" {
+		t.Errorf("same-host Authorization = %q, want Bearer topsecret (same-host redirects keep it)", finalSeen.Get("Authorization"))
+	}
+}

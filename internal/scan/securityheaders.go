@@ -78,7 +78,7 @@ func SecurityHeaders(url string, timeout time.Duration, logdir string) (Security
 	// header-only scan: drain on close so the conn is returned to the pool.
 	defer httpx.DrainClose(resp)
 
-	results := gradeSecurityHeaders(resp.Header, strings.HasPrefix(url, "https://"))
+	results := gradeSecurityHeaders(resp.Header, responseIsHTTPS(resp, url))
 
 	for _, r := range results {
 		line := r.Header + " " + r.Note
@@ -94,6 +94,18 @@ func SecurityHeaders(url string, timeout time.Duration, logdir string) (Security
 
 	log.Complete(len(results), "issues")
 	return results, nil
+}
+
+// responseIsHTTPS reports whether the response was actually served over
+// https. the client follows redirects, so a request that started as
+// http:// can end up served over https:// (or vice versa); the final
+// scheme lives on resp.Request.URL, not the originally requested url.
+// falls back to the requested url's scheme if that's unavailable.
+func responseIsHTTPS(resp *http.Response, requestedURL string) bool {
+	if resp != nil && resp.Request != nil && resp.Request.URL != nil {
+		return resp.Request.URL.Scheme == "https"
+	}
+	return strings.HasPrefix(requestedURL, "https://")
 }
 
 func gradeSecurityHeaders(header http.Header, https bool) SecurityHeaderResults {
