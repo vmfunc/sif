@@ -108,3 +108,54 @@ func TestCDNDetectors_NotInFrameworkRegistry(t *testing.T) {
 		}
 	}
 }
+
+// an origin that merely references cdn-hosted assets in a header is the common
+// case, not an edge deployment: a CSP naming cdnjs.cloudflare.com, a Link
+// preconnect to a cloudfront bucket, a vercel.app frame-ancestor. none of those
+// are stamped by an edge, so the brand-word signatures (which are scoped to the
+// Server/Via the provider controls) must not fire on them.
+func TestCDNIgnoresBrandWordsInUnrelatedHeaders(t *testing.T) {
+	origin := http.Header{}
+	origin.Set("Server", "nginx/1.24.0")
+	origin.Set("Content-Security-Policy",
+		"default-src 'self'; script-src https://cdnjs.cloudflare.com; "+
+			"img-src https://assets.cloudfront.net; frame-ancestors https://preview.vercel.app; "+
+			"connect-src https://api.netlify.com https://cdn.fastly.net")
+	origin.Set("Link", "<https://d111111abcdef8.cloudfront.net/app.css>; rel=preload; as=style")
+	origin.Set("X-Powered-By", "Express")
+
+	if got := fw.DetectCDN("<html>powered by cloudflare</html>", origin); got != nil {
+		t.Errorf("plain nginx origin referencing cdn assets reported as %q (confidence %.3f)", got.Name, got.Confidence)
+	}
+}
+
+// the flip side: a response the edge actually stamped still resolves.
+func TestCDNDetectsRealEdgeHeaders(t *testing.T) {
+	tests := []struct {
+		name    string
+		headers map[string]string
+		want    string
+	}{
+		{name: "cloudflare", headers: map[string]string{"CF-RAY": "8a1b2c3d4e5f6789-LAX", "Server": "cloudflare"}, want: "Cloudflare"},
+		{name: "fastly", headers: map[string]string{"X-Fastly-Request-ID": "abc123", "Via": "1.1 varnish (Varnish/6.0)"}, want: "Fastly"},
+		{name: "cloudfront", headers: map[string]string{"X-Amz-Cf-Id": "abc==", "Via": "1.1 abc.cloudfront.net (CloudFront)"}, want: "Amazon CloudFront"},
+		{name: "vercel", headers: map[string]string{"X-Vercel-Id": "sfo1::abc", "Server": "Vercel"}, want: "Vercel"},
+		{name: "netlify", headers: map[string]string{"X-NF-Request-ID": "abc", "Server": "Netlify"}, want: "Netlify"},
+		{name: "akamai", headers: map[string]string{"X-Akamai-Transformed": "9 0 0", "Akamai-GRN": "0.1a2b"}, want: "Akamai"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := http.Header{}
+			for k, v := range tt.headers {
+				h.Set(k, v)
+			}
+			got := fw.DetectCDN("<html></html>", h)
+			if got == nil {
+				t.Fatalf("no cdn detected for real %s edge headers", tt.name)
+			}
+			if got.Name != tt.want {
+				t.Errorf("DetectCDN = %q, want %q", got.Name, tt.want)
+			}
+		})
+	}
+}
