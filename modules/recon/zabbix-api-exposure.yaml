@@ -14,25 +14,31 @@ http:
     - "{{BaseURL}}/api_jsonrpc.php"
     - "{{BaseURL}}/zabbix/api_jsonrpc.php"
 
+  # api_jsonrpc.php answers 412 Precondition Failed unless the request carries
+  # one of application/json-rpc, application/json or application/jsonrequest.
   headers:
     Content-Type: application/json-rpc
 
   body: '{"jsonrpc":"2.0","method":"apiinfo.version","params":{},"id":1}'
 
+  # no response content-type matcher: that type is a request precondition, and
+  # zabbix always answers `header('Content-Type: application/json')`. requiring
+  # application/json-rpc back never matched a live instance. the jsonrpc-2.0 plus
+  # dotted-result shape below is specific to apiinfo.version on its own.
   matchers:
     - type: status
       status:
         - 200
 
-    - type: word
-      part: header
-      words:
-        - "application/json-rpc"
-
+    # two and'd patterns rather than one: json object key order is not
+    # guaranteed, so a serializer that emits id before jsonrpc would miss a
+    # single pattern that requires them adjacent.
     - type: regex
       part: body
+      condition: and
       regex:
-        - '"jsonrpc"\s*:\s*"2\.0"\s*,\s*"result"\s*:\s*"[0-9]+\.[0-9]+(\.[0-9]+)?"'
+        - '"jsonrpc"\s*:\s*"2\.0"'
+        - '"result"\s*:\s*"[0-9]+\.[0-9]+(\.[0-9]+)?"'
 
   extractors:
     - type: regex
