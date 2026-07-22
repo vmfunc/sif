@@ -1,0 +1,36 @@
+# Roundcube Webmail Detection Module
+
+id: roundcube-webmail
+info:
+  name: Roundcube Webmail
+  author: sif
+  severity: info
+  description: Detects a reachable Roundcube webmail login interface via its product string and rcmail JS bootstrap, and extracts the version when the admin has enabled its display
+  tags: [roundcube, webmail, groupware, mail, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?_task=login"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "Roundcube Webmail"
+        - "new rcube_webmail()"
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: roundcube_version
+      part: body
+      regex:
+        - 'Roundcube Webmail\s+([0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+      group: 1

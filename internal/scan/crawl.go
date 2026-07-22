@@ -14,9 +14,11 @@ package scan
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -26,9 +28,15 @@ import (
 	"github.com/vmfunc/sif/internal/output"
 )
 
+// maxCrawlPages bounds total fetches independent of depth: MaxDepth caps
+// recursion depth but not breadth, so a link-heavy page (pagination, faceted
+// search) otherwise grows request count as branching^depth with no ceiling.
+const maxCrawlPages = 500
+
 // CrawlResult holds the deduped set of urls discovered by the spider.
 type CrawlResult struct {
-	URLs []string `json:"urls"`
+	URLs      []string `json:"urls"`
+	Truncated bool     `json:"truncated,omitempty"` // hit maxCrawlPages before the spider ran out of links
 }
 
 func (r *CrawlResult) ResultType() string { return "crawl" }
@@ -36,9 +44,19 @@ func (r *CrawlResult) ResultType() string { return "crawl" }
 // compile-time check so a result-type drift fails the build, not a run.
 var _ ScanResult = (*CrawlResult)(nil)
 
+// maxCrawlRequests caps the total pages a single Crawl call will fetch, so a
+// hostile page fanning out to an attacker-controlled number of links can't
+// turn a bounded-depth crawl into an unbounded one (b^d).
+const maxCrawlRequests = 2000
+
+// maxRedirectHops mirrors net/http's own default redirect cap, which we lose
+// once we install a custom CheckRedirect below.
+const maxRedirectHops = 10
+
 // Crawl spiders the target up to depth, following same-host links/scripts/forms.
 // all traffic flows through the shared httpx client so proxy/headers/rate-limit
-// apply, and robots.txt is respected (colly honors it by default).
+// apply. robots.txt is intentionally NOT honored: this is a recon/pentest
+// crawler and Disallow rules are not a scope boundary we want to respect.
 func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*CrawlResult, error) {
 	log := output.Module("CRAWL")
 	log.Start()
@@ -65,14 +83,35 @@ func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*
 	collector := colly.NewCollector(
 		colly.MaxDepth(depth),
 		colly.AllowedDomains(host),
+		colly.MaxRequests(maxCrawlRequests),
 	)
-	// reuse the shared client so proxy/cookie/-H/rate-limit are honored and the
-	// configured timeout applies to every fetch, robots.txt included.
-	collector.SetClient(httpx.Client(timeout))
+	// reuse the shared transport so proxy/-H/rate-limit still apply, but scope
+	// redirects ourselves: colly's CheckRedirect only re-checks AllowedDomains,
+	// which matches on hostname alone, so a same-host redirect to a different
+	// port would still be followed. also re-cap the hop count, since installing
+	// a custom CheckRedirect drops net/http's own 10-redirect default.
+	collector.SetClient(&http.Client{
+		Timeout:   timeout,
+		Transport: httpx.Client(timeout).Transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= maxRedirectHops {
+				return fmt.Errorf("stopped after %d redirects", maxRedirectHops)
+			}
+			if req.URL.Host != via[0].URL.Host {
+				return fmt.Errorf("redirect to %q leaves crawl scope %q", req.URL, via[0].URL.Host)
+			}
+			return nil
+		},
+	})
 
 	// dedupe across the concurrent callbacks colly may fire.
 	var mu sync.Mutex
 	seen := make(map[string]struct{})
+
+	// visited caps the total pages fetched (see maxCrawlPages); atomic since
+	// colly's callbacks can fire from multiple goroutines.
+	var visited int64
+	var truncated int32
 
 	record := func(raw string) {
 		if raw == "" {
@@ -93,6 +132,15 @@ func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*
 		}
 		mu.Unlock()
 	}
+
+	// count every request toward the budget (the seed included) and abort once
+	// it is exceeded, before the dial, so a link-heavy target can't run away.
+	collector.OnRequest(func(r *colly.Request) {
+		if atomic.AddInt64(&visited, 1) > maxCrawlPages {
+			atomic.StoreInt32(&truncated, 1)
+			r.Abort()
+		}
+	})
 
 	// links drive recursion; scripts/forms are recorded but not followed.
 	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -120,7 +168,10 @@ func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*
 	}
 	collector.Wait()
 
-	result := &CrawlResult{URLs: sortedKeys(seen)}
+	result := &CrawlResult{URLs: sortedKeys(seen), Truncated: atomic.LoadInt32(&truncated) != 0}
+	if result.Truncated {
+		log.Warn("crawl hit the %d-page budget and stopped early; results are partial", maxCrawlPages)
+	}
 
 	log.Complete(len(result.URLs), "urls")
 	return result, nil

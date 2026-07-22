@@ -46,6 +46,13 @@ var mimePrefixes = []string{
 	"application/", "multipart/", "model/", "message/",
 }
 
+// regexFlagLiterals are quoted regex flags (e.g. `str.replace("/gi", x)`) that
+// the endpoint regex mistakes for slash-prefixed paths. Denylisted by exact
+// match, not a length bump, so short real endpoints like /v1 still extract.
+var regexFlagLiterals = map[string]struct{}{
+	"/gi": {}, "/gm": {}, "/gs": {}, "/gu": {}, "/gy": {}, "/mi": {}, "/su": {},
+}
+
 // ExtractEndpoints pulls candidate paths and urls out of a script body, dedupes
 // them, drops obvious noise, and resolves relatives against baseURL so callers
 // get absolute targets where possible. a baseURL that won't parse just leaves
@@ -91,6 +98,10 @@ func isEndpoint(s string) bool {
 	}
 
 	lower := strings.ToLower(s)
+	if _, ok := regexFlagLiterals[lower]; ok {
+		return false
+	}
+
 	for i := 0; i < len(mimePrefixes); i++ {
 		// a mime type is "type/subtype" with no further path; an api route like
 		// /application/users has a leading slash, so anchor on the bare prefix.

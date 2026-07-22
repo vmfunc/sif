@@ -1,0 +1,34 @@
+id: pulsar-metrics-exposure
+info:
+  name: Apache Pulsar Broker Metrics Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Apache Pulsar broker Prometheus metrics endpoint that leaks per-topic and per-subscription throughput and backlog figures without authentication
+  tags: [pulsar, apache, messaging, streaming, metrics, prometheus, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/metrics"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "pulsar_topics_count"
+
+    - type: word
+      part: body
+      words:
+        - "pulsar_subscriptions_count"
+
+    - type: regex
+      part: body
+      regex:
+        - '(?m)^# TYPE pulsar_'

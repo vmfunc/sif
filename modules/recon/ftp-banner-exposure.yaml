@@ -1,0 +1,26 @@
+# FTP Service Banner Detection Module
+
+id: ftp-banner-exposure
+info:
+  name: FTP Service Banner Disclosure
+  author: sif
+  severity: info
+  description: Reads the 220 greeting an FTP server sends on connect, disclosing the daemon and version (often vsFTPd, ProFTPD, or Pure-FTPd) that an attacker can fingerprint for known issues
+  tags: [ftp, banner, version, tcp, exposure, recon]
+
+type: tcp
+
+tcp:
+  port: 21
+
+  matchers:
+    - type: regex
+      regex:
+        - "^220[ -]"
+
+  extractors:
+    - type: regex
+      name: ftp_banner
+      regex:
+        - "^220[ -]([^\\r\\n]+)"
+      group: 1

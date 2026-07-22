@@ -1,0 +1,41 @@
+# Grafana Tempo Search API Exposure Detection Module
+
+id: tempo-search-exposure
+info:
+  name: Grafana Tempo Search API Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed Grafana Tempo query api that returns trace search results without authentication, leaking internal service topology and request timing data
+  tags: [tempo, grafana, tracing, distributed-tracing, observability, topology, exposure, unauth, api, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/search"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"traceID"\s*:\s*"[0-9a-fA-F]+"'
+
+    - type: word
+      part: body
+      words:
+        - "\"rootServiceName\""
+        - "\"rootTraceName\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: tempo_root_service
+      part: body
+      regex:
+        - '"rootServiceName"\s*:\s*"([^"]*)"'
+      group: 1

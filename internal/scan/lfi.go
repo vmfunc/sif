@@ -170,6 +170,25 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 
 	log.Info("Testing %d parameters with %d payloads", len(paramsToTest), len(lfiPayloads))
 
+	// baseline the unmodified target so evidence-like content already present
+	// on every response (a blog post about /etc/passwd, a "<?php" snippet) isn't
+	// reported as an LFI hit for every param/payload combination.
+	baselineEvidence := make(map[string]bool)
+	if baseReq, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, targetURL, http.NoBody); err == nil {
+		if baseResp, err := client.Do(baseReq); err == nil {
+			baseBody, err := io.ReadAll(io.LimitReader(baseResp.Body, 1024*100))
+			baseResp.Body.Close()
+			if err == nil {
+				baseBodyStr := string(baseBody)
+				for _, evidence := range lfiEvidencePatterns {
+					if evidence.pattern.MatchString(baseBodyStr) {
+						baselineEvidence[evidence.description] = true
+					}
+				}
+			}
+		}
+	}
+
 	// create work items
 	type workItem struct {
 		param   string
@@ -236,8 +255,10 @@ func LFI(targetURL string, timeout time.Duration, threads int, logdir string) (*
 				// check for evidence patterns
 				for _, evidence := range lfiEvidencePatterns {
 					match := evidence.pattern.FindString(bodyStr)
-					// our own payload echoed back isn't proof of inclusion
-					if match != "" && !strings.Contains(item.payload.payload, match) {
+					// our own payload echoed back isn't proof of inclusion, and
+					// evidence already present in the unmodified baseline means
+					// the content is static, not caused by this payload
+					if match != "" && !strings.Contains(item.payload.payload, match) && !baselineEvidence[evidence.description] {
 						key := item.param + "|" + item.payload.payload
 						mu.Lock()
 						if seen[key] {

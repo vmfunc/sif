@@ -267,3 +267,60 @@ func TestLoaderScriptStubNoop(t *testing.T) {
 		t.Errorf("loadScript stub returned error: %v", err)
 	}
 }
+
+func TestDataDirs(t *testing.T) {
+	t.Setenv("XDG_DATA_DIRS", "/opt/a"+string(os.PathListSeparator)+"/opt/b")
+	if got := dataDirs(); len(got) != 2 || got[0] != "/opt/a" || got[1] != "/opt/b" {
+		t.Errorf("dataDirs() with XDG set = %v, want [/opt/a /opt/b]", got)
+	}
+
+	t.Setenv("XDG_DATA_DIRS", "")
+	if got := dataDirs(); len(got) != 2 || got[0] != "/usr/local/share" || got[1] != "/usr/share" {
+		t.Errorf("dataDirs() default = %v, want [/usr/local/share /usr/share]", got)
+	}
+}
+
+func TestFirstExistingDir(t *testing.T) {
+	tmp := t.TempDir()
+	realDir := filepath.Join(tmp, "real")
+	if err := os.Mkdir(realDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file := writeModule(t, tmp, "afile", "x")
+
+	if got := firstExistingDir([]string{filepath.Join(tmp, "missing"), file, realDir}); got != realDir {
+		t.Errorf("firstExistingDir = %q, want %q (a file must be skipped)", got, realDir)
+	}
+	if got := firstExistingDir([]string{filepath.Join(tmp, "nope")}); got != "" {
+		t.Errorf("firstExistingDir with no match = %q, want empty", got)
+	}
+}
+
+// TestBuiltinDirCandidatesIncludesDataDirs is the FHS regression: packaged
+// installs keep modules under <data-dir>/sif/modules, so that path must be a
+// candidate, ordered after the executable-relative and working-dir paths.
+func TestBuiltinDirCandidatesIncludesDataDirs(t *testing.T) {
+	t.Setenv("XDG_DATA_DIRS", "/usr/share")
+	candidates := builtinDirCandidates()
+
+	want := "/usr/share/sif/modules"
+	if candidates[len(candidates)-1] != want {
+		t.Errorf("candidates %v missing trailing data-dir path %q", candidates, want)
+	}
+}
+
+// TestResolveBuiltinDirFindsPackagedModules is the resolveBuiltinDir-level
+// counterpart to TestBuiltinDirCandidatesIncludesDataDirs above.
+func TestResolveBuiltinDirFindsPackagedModules(t *testing.T) {
+	tmp := t.TempDir()
+	pkg := filepath.Join(tmp, "sif", "modules")
+	if err := os.MkdirAll(pkg, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_DATA_DIRS", tmp)
+	t.Chdir(t.TempDir()) // scratch cwd so the "modules" candidate does not exist
+
+	if got := resolveBuiltinDir(); got != pkg {
+		t.Errorf("resolveBuiltinDir = %q, want packaged %q", got, pkg)
+	}
+}

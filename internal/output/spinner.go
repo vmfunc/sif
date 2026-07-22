@@ -54,8 +54,9 @@ func (s *Spinner) Start() {
 	s.done = make(chan struct{})
 	s.mu.Unlock()
 
-	// In non-TTY mode, just print the message once
-	if !IsTTY {
+	// In non-TTY mode, or when targets scan in parallel, just print the message
+	// once: a shared animated line can't be driven from concurrent goroutines.
+	if !IsTTY || concurrent {
 		fmt.Fprintf(sink, "    %s...\n", s.message)
 		return
 	}

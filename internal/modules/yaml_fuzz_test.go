@@ -23,6 +23,6 @@ func FuzzParseYAMLModule(f *testing.F) {
 	f.Add([]byte("id: x\ntype: http\nhttp:\n  matchers-condition: xor\n"))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		parseYAMLModuleBytes(data)
+		ParseYAMLModuleBytes(data)
 	})
 }
