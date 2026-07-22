@@ -257,6 +257,27 @@ func TestFlattenCoversEveryResultType(t *testing.T) {
 	}
 }
 
+// TestFlattenFrameworkCarriesConfidence asserts the detector's confidence rides
+// onto the framework finding, while a scanner with no confidence stays at zero.
+func TestFlattenFrameworkCarriesConfidence(t *testing.T) {
+	fw := Flatten(target, "framework", &frameworks.FrameworkResult{Name: "Laravel", Version: "9.0", Confidence: 0.82})
+	if len(fw) != 1 {
+		t.Fatalf("framework: got %d findings, want 1", len(fw))
+	}
+	if fw[0].Confidence != 0.82 {
+		t.Errorf("framework confidence = %v, want 0.82", fw[0].Confidence)
+	}
+
+	// a scanner without a confidence signal leaves the field at its zero value.
+	hdr := Flatten(target, "headers", []scan.HeaderResult{{Name: "Server", Value: "nginx"}})
+	if len(hdr) != 1 {
+		t.Fatalf("headers: got %d findings, want 1", len(hdr))
+	}
+	if hdr[0].Confidence != 0 {
+		t.Errorf("headers confidence = %v, want 0", hdr[0].Confidence)
+	}
+}
+
 // TestEveryResultTypeIsInCoverageTable cross-checks the table against the actual
 // ResultType() registry: if a scanner type exists whose ResultType() isn't in
 // the table, the coverage guard above would never exercise it. enumerate the
