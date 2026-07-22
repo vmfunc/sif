@@ -354,8 +354,15 @@ type strapiDetector struct{}
 func (d *strapiDetector) Name() string { return "Strapi" }
 
 func (d *strapiDetector) Signatures() []fw.Signature {
+	// the bare "strapi" body word matched any page that merely named the
+	// framework (a blog post, a listicle), and as a lone signature it always
+	// normalized to a full 1.0 score, suppressing the site's real framework.
+	// key on the structural marker instead: Strapi's default poweredBy
+	// middleware sets "X-Powered-By: Strapi <strapi.io>" on every response.
+	// scoped to that header, or the word still matches any header value that
+	// happens to name it (a cache-tag list, an expose-headers list).
 	return []fw.Signature{
-		{Pattern: "strapi", Weight: 0.4},
+		{Pattern: "Strapi", Weight: 0.4, HeaderOnly: true, Header: "X-Powered-By"},
 	}
 }
 
@@ -400,9 +407,12 @@ type cakephpDetector struct{}
 func (d *cakephpDetector) Name() string { return "CakePHP" }
 
 func (d *cakephpDetector) Signatures() []fw.Signature {
+	// drop the bare "cakephp" body word: it matched prose that merely named
+	// the framework. the default CAKEPHP session cookie is the structural
+	// marker, scoped to Set-Cookie so the word cannot match some other header's
+	// value.
 	return []fw.Signature{
-		{Pattern: "cakephp", Weight: 0.4},
-		{Pattern: "CAKEPHP", Weight: 0.4, HeaderOnly: true},
+		{Pattern: "CAKEPHP", Weight: 0.4, HeaderOnly: true, Header: "Set-Cookie"},
 	}
 }
 

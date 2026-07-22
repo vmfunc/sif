@@ -968,8 +968,9 @@ func TestDetectFramework_StrapiFalsePositive(t *testing.T) {
 
 func TestDetectFramework_Strapi(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Powered-By", "Strapi <strapi.io>")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<!DOCTYPE html><html><body><div>powered by strapi</div></body></html>`))
+		w.Write([]byte(`<!DOCTYPE html><html><body><div>Welcome</div></body></html>`))
 	}))
 	defer server.Close()
 
@@ -979,6 +980,57 @@ func TestDetectFramework_Strapi(t *testing.T) {
 	}
 	if result == nil || result.Name != "Strapi" {
 		t.Errorf("expected framework 'Strapi', got '%v'", result)
+	}
+}
+
+// a page that merely names the framework in prose (a listicle, a comparison)
+// must not be fingerprinted as that framework, as the old bare body words did.
+func TestDetectFramework_ProseMentionsAreNotDetections(t *testing.T) {
+	cases := map[string]string{
+		"Strapi":  `<h1>Is Strapi Right For You?</h1><p>we compare strapi with other headless cms platforms.</p>`,
+		"CakePHP": `<h1>Choosing a PHP framework</h1><p>cakephp, laravel and symfony all have strong communities.</p>`,
+	}
+	for name, body := range cases {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`<!DOCTYPE html><html><body>` + body + `</body></html>`))
+		}))
+		result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+		server.Close()
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", name, err)
+		}
+		if result != nil && result.Name == name {
+			t.Errorf("false positive: prose mentioning %s detected as %s (%.2f)", name, name, result.Confidence)
+		}
+	}
+}
+
+// the bare body words let a single prose mention outscore the site's real,
+// multi-marker framework: MatchSignatures normalizes by total signature weight,
+// so a lone signature always resolved to a full 1.0, and the single-argmax
+// reducer then swapped the true framework for the spurious one.
+func TestDetectFramework_ProseDoesNotSuppressRealFramework(t *testing.T) {
+	for _, mention := range []string{"strapi", "cakephp"} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`<!DOCTYPE html><html><head>` +
+				`<link rel="stylesheet" href="/wp-content/themes/x/style.css">` +
+				`<script src="/wp-includes/js/jquery.js"></script></head><body>` +
+				`<p>we compare ` + mention + ` against other platforms.</p></body></html>`))
+		}))
+		result, err := frameworks.DetectFramework(server.URL, 5*time.Second, "")
+		server.Close()
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", mention, err)
+		}
+		if result == nil {
+			t.Fatalf("%s: expected WordPress, got nil", mention)
+		}
+		if result.Name != "WordPress" {
+			t.Errorf("prose mention of %q suppressed the real framework: got %q (%.4f), want WordPress",
+				mention, result.Name, result.Confidence)
+		}
 	}
 }
 
@@ -1161,5 +1213,32 @@ func TestDetectFramework_CodeIgniterFalsePositive(t *testing.T) {
 	}
 	if result != nil && result.Name == "CodeIgniter" {
 		t.Errorf("expected no CodeIgniter match for prose mentioning it, got %.2f confidence", result.Confidence)
+	}
+}
+
+// the header-only markers are scoped to the header that carries them. an
+// unscoped HeaderOnly signature matches every header name and value, so the
+// word would still fire from a cache-tag list or an expose-headers list, which
+// is the same false positive class this pair was tightened to close.
+func TestStrapiCakePHPNotFiredByUnrelatedHeaders(t *testing.T) {
+	for _, tc := range []struct{ name, hdr, val, want string }{
+		{"strapi named in an unrelated header", "X-Cache-Tags", "cms,Strapi,blog", "Strapi"},
+		{"cakephp named in an unrelated header", "Access-Control-Expose-Headers", "CAKEPHP, X-Total", "CakePHP"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set(tc.hdr, tc.val)
+				w.WriteHeader(200)
+				_, _ = w.Write([]byte(`<!DOCTYPE html><html><body>hi</body></html>`))
+			}))
+			defer srv.Close()
+			res, err := frameworks.DetectFramework(srv.URL, 5*time.Second, "")
+			if err != nil {
+				t.Fatalf("detect: %v", err)
+			}
+			if res != nil && res.Name == tc.want {
+				t.Errorf("FP: %q detected (%.4f) from header %q: %q", tc.want, res.Confidence, tc.hdr, tc.val)
+			}
+		})
 	}
 }
