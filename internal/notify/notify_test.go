@@ -278,25 +278,30 @@ func TestNotifyCodeBlockBreakoutNeutralized(t *testing.T) {
 	var c capture
 	srv := captureServer(t, &c)
 
-	evil := []finding.Finding{{
-		Target:   "https://evil.test",
-		Module:   "probe",
-		Severity: finding.SeverityHigh,
-		Key:      "probe:x",
-		Title:    "```\n@everyone pwned <https://evil.test|click>\n```",
-	}}
-	p := &discordProvider{webhook: srv.URL}
-	if err := p.send(context.Background(), srv.Client(), evil); err != nil {
-		t.Fatalf("send: %v", err)
-	}
-	var payload discordPayload
-	if err := json.Unmarshal(c.body, &payload); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	// a clean payload has exactly the 2 fences we added (open+close); any more
-	// means attacker content broke out.
-	if fences := strings.Count(payload.Content, "```"); fences > 2 {
-		t.Fatalf("INJECTION: attacker content added %d extra code fences, breaking out: %q", fences-2, payload.Content)
+	// a backtick run of any length has to come out broken; 5, 8 and 11 are the
+	// lengths that reformed a fence when only exact triples were replaced.
+	for _, n := range []int{3, 4, 5, 6, 8, 11} {
+		run := strings.Repeat("`", n)
+		evil := []finding.Finding{{
+			Target:   "https://evil.test",
+			Module:   "probe",
+			Severity: finding.SeverityHigh,
+			Key:      "probe:x",
+			Title:    run + "\n@everyone pwned <https://evil.test|click>\n" + run,
+		}}
+		p := &discordProvider{webhook: srv.URL}
+		if err := p.send(context.Background(), srv.Client(), evil); err != nil {
+			t.Fatalf("run of %d: send: %v", n, err)
+		}
+		var payload discordPayload
+		if err := json.Unmarshal(c.body, &payload); err != nil {
+			t.Fatalf("run of %d: unmarshal: %v", n, err)
+		}
+		// a clean payload has exactly the 2 fences we added (open+close); any more
+		// means attacker content broke out.
+		if fences := strings.Count(payload.Content, "```"); fences > 2 {
+			t.Fatalf("INJECTION: run of %d backticks added %d extra code fences, breaking out: %q", n, fences-2, payload.Content)
+		}
 	}
 }
 

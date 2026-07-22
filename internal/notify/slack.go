@@ -57,11 +57,14 @@ func codeBlock(body string) string {
 	return "```\n" + sanitizeFence(body) + "```"
 }
 
-// sanitizeFence breaks up any triple-backtick run inside body by interleaving
-// zero-width spaces between the backticks. the text still reads as backticks
-// to a human but neither slack nor discord treats it as a fence boundary, so
-// it can't prematurely close the code block we wrap it in.
+// sanitizeFence separates every backtick in body from the next with a
+// zero-width space. the text still reads as backticks to a human but no two
+// are ever adjacent, so neither slack nor discord sees a fence boundary and
+// attacker content can't close the code block we wrap it in.
+//
+// breaking exact triples instead would leave a trailing bare backtick, and any
+// run of length \u2261 2 mod 3 (5, 8, 11...) would reform a contiguous triple.
 func sanitizeFence(body string) string {
 	const zwsp = "\u200b" // zero-width space
-	return strings.ReplaceAll(body, "```", "`"+zwsp+"`"+zwsp+"`")
+	return strings.ReplaceAll(body, "`", "`"+zwsp)
 }
