@@ -72,6 +72,18 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 		}
 	}
 
+	// disable-redirects only applies to this module's requests; opts.Client may
+	// be the shared httpx client reused by every other module in the run, so a
+	// module-scoped policy shallow-copies it (keeping the pooled Transport)
+	// rather than mutating CheckRedirect on the shared instance.
+	if cfg.DisableRedirects {
+		scoped := *client
+		scoped.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+		client = &scoped
+	}
+
 	// Generate requests based on paths and payloads
 	requests, err := generateHTTPRequests(target, cfg)
 	if err != nil {

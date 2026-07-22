@@ -61,6 +61,7 @@ type HTTPConfig struct {
 	Body              string            `yaml:"body,omitempty"`
 	Attack            string            `yaml:"attack,omitempty"` // clusterbomb (default), pitchfork
 	Threads           int               `yaml:"threads,omitempty"`
+	DisableRedirects  bool              `yaml:"disable-redirects,omitempty"` // stop at the first response; don't follow 3xx
 	Matchers          []Matcher         `yaml:"matchers"`
 	MatchersCondition string            `yaml:"matchers-condition,omitempty"` // and (default), or
 	Extractors        []Extractor       `yaml:"extractors,omitempty"`
