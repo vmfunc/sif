@@ -14,6 +14,7 @@ package modules
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -22,10 +23,21 @@ import (
 	"github.com/vmfunc/sif/internal/output"
 )
 
+// builtinFS holds the modules embedded into the binary. it's set once, from the
+// repo-root package that can actually run the go:embed directive (go:embed can't
+// reach a parent directory, and modules/ sits above this package). it stays nil
+// in builds and tests that don't import that package, so the loader simply falls
+// back to the filesystem as before.
+var builtinFS fs.FS
+
+// SetBuiltinFS registers the embedded module filesystem. see builtinFS.
+func SetBuiltinFS(fsys fs.FS) { builtinFS = fsys }
+
 // Loader handles module discovery and loading.
 type Loader struct {
 	builtinDir string
 	userDir    string
+	embedded   fs.FS
 	loaded     int
 }
 
@@ -62,15 +74,26 @@ func NewLoader() (*Loader, error) {
 	return &Loader{
 		builtinDir: builtinDir,
 		userDir:    userDir,
+		embedded:   builtinFS,
 	}, nil
 }
 
 // LoadAll discovers and loads all modules from both built-in
 // and user directories.
 func (l *Loader) LoadAll() error {
-	// Load built-in modules first
+	// Load built-in modules first, preferring an on-disk modules/ dir (dev tree
+	// or a release that ships the folder alongside the binary).
+	before := l.loaded
 	if err := l.loadDir(l.builtinDir, false); err != nil {
 		log.Debugf("No built-in modules found: %v", err)
+	}
+
+	// nothing on disk: fall back to the modules embedded in the binary so a bare
+	// `go install`ed sif still ships its built-in modules.
+	if l.loaded == before && l.embedded != nil {
+		if err := l.loadFS(l.embedded); err != nil {
+			log.Debugf("No embedded modules loaded: %v", err)
+		}
 	}
 
 	// Load user modules (can override built-in)
@@ -114,6 +137,36 @@ func (l *Loader) loadDir(dir string, userDefined bool) error {
 			}
 		}
 
+		return nil
+	})
+}
+
+// loadFS loads yaml modules from an embedded filesystem. only yaml is embedded
+// (the .go script path is a filesystem-only dev affordance), so this walks for
+// yaml files and parses them from bytes.
+func (l *Loader) loadFS(fsys fs.FS) error {
+	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		switch filepath.Ext(path) {
+		case ".yaml", ".yml":
+			data, rerr := fs.ReadFile(fsys, path)
+			if rerr != nil {
+				log.Warnf("Failed to read embedded module %s: %v", path, rerr)
+				return nil
+			}
+			def, perr := ParseYAMLModuleBytes(data)
+			if perr != nil {
+				log.Warnf("Failed to load embedded module %s: %v", path, perr)
+				return nil
+			}
+			Register(newYAMLModuleWrapper(def, path))
+			l.loaded++
+		}
 		return nil
 	})
 }

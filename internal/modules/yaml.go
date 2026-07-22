@@ -90,7 +90,12 @@ func ParseYAMLModule(path string) (*YAMLModule, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read module file: %w", err)
 	}
+	return ParseYAMLModuleBytes(data)
+}
 
+// ParseYAMLModuleBytes parses and validates a module definition from raw bytes,
+// so the loader can read modules from an embedded fs.FS as well as from disk.
+func ParseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 	var ym YAMLModule
 	if err := yaml.Unmarshal(data, &ym); err != nil {
 		return nil, fmt.Errorf("parse yaml: %w", err)
