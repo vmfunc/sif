@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	urlutil "github.com/projectdiscovery/utils/url"
 	"github.com/vmfunc/sif/internal/httpx"
@@ -41,7 +42,7 @@ var nextPagesRegex = regexp.MustCompile(`\[("([^"]+\.js)"(,?))`)
 // cannot exhaust memory.
 const maxManifestSize = 5 * 1024 * 1024
 
-func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
+func GetPagesRouterScripts(scriptUrl string, timeout time.Duration) ([]string, error) {
 	baseUrl, err := urlutil.Parse(scriptUrl)
 	if err != nil {
 		return nil, err
@@ -53,9 +54,9 @@ func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
 		return nil, err
 	}
 
-	// no timeout in scope here; 0 matches the previous DefaultClient behavior
-	// while still routing through the shared transport (proxy/headers/rate-limit).
-	resp, err := httpx.Client(0).Do(req)
+	// use the caller's scan timeout so a slow or hostile manifest host cannot
+	// hang the whole scan; a zero timeout would read with no deadline.
+	resp, err := httpx.Client(timeout).Do(req)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
