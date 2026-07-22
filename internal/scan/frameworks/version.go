@@ -13,7 +13,9 @@
 package frameworks
 
 import (
+	"net/http"
 	"regexp"
+	"strings"
 	"unicode"
 )
 
@@ -56,9 +58,13 @@ func init() {
 			{`"express":\s*"[~^]?(\d+\.\d+(?:\.\d+)?)"`, 0.85, "package.json"},
 		},
 		"ASP.NET": {
-			{`X-AspNet-Version:\s*(\d+\.\d+(?:\.\d+)?)`, 0.95, "header"},
+			// header names are matched case-insensitively: Go's http.Header
+			// canonicalizes "X-AspNet-Version" to "X-Aspnet-Version", so a
+			// case-sensitive literal here would never match the header line
+			// built by headerSearchText.
+			{`(?i:X-AspNet-Version):\s*(\d+\.\d+(?:\.\d+)?)`, 0.95, "header"},
 			{`ASP\.NET[/\s]+[Vv]?(\d+\.\d+(?:\.\d+)?)`, 0.9, "explicit version"},
-			{`X-AspNetMvc-Version:\s*(\d+\.\d+(?:\.\d+)?)`, 0.9, "MVC header"},
+			{`(?i:X-AspNetMvc-Version):\s*(\d+\.\d+(?:\.\d+)?)`, 0.9, "MVC header"},
 		},
 		"ASP.NET Core": {
 			{`\.NET\s*(\d+\.\d+(?:\.\d+)?)`, 0.8, "dotnet version"},
@@ -159,9 +165,39 @@ func init() {
 	}
 }
 
-// ExtractVersionOptimized extracts version using pre-compiled patterns.
-// This is exported for use by individual detector implementations.
+// ExtractVersionOptimized extracts version using pre-compiled patterns,
+// searching only the response body. This is exported for use by individual
+// detector implementations.
 func ExtractVersionOptimized(body string, framework string) VersionMatch {
+	return extractVersion(body, framework)
+}
+
+// ExtractVersionFromResponse is like ExtractVersionOptimized but also searches
+// canonical header lines, so header-shaped patterns (e.g. ASP.NET's
+// X-AspNet-Version) can match; use it for detectors with header-shaped patterns.
+func ExtractVersionFromResponse(body string, headers http.Header, framework string) VersionMatch {
+	return extractVersion(body+"\n"+headerSearchText(headers), framework)
+}
+
+// headerSearchText renders headers as canonical "Name: value" lines, one per
+// value, so version regexes written against raw header text (e.g.
+// "X-AspNet-Version: 4.0.30319") have something to match against.
+func headerSearchText(headers http.Header) string {
+	var b strings.Builder
+	for name, values := range headers {
+		for _, v := range values {
+			b.WriteString(name)
+			b.WriteString(": ")
+			b.WriteString(v)
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
+// extractVersion runs every pattern registered for framework against text and
+// keeps the highest-confidence valid match.
+func extractVersion(text string, framework string) VersionMatch {
 	patterns, exists := frameworkVersionPatterns[framework]
 	if !exists {
 		return VersionMatch{Version: "unknown", Confidence: 0, Source: ""}
@@ -169,7 +205,7 @@ func ExtractVersionOptimized(body string, framework string) VersionMatch {
 
 	var bestMatch VersionMatch
 	for _, p := range patterns {
-		matches := p.re.FindStringSubmatch(body)
+		matches := p.re.FindStringSubmatch(text)
 		if len(matches) > 1 && p.confidence > bestMatch.Confidence {
 			candidate := matches[1]
 			if isValidVersionString(candidate) {

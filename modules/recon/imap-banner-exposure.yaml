@@ -1,0 +1,26 @@
+# IMAP Service Banner Detection Module
+
+id: imap-banner-exposure
+info:
+  name: IMAP Service Banner Disclosure
+  author: sif
+  severity: info
+  description: Reads the untagged * OK greeting an IMAP server sends on connect (RFC 3501), confirming a mail-access service is reachable and disclosing the daemon banner and capabilities before authentication
+  tags: [imap, mail, banner, tcp, exposure, recon]
+
+type: tcp
+
+tcp:
+  port: 143
+
+  matchers:
+    - type: regex
+      regex:
+        - "^\\* OK"
+
+  extractors:
+    - type: regex
+      name: imap_banner
+      regex:
+        - "^\\* OK ([^\\r\\n]+)"
+      group: 1

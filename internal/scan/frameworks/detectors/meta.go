@@ -43,7 +43,8 @@ func (d *nextjsDetector) Name() string { return "Next.js" }
 func (d *nextjsDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: "__NEXT_DATA__", Weight: 0.5},
-		{Pattern: "_next/static", Weight: 0.4},
+		// same attribute-form-vs-prose rationale as Angular's ng-version marker.
+		{Pattern: `="/_next/static/`, Weight: 0.6},
 		{Pattern: "__next", Weight: 0.3},
 		{Pattern: "x-nextjs", Weight: 0.3, HeaderOnly: true},
 	}
@@ -117,10 +118,12 @@ type gatsbyDetector struct{}
 func (d *gatsbyDetector) Name() string { return "Gatsby" }
 
 func (d *gatsbyDetector) Signatures() []fw.Signature {
+	// "gatsby-" alone cleared the detection threshold on prose merely naming a
+	// plugin (a migration guide, a plugin comparison). the remaining patterns
+	// are structural markers that only appear when gatsby rendered the page.
 	return []fw.Signature{
 		{Pattern: "___gatsby", Weight: 0.5},
-		{Pattern: "gatsby-", Weight: 0.4},
-		{Pattern: "page-data.json", Weight: 0.3},
+		{Pattern: "/page-data/", Weight: 0.3},
 	}
 }
 
@@ -166,7 +169,8 @@ func (d *astroDetector) Name() string { return "Astro" }
 
 func (d *astroDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: `<meta name="generator" content="Astro`, Weight: 0.5},
+		// definitive quote-anchored marker; same threshold rationale as Next.js above.
+		{Pattern: `<meta name="generator" content="Astro`, Weight: 1.1},
 		{Pattern: "astro-island", Weight: 0.5},
 		{Pattern: "data-astro-cid-", Weight: 0.4},
 		{Pattern: "/_astro/", Weight: 0.4},

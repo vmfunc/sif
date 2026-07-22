@@ -18,6 +18,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestGetPagesRouterScriptsCapturesAllChunksPerRoute(t *testing.T) {
@@ -30,7 +31,7 @@ func TestGetPagesRouterScriptsCapturesAllChunksPerRoute(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	scripts, err := GetPagesRouterScripts(srv.URL + "/_buildManifest.js")
+	scripts, err := GetPagesRouterScripts(srv.URL+"/_buildManifest.js", 5*time.Second)
 	if err != nil {
 		t.Fatalf("GetPagesRouterScripts: %v", err)
 	}
@@ -59,7 +60,7 @@ func TestGetPagesRouterScriptsReadsPastLongLine(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	scripts, err := GetPagesRouterScripts(srv.URL + "/_buildManifest.js")
+	scripts, err := GetPagesRouterScripts(srv.URL+"/_buildManifest.js", 5*time.Second)
 	if err != nil {
 		t.Fatalf("GetPagesRouterScripts: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestGetPagesRouterScriptsRealisticManifest(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	scripts, err := GetPagesRouterScripts(srv.URL + "/_buildManifest.js")
+	scripts, err := GetPagesRouterScripts(srv.URL+"/_buildManifest.js", 5*time.Second)
 	if err != nil {
 		t.Fatalf("GetPagesRouterScripts: %v", err)
 	}
@@ -130,5 +131,32 @@ func TestGetPagesRouterScriptsRealisticManifest(t *testing.T) {
 		if found(bad) {
 			t.Errorf("false positive: captured non-chunk %q in %v", bad, scripts)
 		}
+	}
+}
+
+func TestGetPagesRouterScriptsHonorsTimeout(t *testing.T) {
+	// a slow manifest host must not hang the scan: the fetch has to give up
+	// once the caller's timeout elapses instead of reading with no deadline.
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		<-release
+		w.Write([]byte(`["late.js"]`))
+	}))
+	defer srv.Close()
+	defer close(release)
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := GetPagesRouterScripts(srv.URL+"/_buildManifest.js", 100*time.Millisecond)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected a timeout error from the slow manifest host, got nil")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("GetPagesRouterScripts did not honor the timeout and hung")
 	}
 }

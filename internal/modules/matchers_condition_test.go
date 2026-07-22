@@ -130,3 +130,22 @@ func TestExecuteHTTPModuleMatchersConditionOr(t *testing.T) {
 		t.Fatalf("and: got %d findings, want 0 (status:500 fails)", len(res.Findings))
 	}
 }
+
+func TestExecuteTCPModuleMatchersConditionOr(t *testing.T) {
+	withFakeTCP(t, "+PONG\r\n")
+	def := tcpDef(&TCPConfig{
+		Port:              6379,
+		Matchers:          []Matcher{tcpWord("absent-token"), tcpWord("+PONG")},
+		MatchersCondition: "or",
+	})
+
+	res, err := ExecuteTCPModule(context.Background(), "example.com", def, Options{})
+	if err != nil {
+		t.Fatalf("or: %v", err)
+	}
+	// or: the second matcher hits, so the finding fires even though the first
+	// missed; default and would suppress it.
+	if len(res.Findings) != 1 {
+		t.Fatalf("or: got %d findings, want 1", len(res.Findings))
+	}
+}

@@ -285,6 +285,61 @@ func TestJWT_SensitiveClaimFlagged(t *testing.T) {
 	}
 }
 
+func TestNumericClaim_AcceptsStringEncodedExp(t *testing.T) {
+	// some jwt stacks (older php/java libs) serialize NumericDate as a quoted
+	// string instead of a json number. a stringly-typed exp must still count
+	// as present, or a genuinely expired token reads as "missing exp" instead.
+	cases := []struct {
+		name    string
+		payload map[string]any
+		wantF   float64
+		wantOK  bool
+	}{
+		{"string past exp", map[string]any{"exp": "1000000000"}, 1000000000, true},
+		{"string future exp", map[string]any{"exp": "9999999999"}, 9999999999, true},
+		{"float exp still works", map[string]any{"exp": float64(1000000000)}, 1000000000, true},
+		{"garbage string exp", map[string]any{"exp": "not-a-number"}, 0, false},
+		{"missing exp", map[string]any{}, 0, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f, ok := numericClaim(tc.payload, "exp")
+			if ok != tc.wantOK || f != tc.wantF {
+				t.Errorf("numericClaim(%+v) = (%v, %v), want (%v, %v)", tc.payload, f, ok, tc.wantF, tc.wantOK)
+			}
+		})
+	}
+}
+
+func TestJWT_StringExpStillDetectsExpiry(t *testing.T) {
+	// header {alg:none}, payload {sub:x, exp:"1000000000"} (string-typed, long past).
+	// exp is a valid number, just quoted, so this must flag "expired token" and
+	// must NOT also claim the expiry is missing.
+	jwtStringExpPast := "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0." +
+		"eyJzdWIiOiJ4IiwiZXhwIjoiMTAwMDAwMDAwMCJ9."
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(jwtStringExpPast))
+	}))
+	defer srv.Close()
+
+	result, err := JWT(srv.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("JWT: %v", err)
+	}
+	if result == nil || len(result.Tokens) != 1 {
+		t.Fatalf("expected one token, got %+v", result)
+	}
+
+	token := &result.Tokens[0]
+	if !hasIssue(token, "expired token") {
+		t.Errorf("expected string-encoded past exp to be flagged expired, got %+v", token.Issues)
+	}
+	if hasIssue(token, "missing exp") {
+		t.Errorf("string-encoded exp must not be reported as missing, got %+v", token.Issues)
+	}
+}
+
 func TestJWT_NoTokens(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("nothing to see here"))

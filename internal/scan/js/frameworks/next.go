@@ -24,14 +24,15 @@ package frameworks
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	urlutil "github.com/projectdiscovery/utils/url"
 	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/output"
 )
 
 // nextPagesRegex matches chunk paths in a Next.js build manifest. anchoring
@@ -44,7 +45,7 @@ var nextPagesRegex = regexp.MustCompile(`"(static(?:\\u002[fF]|/)[^"]+\.js)"`)
 // cannot exhaust memory.
 const maxManifestSize = 5 * 1024 * 1024
 
-func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
+func GetPagesRouterScripts(scriptUrl string, timeout time.Duration) ([]string, error) {
 	baseUrl, err := urlutil.Parse(scriptUrl)
 	if err != nil {
 		return nil, err
@@ -52,22 +53,22 @@ func GetPagesRouterScripts(scriptUrl string) ([]string, error) {
 
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, scriptUrl, http.NoBody)
 	if err != nil {
-		fmt.Println(err)
+		output.Error("%v", err)
 		return nil, err
 	}
 
-	// no timeout in scope here; 0 matches the previous DefaultClient behavior
-	// while still routing through the shared transport (proxy/headers/rate-limit).
-	resp, err := httpx.Client(0).Do(req)
+	// use the caller's scan timeout so a slow or hostile manifest host cannot
+	// hang the whole scan; a zero timeout would read with no deadline.
+	resp, err := httpx.Client(timeout).Do(req)
 	if err != nil {
-		fmt.Println(err)
+		output.Error("%v", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestSize))
 	if err != nil {
-		fmt.Println(err)
+		output.Error("%v", err)
 		return nil, err
 	}
 	// the manifest ships minified on one line; strip line breaks so the regex

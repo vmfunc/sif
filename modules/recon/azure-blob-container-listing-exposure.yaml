@@ -1,0 +1,47 @@
+# Azure Blob Container Listing Exposure Detection Module
+
+id: azure-blob-container-listing-exposure
+info:
+  name: Azure Blob Container Listing Exposure
+  author: sif
+  severity: high
+  description: Detects an anonymously listable azure blob storage container that returns a full blob enumeration without authentication
+  tags: [azure, blob, container, storage, cloud, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?restype=container&comp=list"
+
+  threads: 3
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '<EnumerationResults[^>]*>'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - "PublicAccessNotPermitted"
+        - "ResourceNotFound"
+        - "ContainerNotFound"
+        - "AuthenticationFailed"
+        - "<Error>"
+
+  extractors:
+    - type: regex
+      name: blob_name
+      part: body
+      regex:
+        - '<Name>([^<]+)</Name>'
+      group: 1

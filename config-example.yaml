@@ -1,0 +1,24 @@
+# sif config file. keys are flag long-names; top-level values are applied as
+# file defaults on every run, the same as ~/.config/sif/config.yaml.
+#
+# sif manages that ambient path itself (goflags auto-creates it, all keys
+# commented out, on first run); this file documents the schema, it is not
+# read automatically. pass -config to point sif at a file like this one.
+
+threads: 20
+timeout: 15s
+headers: true
+
+# profiles are named overlays selected with -profile NAME. a profile's keys
+# win over the top-level defaults above; an explicit cli flag still wins over
+# both.
+profiles:
+  quick:
+    probe: true
+    favicon: true
+    dirlist: small
+  deep:
+    crawl: true
+    crawl-depth: 3
+    sql: true
+    nuclei: true

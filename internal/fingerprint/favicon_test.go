@@ -48,6 +48,41 @@ func TestFaviconHashGolden(t *testing.T) {
 	}
 }
 
+// TestLookupFaviconTech proves the SSOT table is the single place all ten
+// facts are resolved: every entry round-trips, an unknown hash misses, and the
+// count is pinned so an accidental addition/removal is caught.
+func TestLookupFaviconTech(t *testing.T) {
+	if len(faviconTech) != 10 {
+		t.Fatalf("faviconTech has %d entries, want 10", len(faviconTech))
+	}
+	for hash, want := range faviconTech {
+		got, ok := LookupFaviconTech(hash)
+		if !ok {
+			t.Errorf("LookupFaviconTech(%d) ok = false, want true", hash)
+		}
+		if got != want {
+			t.Errorf("LookupFaviconTech(%d) = %q, want %q", hash, got, want)
+		}
+	}
+
+	if tech, ok := LookupFaviconTech(0); ok {
+		t.Errorf("LookupFaviconTech(0) = (%q, true), want (\"\", false)", tech)
+	}
+
+	tests := []struct {
+		hash int32
+		want string
+	}{
+		{hash: -1255347784, want: "GitLab"},
+		{hash: 116323821, want: "Apache Tomcat"},
+	}
+	for _, tt := range tests {
+		if got, ok := LookupFaviconTech(tt.hash); !ok || got != tt.want {
+			t.Errorf("LookupFaviconTech(%d) = (%q, %v), want (%q, true)", tt.hash, got, ok, tt.want)
+		}
+	}
+}
+
 // TestFaviconBase64Chunking pins the encode step against python's
 // base64.encodebytes: a 60-byte input encodes to 80 base64 chars, so it must
 // wrap into two newline-terminated lines.

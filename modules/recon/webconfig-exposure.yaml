@@ -34,6 +34,16 @@ http:
         - "<system.webServer"
         - "<appSettings"
 
+    # a docs page that embeds a raw web.config sample as an example trips both
+    # matchers above with no real web.config present. suppress any response
+    # that opens like an html document; a real web.config is a plain xml
+    # document rooted at <configuration> and never carries html markup.
+    - type: regex
+      part: body
+      negative: true
+      regex:
+        - '(?i)<(!doctype|html|head|title|body)[ >]'
+
   extractors:
     - type: regex
       name: connection_string

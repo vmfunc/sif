@@ -40,6 +40,7 @@ type Settings struct {
 	Git               bool
 	Whois             bool
 	Threads           int
+	Concurrency       int
 	Nuclei            bool
 	JavaScript        bool
 	Timeout           time.Duration
@@ -69,6 +70,7 @@ type Settings struct {
 	Probe             bool
 	SARIF             string // path to write a sarif 2.1.0 report to ("" = off)
 	Markdown          string // path to write a markdown report to ("" = off)
+	JSONReport        string // path to write a json findings report to ("" = off)
 	Silent            bool   // route chrome to stderr, print one finding per line to stdout
 	Diff              bool   // surface only findings added/removed vs the last snapshot
 	Store             string // snapshot dir for diff mode ("" = default state dir)
@@ -84,6 +86,8 @@ type Settings struct {
 	Notify            bool   // -notify: ship findings to configured providers
 	NotifySeverity    string // -notify-severity: minimum severity to send (info..critical)
 	NotifyConfig      string // -notify-config: path to a notify-compatible yaml file
+	ConfigFile        string // -config: path to a yaml config file ("" = default ~/.config/sif/config.yaml)
+	Profile           string // -profile: named profile overlay from the config file
 }
 
 // minThreads is the floor for the worker count. Threads feeds wg.Add across the
@@ -171,7 +175,13 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 		flagSet.DurationVarP(&settings.Timeout, "timeout", "t", 10*time.Second, "HTTP request timeout"),
 		flagSet.StringVarP(&settings.LogDir, "log", "l", "", "Directory to store logs in"),
 		flagSet.IntVar(&settings.Threads, "threads", 10, "Number of threads to run scans on"),
+		flagSet.IntVar(&settings.Concurrency, "concurrency", 1, "Number of targets to scan in parallel (>1 interleaves console output)"),
 		flagSet.StringVar(&settings.Template, "template", "", "Load scan settings from a template (preset minimal/recon/full, or a local yaml file)"),
+	)
+
+	flagSet.CreateGroup("config", "Config",
+		flagSet.StringVar(&settings.ConfigFile, "config", "", "Load flags from a yaml config file (default ~/.config/sif/config.yaml)"),
+		flagSet.StringVar(&settings.Profile, "profile", "", "Select a named profile from the config file"),
 	)
 
 	flagSet.CreateGroup("http", "HTTP",
@@ -185,6 +195,7 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 	flagSet.CreateGroup("output", "Output",
 		flagSet.StringVar(&settings.SARIF, "sarif", "", "Write a SARIF 2.1.0 report to this file"),
 		flagSet.StringVarP(&settings.Markdown, "markdown", "md", "", "Write a markdown report to this file"),
+		flagSet.StringVar(&settings.JSONReport, "json", "", "Write a json findings report to this file"),
 		flagSet.BoolVar(&settings.Silent, "silent", false, "Plain output: chrome to stderr, one finding per line to stdout (for pipelines)"),
 		flagSet.BoolVar(&settings.Diff, "diff", false, "Diff mode: surface only findings added/removed since the last snapshot of each target"),
 		flagSet.StringVar(&settings.Store, "store", "", "Snapshot directory for -diff (default: log dir, else <user-config>/sif/state)"),
@@ -214,19 +225,20 @@ func Parse() *Settings {
 	settings := &Settings{}
 	flagSet := registerFlags(settings)
 
-	// -template presets a batch of scans from a yaml file or named preset; point
-	// goflags at it before Parse so it merges as config (cli flags still win) and
-	// replaces the ambient config for this run.
-	templatePath, cleanup, err := templateConfigPath(os.Args[1:])
+	// -config/-profile/-template all resolve to a single flat yaml config path
+	// for goflags to merge, so point it there before Parse (cli flags still
+	// win). unset, this returns "" and goflags falls back to its own ambient
+	// default config path, unchanged from before this feature existed.
+	configPath, cleanup, err := resolveConfigInput(os.Args[1:])
 	if err != nil {
-		log.Fatalf("Could not load template: %s", err)
+		log.Fatalf("Could not load config: %s", err)
 	}
-	if templatePath != "" {
-		flagSet.SetConfigFilePath(templatePath)
+	if configPath != "" {
+		flagSet.SetConfigFilePath(configPath)
 	}
 
-	// Parse merges the template config synchronously, so a temp preset file can
-	// be removed right after, before any fatal exit (no leaking defer).
+	// Parse merges the config synchronously, so a temp overlay file can be
+	// removed right after, before any fatal exit (no leaking defer).
 	parseErr := flagSet.Parse()
 	if cleanup != nil {
 		cleanup()
@@ -239,6 +251,12 @@ func Parse() *Settings {
 	// negative value can't panic the waitgroup.
 	if settings.Threads < minThreads {
 		settings.Threads = minThreads
+	}
+
+	// concurrency bounds the target worker pool; floor it so 0/negative means
+	// sequential rather than a stalled or panicking pool.
+	if settings.Concurrency < 1 {
+		settings.Concurrency = 1
 	}
 
 	return settings

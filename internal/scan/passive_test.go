@@ -15,6 +15,7 @@ package scan
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -165,6 +166,30 @@ func TestPassive_ScopesSubdomainsToTarget(t *testing.T) {
 	}
 	if !urlsContain(result.Subdomains, "www.example.com") {
 		t.Errorf("expected the in-scope subdomain to remain: %v", result.Subdomains)
+	}
+}
+
+func TestPassive_WaybackLongLineKeepsFeed(t *testing.T) {
+	// a single archived url with a huge query string (data:/base64 blobs do
+	// occur) must not discard every other harvested url.
+	longURL := "http://example.com/?blob=" + strings.Repeat("a", 2*1024*1024)
+	wayback := longURL + "\n" +
+		"http://example.com/keep-one\n" +
+		"http://example.com/keep-two\n"
+	fixtureServer(t, "[]", "[]", wayback)
+
+	result, err := Passive("https://example.com", 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("Passive: %v", err)
+	}
+
+	for _, want := range []string{"http://example.com/keep-one", "http://example.com/keep-two"} {
+		if !urlsContain(result.URLs, want) {
+			t.Errorf("over-long wayback line dropped the feed; missing %q, got %d urls", want, len(result.URLs))
+		}
+	}
+	if !urlsContain(result.URLs, longURL) {
+		t.Errorf("the over-long url itself was dropped, got %d urls", len(result.URLs))
 	}
 }
 

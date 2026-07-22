@@ -65,7 +65,7 @@ info:
 
 ### type (required)
 
-module type. currently only `http` is supported.
+module type. `http` and `tcp` are supported.
 
 ```yaml
 type: http
@@ -167,6 +167,58 @@ concurrent requests (default: 10).
 http:
   threads: 5
 ```
+
+### tcp
+
+raw tcp configuration. connects to a port, optionally sends a payload, and runs
+matchers and extractors against the response banner.
+
+#### port
+
+the tcp port to connect to (required, 1-65535). the port selects the service, so
+the target's own scheme and port are ignored.
+
+```yaml
+tcp:
+  port: 6379
+```
+
+#### data
+
+an optional payload sent after connecting. sif decodes C-style escapes in the
+value, so `\r`, `\n`, `\t`, `\\` and `\xHH` reach the wire as the raw bytes no
+matter how the yaml scalar is quoted; an unrecognized escape is left verbatim. a
+server that only banners (ssh, smtp) needs no data at all.
+
+```yaml
+tcp:
+  port: 6379
+  data: "INFO\r\n"
+```
+
+#### matchers and extractors
+
+tcp runs `word`, `regex` and `size` matchers (no `status`/`favicon`, those are
+http only) against the banner string, and `regex` extractors pull values out of
+it. there is no `part` selector: the banner is the only stream.
+
+```yaml
+tcp:
+  port: 6379
+  data: "INFO\r\n"
+  matchers:
+    - type: word
+      words:
+        - "redis_version:"
+  extractors:
+    - type: regex
+      name: redis_version
+      regex:
+        - "redis_version:([0-9.]+)"
+      group: 1
+```
+
+see `modules/recon/redis-unauth-exposure.yaml` for the full module.
 
 ## matchers
 
@@ -277,8 +329,8 @@ matchers:
 
 this matches responses with status 200 AND containing "ref: refs/".
 
-to require any matcher instead of all, set `matchers-condition: or` on the http
-block; the module then reports a finding when any one matcher matches.
+set `matchers-condition: or` to fire when any matcher hits instead of all; it
+applies to `http` and `tcp` modules alike.
 
 ```yaml
 http:
