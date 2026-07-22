@@ -159,3 +159,19 @@ func TestCDNDetectsRealEdgeHeaders(t *testing.T) {
 		})
 	}
 }
+
+// an origin advertising which of its headers CORS clients may read is naming
+// header names in a header VALUE, not sitting behind that edge. matching a
+// vendor marker across every header value turns the most common CORS config
+// into a cdn detection, so those markers match on header presence instead.
+func TestCDNIgnoresVendorHeaderNamesInValues(t *testing.T) {
+	origin := http.Header{}
+	origin.Set("Server", "nginx/1.24.0")
+	origin.Set("Access-Control-Expose-Headers",
+		"CF-Ray, X-Amz-Cf-Id, X-Vercel-Id, X-Fastly-Request-Id, X-NF-Request-ID, Akamai-GRN")
+	origin.Set("Vary", "Accept-Encoding, X-Akamai-Transformed")
+
+	if got := fw.DetectCDN("<html></html>", origin); got != nil {
+		t.Errorf("plain nginx origin reported as %q (confidence %.4f) from vendor header names quoted in a value", got.Name, got.Confidence)
+	}
+}
