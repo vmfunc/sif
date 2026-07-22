@@ -43,7 +43,8 @@ func (d *nextjsDetector) Name() string { return "Next.js" }
 func (d *nextjsDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		{Pattern: "__NEXT_DATA__", Weight: 0.5},
-		{Pattern: "_next/static", Weight: 0.4},
+		// same attribute-form-vs-prose rationale as Angular's ng-version marker.
+		{Pattern: `="/_next/static/`, Weight: 0.6},
 		{Pattern: "__next", Weight: 0.3},
 		{Pattern: "x-nextjs", Weight: 0.3, HeaderOnly: true},
 	}
@@ -168,7 +169,8 @@ func (d *astroDetector) Name() string { return "Astro" }
 
 func (d *astroDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: `<meta name="generator" content="Astro`, Weight: 0.5},
+		// definitive quote-anchored marker; same threshold rationale as Next.js above.
+		{Pattern: `<meta name="generator" content="Astro`, Weight: 1.1},
 		{Pattern: "astro-island", Weight: 0.5},
 		{Pattern: "data-astro-cid-", Weight: 0.4},
 		{Pattern: "/_astro/", Weight: 0.4},

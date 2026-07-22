@@ -99,7 +99,9 @@ func (d *angularDetector) Name() string { return "Angular" }
 
 func (d *angularDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "ng-version", Weight: 0.5},
+		// require the attribute-assignment form, not the bare word, so prose
+		// discussing ng-version can't match; weighted to clear the threshold alone.
+		{Pattern: `ng-version="`, Weight: 1.2},
 		{Pattern: "ng-app", Weight: 0.4},
 		{Pattern: "ng-controller", Weight: 0.4},
 		{Pattern: "angular.js", Weight: 0.4},
