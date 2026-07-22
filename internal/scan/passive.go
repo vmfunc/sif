@@ -33,7 +33,7 @@ import (
 var (
 	crtshBaseURL       = "https://crt.sh/?q=%%25.%s&output=json"
 	certspotterBaseURL = "https://api.certspotter.com/v1/issuances?domain=%s&include_subdomains=true&expand=dns_names"
-	waybackBaseURL     = "http://web.archive.org/cdx/search/cdx?url=*.%s/*&output=text&fl=original&collapse=urlkey"
+	waybackBaseURL     = "https://web.archive.org/cdx/search/cdx?url=*.%s/*&output=text&fl=original&collapse=urlkey"
 )
 
 // cap the response we read from any one source so a hostile/huge feed can't
