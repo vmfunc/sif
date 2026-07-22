@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif/internal/scan/frameworks"
 )
 
@@ -69,7 +70,12 @@ func bridgeFingerprint(def *YAMLModule) (bool, string) {
 		}
 	}
 
-	frameworks.Register(d)
+	// the name comes from a user-controlled module id and frameworks.Register
+	// clobbers by name, so a module id matching a builtin ("WordPress",
+	// "Django") would silently replace that detector. refuse instead.
+	if !frameworks.RegisterIfAbsent(d) {
+		return false, "detector name already registered"
+	}
 	return true, ""
 }
 
@@ -98,15 +104,29 @@ func (d *bridgedDetector) Detect(body string, headers http.Header) (float32, str
 }
 
 // BridgeFingerprints registers every already-loaded type: fingerprint module
-// as a framework detector where bridgeableToFramework allows it. modules
-// outside that domain are left untouched and keep running only in the module
-// engine; bridging never removes or alters a module's native execution.
-func BridgeFingerprints() {
+// as a framework detector where bridgeableToFramework allows it, and returns
+// the set of module ids it bridged. modules outside that domain are left
+// untouched and keep running only in the module engine; bridging never removes
+// or alters a module's native execution.
+//
+// the returned set is what the caller needs to avoid reporting one technology
+// from both engines: a bridged module is covered by framework detection, so the
+// caller can leave it out of an implicit module run. see the call site in
+// sif.go.
+func BridgeFingerprints() map[string]bool {
+	bridged := make(map[string]bool)
 	for _, m := range ByType(TypeFingerprint) {
 		w, ok := m.(*yamlModuleWrapper)
 		if !ok {
 			continue
 		}
-		bridgeFingerprint(w.definition())
+		def := w.definition()
+		ok, reason := bridgeFingerprint(def)
+		if ok {
+			bridged[def.ID] = true
+			continue
+		}
+		log.Debugf("fingerprint %s not bridged to framework detection: %s", def.ID, reason)
 	}
+	return bridged
 }

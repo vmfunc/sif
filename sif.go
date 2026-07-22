@@ -48,6 +48,42 @@ type App struct {
 	settings *config.Settings
 	targets  []string
 	logFiles []string
+
+	// both are written once in Run before any scanTarget goroutine starts and
+	// only read afterwards, so the worker pool sees them without a lock.
+	modulesLoaded       bool
+	bridgedFingerprints map[string]bool
+}
+
+// loadModules populates the module registry the first time it is called and is
+// a no-op afterwards. it must not be called from scanTarget: that runs on the
+// -concurrency worker pool, and modulesLoaded is not guarded.
+//
+// a loader that cannot be constructed is returned as an error so -list-modules
+// can stay fatal; a scan downgrades it to a warning and carries on, which is
+// the behaviour both paths had before they shared this helper.
+func (app *App) loadModules() error {
+	if app.modulesLoaded {
+		return nil
+	}
+	loader, err := modules.NewLoader()
+	if err != nil {
+		return fmt.Errorf("failed to create module loader: %w", err)
+	}
+	if err := loader.LoadAll(); err != nil {
+		log.Warnf("Failed to load modules: %v", err)
+	}
+	builtin.Register()
+	app.modulesLoaded = true
+	return nil
+}
+
+// wantsModules reports whether this run needs the module registry populated,
+// either to run modules directly or to bridge fingerprints into framework
+// detection.
+func (app *App) wantsModules() bool {
+	return app.settings.Framework || app.settings.AllModules ||
+		app.settings.Modules != "" || app.settings.ModuleTags != ""
 }
 
 // Version is set by main to the resolved build version and shown on the banner.
@@ -237,16 +273,9 @@ func normalizeTarget(target string) (string, error) {
 func (app *App) Run() error {
 	// Handle --list-modules before any other processing
 	if app.settings.ListModules {
-		loader, err := modules.NewLoader()
-		if err != nil {
-			return fmt.Errorf("failed to create module loader: %w", err)
+		if err := app.loadModules(); err != nil {
+			return err
 		}
-		if err := loader.LoadAll(); err != nil {
-			log.Warnf("Failed to load modules: %v", err)
-		}
-
-		// Register built-in Go modules
-		builtin.Register()
 
 		fmt.Println("Available modules:")
 		for _, m := range modules.All() {
@@ -321,6 +350,22 @@ func (app *App) Run() error {
 		} else {
 			storeDir = dir
 		}
+	}
+
+	// load the module set once for the whole run, then register the fingerprint
+	// modules the framework engine can reproduce exactly as detectors, so
+	// framework detection covers yaml-defined technologies too.
+	//
+	// both have to happen before scanAllTargets: the per-target framework scan
+	// runs inside the worker pool, so bridging any later would miss it, and
+	// loading here keeps the pool off the shared registry write path.
+	if app.wantsModules() {
+		if err := app.loadModules(); err != nil {
+			log.Warnf("%v", err)
+		}
+	}
+	if app.settings.Framework {
+		app.bridgedFingerprints = modules.BridgeFingerprints()
 	}
 
 	results, err := app.scanAllTargets(storeDir, wantReport)
@@ -717,26 +762,46 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 
 	// Load and run modules
 	if app.settings.AllModules || app.settings.Modules != "" || app.settings.ModuleTags != "" {
-		loader, err := modules.NewLoader()
-		if err != nil {
-			log.Warnf("Failed to create module loader: %v", err)
-		} else {
-			if err := loader.LoadAll(); err != nil {
-				log.Warnf("Failed to load modules: %v", err)
-			}
+		{
+			// the registry was populated once in Run; loading it per target
+			// would re-walk the module dirs on every url and, under
+			// -concurrency, from several workers at once.
 
-			// Register built-in Go modules
-			builtin.Register()
-
-			// Determine which modules to run
+			// Determine which modules to run.
+			//
+			// a bridged fingerprint is already reported by the framework
+			// engine, so running it here too would name the same technology
+			// twice. drop it from the implicit selections only: naming a module
+			// with -modules is a direct request and still runs it.
+			//
+			// the two engines disagree on one boundary, the module engine fires
+			// at score >= confidence and the framework engine at
+			// score > threshold, so a bridged module sitting exactly at 0.5 is
+			// reported by neither in an implicit run. that is the residual
+			// bridgeableToFramework already documents.
 			var toRun []modules.Module
+			keep := func(ms []modules.Module) []modules.Module {
+				if len(app.bridgedFingerprints) == 0 {
+					return ms
+				}
+				out := make([]modules.Module, 0, len(ms))
+				for _, m := range ms {
+					if id := m.Info().ID; app.bridgedFingerprints[id] {
+						log.Debugf("Skipping %s: covered by framework detection", id)
+						continue
+					}
+					out = append(out, m)
+				}
+				return out
+			}
 			switch {
 			case app.settings.AllModules:
-				toRun = modules.All()
+				toRun = keep(modules.All())
 			case app.settings.ModuleTags != "":
 				for _, tag := range strings.Split(app.settings.ModuleTags, ",") {
 					toRun = append(toRun, modules.ByTag(strings.TrimSpace(tag))...)
 				}
+				toRun = keep(toRun)
 			case app.settings.Modules != "":
 				for _, id := range strings.Split(app.settings.Modules, ",") {
 					if m, ok := modules.Get(strings.TrimSpace(id)); ok {

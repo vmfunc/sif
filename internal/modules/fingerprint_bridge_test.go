@@ -179,3 +179,79 @@ func TestBridgeFingerprint_ZeroWeightSignature_Refuses(t *testing.T) {
 		t.Fatalf("frameworks.GetDetector(%q) found a detector that should have been refused", def.ID)
 	}
 }
+
+// bridged names come from user-controlled module ids and frameworks.Register
+// clobbers by name, so a module id that collides with a builtin detector would
+// silently replace the builtin. the bridge must refuse instead.
+func TestBridgeFingerprint_ExistingDetectorName_Refuses(t *testing.T) {
+	const name = "fp-bridge-collision"
+	builtin := &bridgedDetector{BaseDetector: frameworks.NewBaseDetector(name, []frameworks.Signature{
+		{Pattern: "the-builtin-marker", Weight: 1},
+	})}
+	frameworks.Register(builtin)
+
+	def := okFingerprintDef(name)
+	registered, reason := bridgeFingerprint(def)
+	if registered {
+		t.Fatal("bridgeFingerprint overwrote an already-registered detector name")
+	}
+	if reason == "" {
+		t.Fatal("expected a non-empty refusal reason")
+	}
+
+	// the original detector must still be the one in the registry.
+	got, ok := frameworks.GetDetector(name)
+	if !ok {
+		t.Fatal("the pre-existing detector was removed from the registry")
+	}
+	if conf, _ := got.Detect("the-builtin-marker", http.Header{}); conf == 0 {
+		t.Error("the registered detector no longer matches the builtin marker, it was clobbered")
+	}
+}
+
+// BridgeFingerprints must report what it bridged so callers can tell which
+// modules the framework engine now covers.
+func TestBridgeFingerprintsReportsBridgedIDs(t *testing.T) {
+	ok := okFingerprintDef("fp-bridge-reported")
+	refused := okFingerprintDef("fp-bridge-not-reported")
+	refused.Fingerprint.Path = "/admin"
+	Register(&yamlModuleWrapper{def: ok})
+	Register(&yamlModuleWrapper{def: refused})
+
+	bridged := BridgeFingerprints()
+	if !bridged[ok.ID] {
+		t.Errorf("bridged set is missing %q", ok.ID)
+	}
+	if bridged[refused.ID] {
+		t.Errorf("bridged set contains refused module %q", refused.ID)
+	}
+}
+
+// the bridge is only worth anything if a bridged fingerprint actually
+// participates in framework detection, which is what a registered detector
+// buys. run the registered detector through the same scoring the framework
+// engine uses and require it to clear the reporting floor on a real body.
+func TestBridgedFingerprintScoresInFrameworkEngine(t *testing.T) {
+	def := okFingerprintDef("fp-bridge-scores")
+	Register(&yamlModuleWrapper{def: def})
+
+	if bridged := BridgeFingerprints(); !bridged[def.ID] {
+		t.Fatalf("%q was not bridged", def.ID)
+	}
+
+	det, ok := frameworks.GetDetector(def.ID)
+	if !ok {
+		t.Fatalf("no detector registered for %q", def.ID)
+	}
+
+	// both signatures present: the framework engine must see a full score.
+	conf, _ := det.Detect("served by nginx", http.Header{"X-Powered-By": {"PHP"}})
+	if conf != 1 {
+		t.Errorf("bridged detector scored %v on a full match, want 1", conf)
+	}
+
+	// nothing present: it must not invent a detection.
+	if conf, _ := det.Detect("static site", http.Header{}); conf != 0 {
+		t.Errorf("bridged detector scored %v on an unrelated response, want 0", conf)
+	}
+}
