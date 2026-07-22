@@ -18,6 +18,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestResolveHostname_IP(t *testing.T) {
@@ -50,12 +51,18 @@ func TestTruncateBanner(t *testing.T) {
 		{"this is a long banner", 10, "this is a ..."},
 		{"with\nnewlines\r\n", 50, "with newlines"},
 		{"  trimmed  ", 50, "trimmed"},
+		// truncation must land on a rune boundary, not split a multibyte rune
+		{"aaaé", 4, "aaaé"},
+		{"日本語テスト", 3, "日本語..."},
 	}
 
 	for _, tt := range tests {
 		result := truncateBanner(tt.input, tt.maxLen)
 		if result != tt.expected {
 			t.Errorf("truncateBanner(%q, %d) = %q, want %q", tt.input, tt.maxLen, result, tt.expected)
+		}
+		if !utf8.ValidString(result) {
+			t.Errorf("truncateBanner(%q, %d) produced invalid UTF-8: %q", tt.input, tt.maxLen, result)
 		}
 	}
 }
