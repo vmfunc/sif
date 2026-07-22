@@ -683,6 +683,16 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 		}
 	}
 
+	if app.settings.TLSCert {
+		result, err := scan.TLSCert(url, app.settings.TLSCertPort, app.settings.Timeout, app.settings.LogDir)
+		if err != nil {
+			log.Errorf("Error while running tls certificate recon: %s", err)
+		} else if result != nil {
+			moduleResults = append(moduleResults, NewModuleResult(result))
+			scansRun = append(scansRun, "TLSCert")
+		}
+	}
+
 	if app.settings.Passive {
 		result, err := scan.Passive(url, app.settings.Timeout, app.settings.LogDir)
 		if err != nil {

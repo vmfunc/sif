@@ -66,6 +66,8 @@ type Settings struct {
 	Framework         bool
 	Crawl             bool
 	CrawlDepth        int
+	TLSCert           bool
+	TLSCertPort       int
 	Passive           bool
 	Probe             bool
 	SARIF             string // path to write a sarif 2.1.0 report to ("" = off)
@@ -166,6 +168,8 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 		flagSet.BoolVar(&settings.Framework, "framework", false, "Enable framework detection"),
 		flagSet.BoolVar(&settings.Crawl, "crawl", false, "Enable web crawling (spider same-host links/scripts/forms)"),
 		flagSet.IntVar(&settings.CrawlDepth, "crawl-depth", defaultCrawlDepth, "Max crawl recursion depth"),
+		flagSet.BoolVar(&settings.TLSCert, "tls-cert", false, "Enable tls certificate recon (mine SANs, issuer, posture from the leaf cert)"),
+		flagSet.IntVar(&settings.TLSCertPort, "tls-cert-port", 0, "Port for tls certificate recon (default 443)"),
 		flagSet.BoolVar(&settings.Passive, "passive", false, "Enable passive subdomain/url discovery (zero traffic to target)"),
 		flagSet.BoolVar(&settings.Probe, "probe", false, "Probe the target for liveness (status, title, server, redirect chain)"),
 	)
