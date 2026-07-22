@@ -50,17 +50,7 @@ func NewLoader() (*Loader, error) {
 		return nil, fmt.Errorf("get home dir: %w", err)
 	}
 
-	// Find built-in modules relative to executable
-	execPath, err := os.Executable()
-	if err != nil {
-		execPath = "."
-	}
-	builtinDir := filepath.Join(filepath.Dir(execPath), "modules")
-
-	// Also check current working directory for development
-	if _, err := os.Stat(builtinDir); os.IsNotExist(err) {
-		builtinDir = "modules"
-	}
+	builtinDir := resolveBuiltinDir()
 
 	// User modules directory based on OS
 	var userDir string
@@ -76,6 +66,53 @@ func NewLoader() (*Loader, error) {
 		userDir:    userDir,
 		embedded:   builtinFS,
 	}, nil
+}
+
+// resolveBuiltinDir picks the built-in modules directory: the first existing
+// candidate, or the working-directory default when none are present (LoadAll
+// then logs "no built-in modules found" as before).
+func resolveBuiltinDir() string {
+	if dir := firstExistingDir(builtinDirCandidates()); dir != "" {
+		return dir
+	}
+	return "modules"
+}
+
+// builtinDirCandidates lists the directories to probe for built-in modules,
+// most specific first: next to the executable, the working directory (for
+// development), then the freedesktop system data dirs so packaged installs
+// (modules under /usr/share/sif) are found too.
+func builtinDirCandidates() []string {
+	candidates := make([]string, 0, 4)
+
+	if execPath, err := os.Executable(); err == nil {
+		candidates = append(candidates, filepath.Join(filepath.Dir(execPath), "modules"))
+	}
+	candidates = append(candidates, "modules")
+
+	for _, dir := range dataDirs() {
+		candidates = append(candidates, filepath.Join(dir, "sif", "modules"))
+	}
+
+	return candidates
+}
+
+// dataDirs returns the freedesktop base data directories, honoring
+// $XDG_DATA_DIRS and falling back to the spec default when it is unset.
+func dataDirs() []string {
+	if env := os.Getenv("XDG_DATA_DIRS"); env != "" {
+		return filepath.SplitList(env)
+	}
+	return []string{"/usr/local/share", "/usr/share"}
+}
+
+func firstExistingDir(candidates []string) string {
+	for _, dir := range candidates {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			return dir
+		}
+	}
+	return ""
 }
 
 // LoadAll discovers and loads all modules from both built-in
