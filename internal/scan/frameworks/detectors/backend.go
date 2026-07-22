@@ -91,9 +91,7 @@ func (d *djangoDetector) Signatures() []fw.Signature {
 		// never a header, so this must not be HeaderOnly.
 		{Pattern: "csrfmiddlewaretoken", Weight: 0.4},
 		{Pattern: "csrftoken", Weight: 0.3, HeaderOnly: true},
-		{Pattern: "django.contrib", Weight: 0.3},
-		{Pattern: "django.core", Weight: 0.3},
-		{Pattern: "__admin_media_prefix__", Weight: 0.3},
+		{Pattern: "/static/admin/", Weight: 0.3},
 	}
 }
 
