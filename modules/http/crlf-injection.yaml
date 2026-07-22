@@ -1,0 +1,41 @@
+# CRLF Injection / HTTP Response Splitting Detection Module
+
+id: crlf-injection
+info:
+  name: CRLF Injection Detection
+  author: sif
+  severity: medium
+  description: Detects CRLF injection and HTTP response splitting via header reflection
+  tags: [crlf, injection, response-splitting, owasp-top10]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?url={{payload}}"
+    - "{{BaseURL}}/?redirect={{payload}}"
+    - "{{BaseURL}}/?next={{payload}}"
+    - "{{BaseURL}}/?page={{payload}}"
+    - "{{BaseURL}}/?dest={{payload}}"
+    - "{{BaseURL}}/?r={{payload}}"
+    - "{{BaseURL}}/{{payload}}"
+
+  payloads:
+    - "%0d%0aX-Sif-Injected:1"
+    - "%0d%0aX-Sif-Injected%3A1"
+    - "%0aX-Sif-Injected:1"
+    - "test%0d%0aX-Sif-Injected:1"
+
+  threads: 10
+
+  # proof: anchor to a header LINE that starts with our injected key. a real
+  # split promotes "X-Sif-Injected:1" to its own header line; reflecting the
+  # payload into some other header's VALUE (go rewrites the CR/LF to nothing, so
+  # no split) leaves the text mid-line, where "^" cannot match. getPart renders
+  # one "Key: value" per line, so line-start distinguishes split from reflection.
+  matchers:
+    - type: regex
+      part: header
+      regex:
+        - "(?m)^X-Sif-Injected:"
