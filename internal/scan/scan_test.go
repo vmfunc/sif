@@ -20,7 +20,7 @@ func TestCheckSubdomainTakeover_GitHubPages(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	host := strings.TrimPrefix(server.URL, "http://")
 
-	vulnerable, service := checkSubdomainTakeover(host, client)
+	vulnerable, service, _ := checkSubdomainTakeover(host, client)
 
 	if !vulnerable {
 		t.Error("expected subdomain to be vulnerable")
@@ -40,7 +40,7 @@ func TestCheckSubdomainTakeover_NotVulnerable(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	host := strings.TrimPrefix(server.URL, "http://")
 
-	vulnerable, service := checkSubdomainTakeover(host, client)
+	vulnerable, service, _ := checkSubdomainTakeover(host, client)
 
 	if vulnerable {
 		t.Error("expected subdomain to not be vulnerable")
@@ -60,7 +60,7 @@ func TestCheckSubdomainTakeover_Heroku(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	host := strings.TrimPrefix(server.URL, "http://")
 
-	vulnerable, service := checkSubdomainTakeover(host, client)
+	vulnerable, service, _ := checkSubdomainTakeover(host, client)
 
 	if !vulnerable {
 		t.Error("expected subdomain to be vulnerable")
@@ -80,7 +80,7 @@ func TestCheckSubdomainTakeover_AmazonS3(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	host := strings.TrimPrefix(server.URL, "http://")
 
-	vulnerable, service := checkSubdomainTakeover(host, client)
+	vulnerable, service, _ := checkSubdomainTakeover(host, client)
 
 	if !vulnerable {
 		t.Error("expected subdomain to be vulnerable")
@@ -94,7 +94,7 @@ func TestCheckSubdomainTakeover_ConnectionError(t *testing.T) {
 	client := &http.Client{Timeout: 1 * time.Second}
 
 	// Use invalid host to simulate connection error
-	vulnerable, service := checkSubdomainTakeover("invalid.host.that.does.not.exist.local", client)
+	vulnerable, service, _ := checkSubdomainTakeover("invalid.host.that.does.not.exist.local", client)
 
 	if vulnerable {
 		t.Error("expected subdomain to not be vulnerable on connection error")

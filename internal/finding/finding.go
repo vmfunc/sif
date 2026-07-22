@@ -577,10 +577,17 @@ func flattenTakeover(target string, rs []scan.SubdomainTakeoverResult) []Finding
 		if !t.Vulnerable {
 			continue
 		}
+		// a "potential" result only matched a body fingerprint and could not be
+		// checked against the cname (lookup unavailable), so it does not earn
+		// the same severity as a cname-confirmed takeover.
+		sev := sevTakeover
+		if t.Confidence == "potential" {
+			sev = SeverityMedium
+		}
 		out = append(out, Finding{
 			Target:   target,
 			Module:   "subdomain_takeover",
-			Severity: sevTakeover,
+			Severity: sev,
 			Key:      key("subdomain_takeover", t.Subdomain),
 			Title:    "takeover: " + t.Subdomain,
 			Raw:      t.Service,
