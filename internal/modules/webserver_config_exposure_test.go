@@ -111,6 +111,15 @@ func TestWebserverConfigExposureModules(t *testing.T) {
 		}
 	})
 
+	t.Run("a docs page that embeds a raw web.config sample is not flagged", func(t *testing.T) {
+		body := `<!DOCTYPE html><html><head><title>IIS docs</title></head><body>` +
+			`<p>example: <configuration><connectionStrings><add name="x"/></connectionStrings></configuration></p>` +
+			`</body></html>`
+		if res := runWebSrvModule(t, webconfig, 200, body); len(res.Findings) > 0 {
+			t.Errorf("an html docs page should not match, got %d findings", len(res.Findings))
+		}
+	})
+
 	t.Run("an html page is not an htaccess", func(t *testing.T) {
 		body := "<html><head><title>x</title></head><body>RewriteEngine On AuthType Basic</body></html>"
 		if res := runWebSrvModule(t, htaccess, 200, body); len(res.Findings) > 0 {
