@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -39,6 +40,34 @@ var jwtRegex = regexp.MustCompile(`["'\x60](ey[A-Za-z0-9_-]{2,}(?:\.[A-Za-z0-9_-
 type supabaseJwtBody struct {
 	ProjectId *string `json:"ref"`
 	Role      *string `json:"role"`
+}
+
+// parseSupabaseJwtBody decodes the claims segment of a jwt. jwt payloads are
+// unpadded base64url, so decode with that alphabet and fall back to the padded
+// variant for emitters that pad; RawStdEncoding would reject any payload whose
+// base64 lands on the url-safe - or _ characters.
+func parseSupabaseJwtBody(token string) (*supabaseJwtBody, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("jwt has %d segments, want 3", len(parts))
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		decoded, err = base64.URLEncoding.DecodeString(parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("base64url decode jwt body: %w", err)
+		}
+	}
+	var body *supabaseJwtBody
+	if err := json.Unmarshal(decoded, &body); err != nil {
+		return nil, fmt.Errorf("unmarshal jwt body: %w", err)
+	}
+	// a literal json null unmarshals into a nil pointer with no error; guard so
+	// callers can dereference the result without a nil panic.
+	if body == nil {
+		return nil, errors.New("jwt body is json null")
+	}
+	return body, nil
 }
 
 type supabaseScanResult struct {
@@ -163,20 +192,9 @@ func ScanSupabase(jsContent string, jsUrl string, timeout time.Duration) ([]supa
 	jwts = slices.Compact(jwts)
 
 	for _, jwt := range jwts {
-		parts := strings.Split(jwt, ".")
-		body := parts[1]
-
-		decoded, err := base64.RawStdEncoding.DecodeString(body)
+		supabaseJwt, err := parseSupabaseJwtBody(jwt)
 		if err != nil {
-			supabaselog.Debugf("Failed to decode JWT %s: %s", body, err)
-			continue
-		}
-
-		supabaselog.Debugf("JWT body: %s", decoded)
-		var supabaseJwt *supabaseJwtBody
-		err = json.Unmarshal(decoded, &supabaseJwt)
-		if err != nil {
-			supabaselog.Debugf("Failed to json parse JWT %s: %s", jwt, err)
+			supabaselog.Debugf("Failed to parse JWT %s: %s", jwt, err)
 			continue
 		}
 
@@ -203,15 +221,16 @@ func ScanSupabase(jsContent string, jsUrl string, timeout time.Duration) ([]supa
 		var auth string
 		if resp.StatusCode == http.StatusOK {
 			body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
-			if err != nil {
-				resp.Body.Close()
-				return nil, err
-			}
 			resp.Body.Close()
+			if err != nil {
+				supabaselog.Errorf("Failed to read signup response for %s: %s", *supabaseJwt.ProjectId, err)
+				continue
+			}
 
 			var authResp supabaseAuthResponse
 			if err := json.Unmarshal(body, &authResp); err != nil {
-				return nil, err
+				supabaselog.Errorf("Failed to parse signup response for %s: %s", *supabaseJwt.ProjectId, err)
+				continue
 			}
 
 			auth = authResp.AccessToken
@@ -225,11 +244,13 @@ func ScanSupabase(jsContent string, jsUrl string, timeout time.Duration) ([]supa
 
 		openAPI, err := getSupabaseOpenAPI(*supabaseJwt.ProjectId, jwt, &auth, timeout)
 		if err != nil {
-			return nil, err
+			supabaselog.Errorf("Failed to fetch openapi spec for %s: %s", *supabaseJwt.ProjectId, err)
+			continue
 		}
 
 		if openAPI.Paths == nil {
-			return nil, errors.New("paths not found in supabase openapi")
+			supabaselog.Errorf("No paths found in supabase openapi for %s", *supabaseJwt.ProjectId)
+			continue
 		}
 
 		for path := range openAPI.Paths {

@@ -103,6 +103,15 @@ func TestDebugExposureModules(t *testing.T) {
 		}
 	})
 
+	t.Run("an spa fallback shell inlining the ignition client bundle is not the endpoint", func(t *testing.T) {
+		body := `<!DOCTYPE html><html><head><title>App</title></head><body><div id="app"></div>` +
+			`<script>function checkIgnition(r){return r.can_execute_commands;}` +
+			`/* bundled from vendor/facade/ignition */window.__spa_fallback=true;</script></body></html>`
+		if res := runDebugModule(t, ignition, 200, body); len(res.Findings) > 0 {
+			t.Errorf("a bundled js property reference should not match, got %d findings", len(res.Findings))
+		}
+	})
+
 	t.Run("a plain 200 body is not a leak", func(t *testing.T) {
 		for _, file := range []string{ignition, profiler, heapdump} {
 			if res := runDebugModule(t, file, 200, "<html><body>plain</body></html>"); len(res.Findings) > 0 {

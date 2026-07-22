@@ -1,0 +1,51 @@
+id: nosql-injection-error
+info:
+  name: NoSQL Injection (Error-Based)
+  author: sif
+  severity: high
+  description: Detects NoSQL injection via MongoDB driver error messages
+  tags: [nosql, injection, mongodb, database, owasp-top10]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?id={{payload}}"
+    - "{{BaseURL}}/?user={{payload}}"
+    - "{{BaseURL}}/?username={{payload}}"
+    - "{{BaseURL}}/?search={{payload}}"
+    - "{{BaseURL}}/?q={{payload}}"
+    - "{{BaseURL}}/?filter={{payload}}"
+
+  payloads:
+    - "'"
+    - "\""
+    - "\\"
+    - "';return true;var x='"
+    - "{\"$gt\":\"\"}"
+    - "[$ne]=1"
+
+  threads: 10
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - "MongoError"
+        - "MongoServerError"
+        - "MongoParseError"
+        - "E11000 duplicate key"
+        - "CastError"
+        - "BSONError"
+        - "BSONTypeError"
+        - "MongoNetworkError"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: nosql_error
+      part: body
+      regex:
+        - "(Mongo[A-Za-z]*Error|E11000 duplicate key|CastError|BSON[A-Za-z]*Error)"
+      group: 1

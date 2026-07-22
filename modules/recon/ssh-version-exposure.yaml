@@ -1,0 +1,26 @@
+# SSH Service Banner Detection Module
+
+id: ssh-version-exposure
+info:
+  name: SSH Service Version Disclosure
+  author: sif
+  severity: info
+  description: Reads the SSH identification string the server sends on connect (RFC 4253), disclosing the implementation and version that an attacker can match against known CVEs
+  tags: [ssh, banner, version, tcp, exposure, recon]
+
+type: tcp
+
+tcp:
+  port: 22
+
+  matchers:
+    - type: regex
+      regex:
+        - "^SSH-[0-9]+\\.[0-9]+-"
+
+  extractors:
+    - type: regex
+      name: ssh_software
+      regex:
+        - "^SSH-[0-9]+\\.[0-9]+-(\\S+)"
+      group: 1

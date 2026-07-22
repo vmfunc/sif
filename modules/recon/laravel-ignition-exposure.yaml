@@ -20,10 +20,21 @@ http:
       status:
         - 200
 
-    - type: word
+    # an spa fallback route that inlines the ignition client bundle references
+    # can_execute_commands as a bare js property with no real health-check
+    # response present. anchor on the actual json shape the endpoint emits
+    # (a quoted key immediately followed by a boolean), which a bundled script
+    # accessing the field as `r.can_execute_commands` never produces.
+    - type: regex
       part: body
-      words:
-        - "can_execute_commands"
+      regex:
+        - '"can_execute_commands"\s*:\s*(?:true|false)'
+
+    - type: regex
+      part: body
+      negative: true
+      regex:
+        - '(?i)<(!doctype|html|head|title|body)[ >]'
 
   extractors:
     - type: regex
