@@ -1,0 +1,38 @@
+# PostfixAdmin Setup Page Exposure Detection Module
+
+id: postfixadmin-setup-exposure
+info:
+  name: PostfixAdmin Setup Page Exposure
+  author: sif
+  severity: medium
+  description: Detects a reachable PostfixAdmin setup.php that discloses hosting/environment checks and install state unauthenticated. Since PostfixAdmin 2.3 the setup password gate blocks remote superadmin creation without the configured setup_password, so this is an information-disclosure and unhardened-install signal rather than a direct authentication bypass.
+  tags: [postfixadmin, mail, mailserver, admin, setup, install, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/setup.php"
+    - "{{BaseURL}}/postfixadmin/setup.php"
+
+  matchers:
+    - type: word
+      part: body
+      condition: and
+      words:
+        - 'name="setup_password"'
+        - "Postfix Admin"
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: postfixadmin_setup_state
+      part: body
+      regex:
+        - "(You need to have a setup_password hash configured)"
+        - "(setup_password configured)"
+      group: 1
