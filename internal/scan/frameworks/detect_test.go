@@ -110,6 +110,66 @@ func TestDetectFramework_NextJS(t *testing.T) {
 	}
 }
 
+func TestDetectFrameworks_ReportsMultiple(t *testing.T) {
+	// a next.js app served behind an express-tagged server carries markers for
+	// both; the multi-report path must surface each rather than one winner.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("X-Powered-By", "Express")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<!DOCTYPE html>
+			<html><head><title>Test</title></head>
+			<body>
+				<script id="__NEXT_DATA__" type="application/json">{"props":{}}</script>
+				<script src="/_next/static/chunks/main.js"></script>
+			</body></html>
+		`))
+	}))
+	defer server.Close()
+
+	results, err := frameworks.DetectFrameworks(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) < 2 {
+		t.Fatalf("expected at least 2 frameworks, got %d: %+v", len(results), results)
+	}
+
+	names := make(map[string]bool)
+	for i := range results {
+		names[results[i].Name] = true
+	}
+	for _, want := range []string{"Next.js", "Express.js"} {
+		if !names[want] {
+			t.Errorf("expected %q in multi-report, got %v", want, names)
+		}
+	}
+
+	// results must be ranked most-confident first.
+	for i := 1; i < len(results); i++ {
+		if results[i-1].Confidence < results[i].Confidence {
+			t.Errorf("results not sorted by confidence: %v then %v", results[i-1].Confidence, results[i].Confidence)
+		}
+	}
+}
+
+func TestDetectFrameworks_NoMatch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html><html><body>plain</body></html>`))
+	}))
+	defer server.Close()
+
+	results, err := frameworks.DetectFrameworks(server.URL, 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected no frameworks on a blank page, got %+v", results)
+	}
+}
+
 func TestDetectFramework_Express(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Powered-By", "Express")

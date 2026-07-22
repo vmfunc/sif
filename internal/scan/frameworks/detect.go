@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -44,43 +45,36 @@ type detectionResult struct {
 // so config-defined detectors join the registry without a per-target re-read.
 var loadCustomOnce sync.Once
 
-// DetectFramework runs all registered detectors against the target URL.
-func DetectFramework(url string, timeout time.Duration, logdir string) (*FrameworkResult, error) {
-	loadCustomOnce.Do(loadCustomDetectors)
-
-	log := output.Module("FRAMEWORK")
-	log.Start()
-
+// gatherDetections fetches the target once and runs every registered detector
+// against the response, returning each detector's raw confidence. it owns the
+// spinner so the single- and multi-result entry points share one fetch. an
+// empty result slice means no detectors were registered.
+func gatherDetections(url string, timeout time.Duration) ([]detectionResult, string, error) {
 	spin := output.NewSpinner("Detecting frameworks")
 	spin.Start()
+	defer spin.Stop()
 
 	client := httpx.Client(timeout)
 
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 	if err != nil {
-		spin.Stop()
-		return nil, err
+		return nil, "", err
 	}
 	resp, err := client.Do(req) //nolint:bodyclose // closed via defer below
 	if err != nil {
-		spin.Stop()
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
 	if err != nil {
-		spin.Stop()
-		return nil, err
+		return nil, "", err
 	}
 	bodyStr := string(body)
 
-	// Get all registered detectors
 	detectors := GetDetectors()
 	if len(detectors) == 0 {
-		spin.Stop()
-		log.Warn("No framework detectors registered")
-		return nil, nil //nolint:nilnil // no detectors registered is not an error
+		return nil, bodyStr, nil
 	}
 
 	// Run all detectors concurrently
@@ -106,17 +100,39 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 		close(results)
 	}()
 
-	// Find the best match
-	// results arrive in goroutine-completion order; tie-break on name so the
-	// winner is deterministic when two detectors land on the same confidence.
-	var best detectionResult
+	out := make([]detectionResult, 0, len(detectors))
 	for r := range results {
+		out = append(out, r)
+	}
+	return out, bodyStr, nil
+}
+
+// DetectFramework runs all registered detectors against the target URL and
+// returns the single highest-confidence match. see DetectFrameworks for the
+// full set of detected technologies.
+func DetectFramework(url string, timeout time.Duration, logdir string) (*FrameworkResult, error) {
+	loadCustomOnce.Do(loadCustomDetectors)
+
+	log := output.Module("FRAMEWORK")
+	log.Start()
+
+	results, bodyStr, err := gatherDetections(url, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if len(results) == 0 {
+		log.Warn("No framework detectors registered")
+		return nil, nil //nolint:nilnil // no detectors registered is not an error
+	}
+
+	// Find the best match. tie-break on name so the winner is deterministic when
+	// two detectors land on the same confidence.
+	var best detectionResult
+	for _, r := range results {
 		if r.confidence > best.confidence || (r.confidence == best.confidence && r.name < best.name) {
 			best = r
 		}
 	}
-
-	spin.Stop()
 
 	if best.confidence <= detectionThreshold {
 		log.Info("No framework detected with sufficient confidence")
@@ -124,22 +140,78 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 		return nil, nil //nolint:nilnil // no framework detected is not an error
 	}
 
-	// Get version match details. the detector's own best.version is often
-	// "unknown" (it only fingerprints the framework, not always the version),
-	// while ExtractVersionOptimized digs the real version out of the body. prefer
-	// that for both the reported version and the cve lookup, otherwise CVEs that
-	// only match a concrete version are silently missed.
-	versionMatch := ExtractVersionOptimized(bodyStr, best.name)
-	version := resolveVersion(best.version, versionMatch.Version)
-	cves, suggestions := getVulnerabilities(best.name, version)
+	result := assembleResult(best, bodyStr, url, logdir, log)
+	log.Complete(1, "detected")
 
-	result := NewFrameworkResult(best.name, version, best.confidence, versionMatch.Confidence)
+	return result, nil
+}
+
+// DetectFrameworks runs all registered detectors and returns every framework
+// that clears the detection threshold, ranked most-confident first. unlike
+// DetectFramework it does not collapse to a single winner, so a page built from
+// several technologies (say react behind a next.js server) reports each.
+func DetectFrameworks(url string, timeout time.Duration, logdir string) ([]*FrameworkResult, error) {
+	loadCustomOnce.Do(loadCustomDetectors)
+
+	log := output.Module("FRAMEWORK")
+	log.Start()
+
+	results, bodyStr, err := gatherDetections(url, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if len(results) == 0 {
+		log.Warn("No framework detectors registered")
+		return nil, nil //nolint:nilnil // no detectors registered is not an error
+	}
+
+	// keep everything above the threshold, most-confident first with a name
+	// tie-break so the order is stable across runs.
+	detected := make([]detectionResult, 0, len(results))
+	for _, r := range results {
+		if r.confidence > detectionThreshold {
+			detected = append(detected, r)
+		}
+	}
+	sort.Slice(detected, func(i, j int) bool {
+		if detected[i].confidence != detected[j].confidence {
+			return detected[i].confidence > detected[j].confidence
+		}
+		return detected[i].name < detected[j].name
+	})
+
+	if len(detected) == 0 {
+		log.Info("No framework detected with sufficient confidence")
+		log.Complete(0, "detected")
+		return nil, nil //nolint:nilnil // no framework detected is not an error
+	}
+
+	out := make([]*FrameworkResult, 0, len(detected))
+	for i := range detected {
+		out = append(out, assembleResult(detected[i], bodyStr, url, logdir, log))
+	}
+	log.Complete(len(out), "detected")
+
+	return out, nil
+}
+
+// assembleResult turns one detector hit into a full FrameworkResult: it digs out
+// the concrete version, looks up CVEs for it, and logs the detection. the
+// detector's own version is often "unknown" (it fingerprints the framework, not
+// always the version), while ExtractVersionOptimized reads the real version from
+// the body; prefer that for both the reported version and the cve lookup, else
+// CVEs that only match a concrete version are silently missed.
+func assembleResult(d detectionResult, bodyStr, url, logdir string, log *output.ModuleLogger) *FrameworkResult {
+	versionMatch := ExtractVersionOptimized(bodyStr, d.name)
+	version := resolveVersion(d.version, versionMatch.Version)
+	cves, suggestions := getVulnerabilities(d.name, version)
+
+	result := NewFrameworkResult(d.name, version, d.confidence, versionMatch.Confidence)
 	result.WithVulnerabilities(cves, suggestions)
 
-	// Log results
 	if logdir != "" {
 		logEntry := fmt.Sprintf("Detected framework: %s (version: %s, confidence: %.2f, version_confidence: %.2f)\n",
-			best.name, version, best.confidence, versionMatch.Confidence)
+			d.name, version, d.confidence, versionMatch.Confidence)
 		if len(cves) > 0 {
 			logEntry += fmt.Sprintf("  Risk Level: %s\n", result.RiskLevel)
 			logEntry += fmt.Sprintf("  CVEs: %v\n", cves)
@@ -149,7 +221,7 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 	}
 
 	log.Success("Detected %s framework (version: %s, confidence: %.2f)",
-		output.Highlight.Render(best.name), version, best.confidence)
+		output.Highlight.Render(d.name), version, d.confidence)
 
 	if versionMatch.Confidence > 0 {
 		charmlog.Debugf("Version detected from: %s (confidence: %.2f)",
@@ -166,9 +238,7 @@ func DetectFramework(url string, timeout time.Duration, logdir string) (*Framewo
 		}
 	}
 
-	log.Complete(1, "detected")
-
-	return result, nil
+	return result
 }
 
 // unknownVersion is the sentinel both detectors and the version extractor emit
