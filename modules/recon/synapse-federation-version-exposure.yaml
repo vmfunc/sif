@@ -1,0 +1,39 @@
+# Synapse Matrix Homeserver Federation Version Exposure Detection Module
+
+id: synapse-federation-version-exposure
+info:
+  name: Synapse Matrix Homeserver Federation Version Exposure
+  author: sif
+  severity: info
+  description: Detects a Synapse matrix homeserver that discloses its implementation name and version over the federation version endpoint; this route is unauthenticated by the matrix server-server spec so any homeserver can identify a remote peer before federating with it
+  tags: [synapse, matrix, homeserver, federation, fingerprint, version, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/_matrix/federation/v1/version"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"name"\s*:\s*"Synapse"'
+
+    - type: word
+      part: body
+      words:
+        - "\"version\""
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: synapse_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1

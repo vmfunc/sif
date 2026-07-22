@@ -230,8 +230,10 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string, ca
 	}
 	wg.Wait()
 
-	// check main URL for database errors
-	checkDatabaseErrors(client, targetURL, sanitizedURL, result, logdir, &mu, seenErrors)
+	// check main URL for database errors; its body doubles as the baseline
+	// for every probe below, since a shared error template or WAF block page
+	// can echo the same error string for any path regardless of injection.
+	baselineBody := checkDatabaseErrors(client, targetURL, sanitizedURL, result, logdir, &mu, seenErrors, "")
 
 	// check common endpoints that might expose database errors
 	errorCheckPaths := []string{
@@ -246,7 +248,7 @@ func SQL(targetURL string, timeout time.Duration, threads int, logdir string, ca
 
 	for _, path := range errorCheckPaths {
 		checkURL := strings.TrimSuffix(targetURL, "/") + path
-		checkDatabaseErrors(client, checkURL, sanitizedURL, result, logdir, &mu, seenErrors)
+		checkDatabaseErrors(client, checkURL, sanitizedURL, result, logdir, &mu, seenErrors, baselineBody)
 	}
 
 	spin.Stop()
@@ -332,49 +334,63 @@ func isAdminPanel(body string, panelType string) bool {
 	}
 }
 
-func checkDatabaseErrors(client *http.Client, checkURL, sanitizedURL string, result *SQLResult, logdir string, mu *sync.Mutex, seen map[string]bool) {
+// checkDatabaseErrors probes checkURL for database error signatures and returns
+// the body so callers can reuse it as a baseline. baseline is an earlier
+// request's body (empty on the first call); a pattern also present in
+// baseline is skipped, since it is not attributable to this probe.
+func checkDatabaseErrors(client *http.Client, checkURL, sanitizedURL string, result *SQLResult, logdir string, mu *sync.Mutex, seen map[string]bool, baseline string) string {
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, checkURL, http.NoBody)
 	if err != nil {
-		return
+		return ""
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return
+		return ""
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*100))
 	if err != nil {
-		return
+		return ""
 	}
 	bodyStr := string(body)
 
 	for _, pattern := range databaseErrorPatterns {
-		if pattern.pattern.MatchString(bodyStr) {
-			key := checkURL + "|" + pattern.databaseType
-			mu.Lock()
-			if seen[key] {
-				mu.Unlock()
-				break
-			}
-			seen[key] = true
-
-			dbError := SQLDatabaseError{
-				URL:          checkURL,
-				DatabaseType: pattern.databaseType,
-				ErrorPattern: pattern.pattern.String(),
-			}
-			result.DatabaseErrors = append(result.DatabaseErrors, dbError)
-			mu.Unlock()
-
-			output.Warn("Database error disclosure: %s at %s",
-				output.SeverityHigh.Render(pattern.databaseType),
-				output.Highlight.Render(checkURL))
-
-			if logdir != "" {
-				logger.Write(sanitizedURL, logdir, "Database error disclosure: "+pattern.databaseType+" at ["+checkURL+"]\n")
-			}
-			break // only report one database type per URL
+		if !pattern.pattern.MatchString(bodyStr) {
+			continue
 		}
+		if baseline != "" && pattern.pattern.MatchString(baseline) {
+			// same error text is already present on the unmodified page,
+			// so this probe did not cause it; keep looking for a pattern
+			// that is actually differential.
+			continue
+		}
+
+		key := checkURL + "|" + pattern.databaseType
+		mu.Lock()
+		if seen[key] {
+			mu.Unlock()
+			break
+		}
+		seen[key] = true
+
+		dbError := SQLDatabaseError{
+			URL:          checkURL,
+			DatabaseType: pattern.databaseType,
+			ErrorPattern: pattern.pattern.String(),
+		}
+		result.DatabaseErrors = append(result.DatabaseErrors, dbError)
+		mu.Unlock()
+
+		output.Warn("Database error disclosure: %s at %s",
+			output.SeverityHigh.Render(pattern.databaseType),
+			output.Highlight.Render(checkURL))
+
+		if logdir != "" {
+			logger.Write(sanitizedURL, logdir, "Database error disclosure: "+pattern.databaseType+" at ["+checkURL+"]\n")
+		}
+		break // only report one database type per URL
 	}
+
+	return bodyStr
 }

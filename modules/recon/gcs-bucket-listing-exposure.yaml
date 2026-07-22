@@ -1,0 +1,47 @@
+# Google Cloud Storage Bucket Listing Exposure Detection Module
+
+id: gcs-bucket-listing-exposure
+info:
+  name: Google Cloud Storage Bucket Listing Exposure
+  author: sif
+  severity: high
+  description: Detects an anonymously listable google cloud storage bucket that returns a json object listing without authentication
+  tags: [gcs, google, bucket, storage, cloud, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/o"
+    - "{{BaseURL}}/o?alt=json"
+
+  threads: 3
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"kind"\s*:\s*"storage#objects"'
+
+    - type: word
+      part: body
+      negative: true
+      condition: or
+      words:
+        - '"reason": "forbidden"'
+        - '"reason": "required"'
+        - '"reason": "notFound"'
+        - '"error":'
+
+  extractors:
+    - type: regex
+      name: object_name
+      part: body
+      regex:
+        - '"name"\s*:\s*"([^"]+)"'
+      group: 1

@@ -95,6 +95,8 @@ type Matcher struct {
 	Hash      []int64  `yaml:"hash,omitempty"` // favicon: shodan mmh3 hashes (signed or unsigned)
 	Condition string   `yaml:"condition"`      // and, or
 	Negative  bool     `yaml:"negative"`
+	// CaseInsensitive folds word matching to lower-case when set (word matcher only).
+	CaseInsensitive bool `yaml:"case-insensitive,omitempty"`
 }
 
 // Extractor defines data extraction from responses.

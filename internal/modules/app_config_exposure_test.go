@@ -141,6 +141,15 @@ func TestAppConfigExposureModules(t *testing.T) {
 		}
 	})
 
+	t.Run("an appsettings docs page that quotes ConnectionStrings and Password= is not a leak", func(t *testing.T) {
+		body := `<!DOCTYPE html><html><head><title>schema</title></head><body>` +
+			`<pre>{ "ConnectionStrings": "string", "note": "e.g. Server=x;Password=changeme;" }</pre>` +
+			`</body></html>`
+		if res := runAppCfgModule(t, appsettings, 200, body); len(res.Findings) > 0 {
+			t.Errorf("an html docs page should not match, got %d findings", len(res.Findings))
+		}
+	})
+
 	t.Run("prose that names the wp-config password is not a backup", func(t *testing.T) {
 		body := "set the DB_PASSWORD env var before running the installer"
 		if res := runAppCfgModule(t, wpconfig, 200, body); len(res.Findings) > 0 {

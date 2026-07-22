@@ -1,0 +1,42 @@
+# Server-Side Includes (SSI) Injection Detection Module
+
+id: ssi-injection
+info:
+  name: Server-Side Includes Injection Detection
+  author: sif
+  severity: high
+  description: Detects Server-Side Includes injection via directive evaluation
+  tags: [ssi, injection, server-side-includes]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?q={{payload}}"
+    - "{{BaseURL}}/?search={{payload}}"
+    - "{{BaseURL}}/?name={{payload}}"
+    - "{{BaseURL}}/?page={{payload}}"
+    - "{{BaseURL}}/?comment={{payload}}"
+    - "{{BaseURL}}/?msg={{payload}}"
+
+  # the echo directive carries no digit, so a digit appearing between our two
+  # markers can only come from a rendered date. the payload is wrapped so the
+  # value is url-safe on the wire and the server decodes it before evaluation.
+  payloads:
+    - "SIFSSIA%3C!--%23echo%20var%3D%22DATE_GMT%22--%3ESIFSSIZ"
+    - "SIFSSIA%3C!--%23echo%20var%3D%22DATE_LOCAL%22--%3ESIFSSIZ"
+
+  threads: 10
+
+  # proof: a digit must sit between the markers with no "<", "&" or "%" between
+  # them. the directive carries no digit of its own, so every digit-bearing
+  # reflection reaches us through an escape that our excluded set blocks: literal
+  # ("<"), html entity named or numeric ("&lt;", "&#60;" -> "&"), or raw percent
+  # ("%3C" -> "%"). a rendered GMT date has none of those, so only genuine SSI
+  # evaluation (the directive replaced by a date) can satisfy this regex.
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - "SIFSSIA[^<&%]*\\d[^<&%]*SIFSSIZ"

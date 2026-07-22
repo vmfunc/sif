@@ -18,6 +18,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -111,6 +112,75 @@ func TestFaviconEvidence(t *testing.T) {
 			}
 			if ok && got != tt.want {
 				t.Errorf("evidence = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestFaviconEvidenceNamesCanonicalTech proves faviconEvidence consults the same
+// SSOT table as fingerprint.LookupFaviconTech rather than a private copy: the
+// evidence line must always match the format built directly from the shared
+// hash + lookup functions, whether or not the fixture hash is canonical.
+func TestFaviconEvidenceNamesCanonicalTech(t *testing.T) {
+	body := string(faviconFixture)
+	hash := fingerprint.FaviconHash(faviconFixture)
+	want := fmt.Sprintf("favicon mmh3=%d", hash)
+	if tech, ok := fingerprint.LookupFaviconTech(hash); ok {
+		want = fmt.Sprintf("favicon mmh3=%d tech=%s", hash, tech)
+	}
+
+	got, ok := faviconEvidence([]Matcher{{Type: "favicon"}}, body)
+	if !ok {
+		t.Fatal("faviconEvidence ok = false, want true")
+	}
+	if got != want {
+		t.Errorf("evidence = %q, want %q", got, want)
+	}
+}
+
+// favicon demo modules must reference a hash from fingerprint.LookupFaviconTech
+// that names the service in their filename, so a demo cannot drift from the
+// canonical hash->tech table.
+func TestFaviconDemoModulesMatchCanonicalMap(t *testing.T) {
+	matches, err := filepath.Glob("../../modules/info/favicon-*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) == 0 {
+		t.Skip("no favicon demo modules present")
+	}
+
+	for _, path := range matches {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			def, err := ParseYAMLModule(path)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if def.HTTP == nil {
+				t.Fatal("favicon demo is not an http module")
+			}
+
+			var hashes []int64
+			for _, m := range def.HTTP.Matchers {
+				if m.Type == "favicon" {
+					hashes = append(hashes, m.Hash...)
+				}
+			}
+			if len(hashes) == 0 {
+				t.Fatal("no favicon hash in module")
+			}
+
+			service := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(path), "favicon-"), ".yaml")
+			for _, h := range hashes {
+				// hashes are range-checked at parse, so int32(h) is the canonical fold.
+				tech, ok := fingerprint.LookupFaviconTech(int32(h))
+				if !ok {
+					t.Errorf("hash %d is absent from the canonical table; demo references a hash the scanner does not know", h)
+					continue
+				}
+				if !strings.Contains(strings.ToLower(tech), service) {
+					t.Errorf("hash %d maps to %q, but the file names service %q", h, tech, service)
+				}
 			}
 		})
 	}

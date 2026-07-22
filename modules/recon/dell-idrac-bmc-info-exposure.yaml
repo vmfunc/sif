@@ -1,0 +1,42 @@
+# Dell iDRAC Unauthenticated BMC Info Exposure Detection Module
+
+id: dell-idrac-bmc-info-exposure
+info:
+  name: Dell iDRAC Unauthenticated BMC Info Exposure
+  author: sif
+  severity: medium
+  description: Detects a Dell iDRAC9 sysmgmt bmc info endpoint answering without authentication, leaking the host server model and iDRAC firmware version
+  tags: [idrac, dell, bmc, out-of-band, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/sysmgmt/2015/bmc/info"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "BuildVersion"
+        - "SystemModelName"
+
+  extractors:
+    - type: regex
+      name: idrac_firmware
+      part: body
+      regex:
+        - '"FwVer"\s*:\s*"([^"]+)"'
+      group: 1
+
+    - type: regex
+      name: idrac_server_model
+      part: body
+      regex:
+        - '"SystemModelName"\s*:\s*"([^"]+)"'
+      group: 1
