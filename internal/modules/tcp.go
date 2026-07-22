@@ -101,14 +101,27 @@ func ExecuteTCPModule(ctx context.Context, target string, def *YAMLModule, opts 
 	}()
 
 	if cfg.Data != "" {
+		// same re-arm hazard readTCP guards against: if the cancel watchdog's
+		// SetDeadline(now) trip lands before this SetWriteDeadline call, the
+		// call below would silently push the deadline back out to the full
+		// timeout. Check ctx first so an already-cancelled run never arms it,
+		// and prefer ctx.Err() over the raw write error so a write the
+		// watchdog does trip is reported as a cancellation, not an i/o
+		// timeout.
+		if err := ctx.Err(); err != nil {
+			return result, err
+		}
 		payload := decodeTCPData(cfg.Data)
 		_ = conn.SetWriteDeadline(time.Now().Add(timeout))
 		if _, err := conn.Write([]byte(payload)); err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return result, ctxErr
+			}
 			return nil, fmt.Errorf("tcp write %q: %w", addr, err)
 		}
 	}
 
-	data := readTCP(conn, timeout)
+	data := readTCP(ctx, conn, timeout)
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}
@@ -130,11 +143,24 @@ func ExecuteTCPModule(ctx context.Context, target string, def *YAMLModule, opts 
 // cap bounds memory to roughly the limit plus one buffer. A timeout or EOF ends
 // the read normally: a silent or half-open service yields the bytes seen so far
 // rather than an error, leaving the verdict to the matchers.
-func readTCP(conn net.Conn, timeout time.Duration) string {
+//
+// ctx is checked before arming the read deadline and again on every loop
+// iteration. The cancel watchdog in ExecuteTCPModule trips the deadline with a
+// single SetDeadline(now) call, which arming a later deadline here would
+// otherwise silently overwrite (e.g. if the cancel lands while the probe
+// Write is still in flight): a cancelled ctx must abort the read immediately
+// rather than re-arm and block for the full timeout.
+func readTCP(ctx context.Context, conn net.Conn, timeout time.Duration) string {
+	if ctx.Err() != nil {
+		return ""
+	}
 	_ = conn.SetReadDeadline(time.Now().Add(timeout))
 	var out []byte
 	buf := make([]byte, 4096)
 	for len(out) < tcpReadLimit {
+		if ctx.Err() != nil {
+			break
+		}
 		n, err := conn.Read(buf)
 		if n > 0 {
 			out = append(out, buf[:n]...)
