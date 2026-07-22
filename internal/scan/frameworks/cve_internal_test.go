@@ -65,6 +65,18 @@ func TestResolveVersionFeedsCVELookup(t *testing.T) {
 	}
 }
 
+// Drupal's generator meta only exposes a bare major, so the extracted version
+// is "10"/"9". the cve lookup must still surface the matching CVE instead of
+// missing it because the affected entries are dotted.
+func TestGetVulnerabilitiesBareMajor(t *testing.T) {
+	if cves, _ := getVulnerabilities("Drupal", "10"); len(cves) == 0 {
+		t.Error("expected Drupal 10 to surface CVE-2023-44487, got none")
+	}
+	if cves, _ := getVulnerabilities("Drupal", "9"); len(cves) == 0 {
+		t.Error("expected Drupal 9 to surface CVE-2023-44487, got none")
+	}
+}
+
 func TestVersionAffected(t *testing.T) {
 	tests := []struct {
 		version  string
@@ -77,6 +89,13 @@ func TestVersionAffected(t *testing.T) {
 		{"4.20", "4.2", false}, // the boundary bug: 4.20 is not a 4.2.x release
 		{"4.20.0", "4.2", false},
 		{"5.0", "4.2", false},
+		// a coarser version covers the listed sub-versions: Drupal's generator
+		// only emits a bare major, which must still match its dotted entries.
+		{"10", "10.0", true},
+		{"9", "9.3", true},
+		// coarser matching stays on dotted boundaries: "1" is not "10.x".
+		{"1", "10.0", false},
+		{"10", "100.0", false},
 	}
 
 	for _, tt := range tests {
