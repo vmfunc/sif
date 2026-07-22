@@ -18,6 +18,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vmfunc/sif/internal/fingerprint"
 )
 
 // goldenFaviconBytes is a fixed payload long enough to span multiple base64
@@ -60,6 +62,11 @@ func TestFavicon_FetchAndHash(t *testing.T) {
 	wantQ := "http.favicon.hash:-1554620260"
 	if result.ShodanQ != wantQ {
 		t.Errorf("ShodanQ = %q, want %q", result.ShodanQ, wantQ)
+	}
+
+	wantTech, _ := fingerprint.LookupFaviconTech(fingerprint.FaviconHash(goldenFaviconBytes))
+	if result.Tech != wantTech {
+		t.Errorf("Tech = %q, want %q", result.Tech, wantTech)
 	}
 }
 
@@ -107,6 +114,29 @@ func TestFavicon_NoIcon(t *testing.T) {
 	}
 	if result != nil {
 		t.Errorf("expected nil result for missing favicon, got %+v", result)
+	}
+}
+
+func TestResolveFaviconURL(t *testing.T) {
+	cases := []struct {
+		name string
+		base string
+		href string
+		want string
+	}{
+		// see resolveFaviconURL's doc comment (favicon.go) for the anchoring rule.
+		{"root-relative against pathful base", "https://example.com/app", "/favicon.ico", "https://example.com/favicon.ico"},
+		{"root-relative against bare base", "https://example.com", "/static/icon.png", "https://example.com/static/icon.png"},
+		{"absolute href kept", "https://example.com", "https://cdn.example.net/f.ico", "https://cdn.example.net/f.ico"},
+		{"scheme-relative inherits https", "https://example.com", "//cdn.example.net/f.ico", "https://cdn.example.net/f.ico"},
+		{"scheme-relative inherits http", "http://example.com", "//cdn.example.net/f.ico", "http://cdn.example.net/f.ico"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := resolveFaviconURL(tc.base, tc.href); got != tc.want {
+				t.Errorf("resolveFaviconURL(%q, %q) = %q, want %q", tc.base, tc.href, got, tc.want)
+			}
+		})
 	}
 }
 

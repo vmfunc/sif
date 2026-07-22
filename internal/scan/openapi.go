@@ -79,12 +79,21 @@ const (
 // openapiSpec is the minimal slice of an openapi/swagger document we care about:
 // the version banner, info block, top-level security and the path map. unknown
 // fields are ignored by both json and yaml decoders.
+//
+// path items decode into a bare interface{} rather than a typed operation struct
+// because openapi 3.1 allows a path item to be a "$ref" to a shared item instead
+// of a set of operations. a strongly typed sibling map (map[string]rawOpsStruct)
+// makes both json and yaml fail the whole document the moment one path item is a
+// $ref string next to another path item with real get/post operations, which
+// silently drops an otherwise valid, enumerable spec. interface{} accepts either
+// shape without erroring, and operationSecurity below sorts out what's actually
+// an operation object.
 type openapiSpec struct {
-	OpenAPI  string                       `json:"openapi" yaml:"openapi"`
-	Swagger  string                       `json:"swagger" yaml:"swagger"`
-	Info     openapiInfo                  `json:"info" yaml:"info"`
-	Security []map[string][]string        `json:"security" yaml:"security"`
-	Paths    map[string]map[string]rawOps `json:"paths" yaml:"paths"`
+	OpenAPI  string                            `json:"openapi" yaml:"openapi"`
+	Swagger  string                            `json:"swagger" yaml:"swagger"`
+	Info     openapiInfo                       `json:"info" yaml:"info"`
+	Security []map[string][]string             `json:"security" yaml:"security"`
+	Paths    map[string]map[string]interface{} `json:"paths" yaml:"paths"`
 }
 
 type openapiInfo struct {
@@ -92,10 +101,58 @@ type openapiInfo struct {
 	Version string `json:"version" yaml:"version"`
 }
 
-// rawOps captures the per-operation security block. a pointer so an absent block
-// (inherit global) is distinct from an explicit empty one (security: [] = public).
-type rawOps struct {
-	Security *[]map[string][]string `json:"security" yaml:"security"`
+// operationSecurity pulls the per-operation security block out of a decoded path
+// item entry. it reports present=false when the entry isn't an operation object
+// at all (a $ref path item, or a security key that was never declared), which the
+// caller treats as "inherit global" the same as an absent security key.
+func operationSecurity(op interface{}) (reqs []map[string][]string, present bool) {
+	obj, ok := op.(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+	raw, ok := obj["security"]
+	if !ok {
+		return nil, false
+	}
+	// a security key whose value isn't a list (null, or a malformed scalar or
+	// object) is not a usable requirement block. treat it as absent and inherit
+	// the global default rather than fabricate an anonymous high-severity finding
+	// from garbage, which also matches how the old typed decoder handled a null.
+	if _, ok := raw.([]interface{}); !ok {
+		return nil, false
+	}
+	return toSecurityReqs(raw), true
+}
+
+// toSecurityReqs converts a decoded "security" value (a list of scheme->scopes
+// requirement objects) into the typed form securityAllowsAnonymous expects.
+// malformed entries are skipped rather than treated as a parse failure, since by
+// this point the document has already passed the openapi/swagger version check.
+func toSecurityReqs(raw interface{}) []map[string][]string {
+	arr, ok := raw.([]interface{})
+	if !ok {
+		return nil
+	}
+	reqs := make([]map[string][]string, 0, len(arr))
+	for _, item := range arr {
+		obj, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		req := make(map[string][]string, len(obj))
+		for scheme, scopesRaw := range obj {
+			scopesArr, _ := scopesRaw.([]interface{})
+			scopes := make([]string, 0, len(scopesArr))
+			for _, s := range scopesArr {
+				if str, ok := s.(string); ok {
+					scopes = append(scopes, str)
+				}
+			}
+			req[scheme] = scopes
+		}
+		reqs = append(reqs, req)
+	}
+	return reqs
 }
 
 // OpenAPI probes the candidate spec paths concurrently and, on the first hit,
@@ -294,8 +351,8 @@ func specToResult(spec *openapiSpec) *OpenAPIResult {
 			}
 			// an explicit block decides on its own; an absent one inherits global.
 			var unauth bool
-			if op.Security != nil {
-				unauth = securityAllowsAnonymous(*op.Security)
+			if reqs, present := operationSecurity(op); present {
+				unauth = securityAllowsAnonymous(reqs)
 			} else {
 				unauth = globalAllowsAnon
 			}

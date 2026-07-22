@@ -1,0 +1,53 @@
+id: xpath-injection-error
+info:
+  name: XPath Injection (Error-Based)
+  author: sif
+  severity: high
+  description: Detects XPath injection via XPath parser error messages
+  tags: [xpath, injection, xml, owasp-top10]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?id={{payload}}"
+    - "{{BaseURL}}/?user={{payload}}"
+    - "{{BaseURL}}/?name={{payload}}"
+    - "{{BaseURL}}/?search={{payload}}"
+    - "{{BaseURL}}/?q={{payload}}"
+    - "{{BaseURL}}/?query={{payload}}"
+
+  payloads:
+    - "'"
+    - "\""
+    - "']"
+    - "')"
+    - "1'or'1'='1"
+    - "count(//*)"
+
+  threads: 10
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - "XPathException"
+        - "org\\.apache\\.xpath"
+        - "javax\\.xml\\.xpath"
+        - "MS\\.Internal\\.Xml"
+        - "System\\.Xml\\.XPath"
+        - "SimpleXMLElement::xpath"
+        - "xmlXPathEval"
+        - "Warning.*?xpath"
+        - "supplied argument is not a valid XPath"
+        - "Expression must evaluate to a node-set"
+      condition: or
+
+  extractors:
+    - type: regex
+      name: xpath_error
+      part: body
+      regex:
+        - "(XPathException|SimpleXMLElement::xpath|xmlXPathEval|org\\.apache\\.xpath)"
+      group: 1

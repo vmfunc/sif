@@ -14,6 +14,7 @@ package modules
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -22,10 +23,21 @@ import (
 	"github.com/vmfunc/sif/internal/output"
 )
 
+// builtinFS holds the modules embedded into the binary. it's set once, from the
+// repo-root package that can actually run the go:embed directive (go:embed can't
+// reach a parent directory, and modules/ sits above this package). it stays nil
+// in builds and tests that don't import that package, so the loader simply falls
+// back to the filesystem as before.
+var builtinFS fs.FS
+
+// SetBuiltinFS registers the embedded module filesystem. see builtinFS.
+func SetBuiltinFS(fsys fs.FS) { builtinFS = fsys }
+
 // Loader handles module discovery and loading.
 type Loader struct {
 	builtinDir string
 	userDir    string
+	embedded   fs.FS
 	loaded     int
 }
 
@@ -38,17 +50,7 @@ func NewLoader() (*Loader, error) {
 		return nil, fmt.Errorf("get home dir: %w", err)
 	}
 
-	// Find built-in modules relative to executable
-	execPath, err := os.Executable()
-	if err != nil {
-		execPath = "."
-	}
-	builtinDir := filepath.Join(filepath.Dir(execPath), "modules")
-
-	// Also check current working directory for development
-	if _, err := os.Stat(builtinDir); os.IsNotExist(err) {
-		builtinDir = "modules"
-	}
+	builtinDir := resolveBuiltinDir()
 
 	// User modules directory based on OS
 	var userDir string
@@ -62,15 +64,73 @@ func NewLoader() (*Loader, error) {
 	return &Loader{
 		builtinDir: builtinDir,
 		userDir:    userDir,
+		embedded:   builtinFS,
 	}, nil
+}
+
+// resolveBuiltinDir picks the built-in modules directory: the first existing
+// candidate, or the working-directory default when none are present (LoadAll
+// then logs "no built-in modules found" as before).
+func resolveBuiltinDir() string {
+	if dir := firstExistingDir(builtinDirCandidates()); dir != "" {
+		return dir
+	}
+	return "modules"
+}
+
+// builtinDirCandidates lists the directories to probe for built-in modules,
+// most specific first: next to the executable, the working directory (for
+// development), then the freedesktop system data dirs so packaged installs
+// (modules under /usr/share/sif) are found too.
+func builtinDirCandidates() []string {
+	candidates := make([]string, 0, 4)
+
+	if execPath, err := os.Executable(); err == nil {
+		candidates = append(candidates, filepath.Join(filepath.Dir(execPath), "modules"))
+	}
+	candidates = append(candidates, "modules")
+
+	for _, dir := range dataDirs() {
+		candidates = append(candidates, filepath.Join(dir, "sif", "modules"))
+	}
+
+	return candidates
+}
+
+// dataDirs returns the freedesktop base data directories, honoring
+// $XDG_DATA_DIRS and falling back to the spec default when it is unset.
+func dataDirs() []string {
+	if env := os.Getenv("XDG_DATA_DIRS"); env != "" {
+		return filepath.SplitList(env)
+	}
+	return []string{"/usr/local/share", "/usr/share"}
+}
+
+func firstExistingDir(candidates []string) string {
+	for _, dir := range candidates {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			return dir
+		}
+	}
+	return ""
 }
 
 // LoadAll discovers and loads all modules from both built-in
 // and user directories.
 func (l *Loader) LoadAll() error {
-	// Load built-in modules first
+	// Load built-in modules first, preferring an on-disk modules/ dir (dev tree
+	// or a release that ships the folder alongside the binary).
+	before := l.loaded
 	if err := l.loadDir(l.builtinDir, false); err != nil {
 		log.Debugf("No built-in modules found: %v", err)
+	}
+
+	// nothing on disk: fall back to the modules embedded in the binary so a bare
+	// `go install`ed sif still ships its built-in modules.
+	if l.loaded == before && l.embedded != nil {
+		if err := l.loadFS(l.embedded); err != nil {
+			log.Debugf("No embedded modules loaded: %v", err)
+		}
 	}
 
 	// Load user modules (can override built-in)
@@ -114,6 +174,36 @@ func (l *Loader) loadDir(dir string, userDefined bool) error {
 			}
 		}
 
+		return nil
+	})
+}
+
+// loadFS loads yaml modules from an embedded filesystem. only yaml is embedded
+// (the .go script path is a filesystem-only dev affordance), so this walks for
+// yaml files and parses them from bytes.
+func (l *Loader) loadFS(fsys fs.FS) error {
+	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		switch filepath.Ext(path) {
+		case ".yaml", ".yml":
+			data, rerr := fs.ReadFile(fsys, path)
+			if rerr != nil {
+				log.Warnf("Failed to read embedded module %s: %v", path, rerr)
+				return nil
+			}
+			def, perr := ParseYAMLModuleBytes(data)
+			if perr != nil {
+				log.Warnf("Failed to load embedded module %s: %v", path, perr)
+				return nil
+			}
+			Register(newYAMLModuleWrapper(def, path))
+			l.loaded++
+		}
 		return nil
 	})
 }

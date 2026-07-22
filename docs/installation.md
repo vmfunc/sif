@@ -87,7 +87,9 @@ make
 
 sif looks for modules in these locations:
 
-- **built-in**: `modules/` directory next to the sif binary
+- **built-in**: `modules/` directory next to the sif binary, then `modules/` in the
+  working directory, then the system data dirs (`$XDG_DATA_DIRS`, default
+  `/usr/local/share/sif/modules` and `/usr/share/sif/modules`) for packaged installs
 - **user modules**: `~/.config/sif/modules/` (linux/macos) or `%LOCALAPPDATA%\sif\modules\` (windows)
 
 user modules override built-in modules with the same id.

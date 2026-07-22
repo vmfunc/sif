@@ -37,6 +37,16 @@ http:
         - "pwd="
         - "AccountKey="
 
+    # a docs/schema page that quotes the same json keys as a code sample trips
+    # the two matchers above with no real appsettings.json present. suppress
+    # any response that opens like an html document; a real appsettings.json
+    # is a plain json object and carries no markup.
+    - type: regex
+      part: body
+      negative: true
+      regex:
+        - '(?i)<(!doctype|html|head|title|body)[ >]'
+
   extractors:
     - type: regex
       name: connection_string

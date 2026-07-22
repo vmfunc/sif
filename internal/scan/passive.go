@@ -181,17 +181,21 @@ func fetchWayback(ctx context.Context, client *http.Client, domain string) ([]st
 	}
 
 	var urls []string
-	scanner := bufio.NewScanner(strings.NewReader(string(body)))
-	// historical urls can be long; give the scanner a generous line buffer.
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line != "" {
-			urls = append(urls, line)
+	// read line by line without a per-line cap: a single archived url with a
+	// huge query string must not abort the whole feed. overall size is already
+	// bounded by the passiveMaxBytes read limit.
+	reader := bufio.NewReader(strings.NewReader(string(body)))
+	for {
+		line, err := reader.ReadString('\n')
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			urls = append(urls, trimmed)
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("read wayback lines: %w", err)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("read wayback lines: %w", err)
+		}
 	}
 	return urls, nil
 }

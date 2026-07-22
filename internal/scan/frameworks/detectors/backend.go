@@ -86,7 +86,10 @@ func (d *djangoDetector) Name() string { return "Django" }
 
 func (d *djangoDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "csrfmiddlewaretoken", Weight: 0.4, HeaderOnly: true},
+		// csrfmiddlewaretoken is a hidden form BODY field Django templates
+		// render (`<input type="hidden" name="csrfmiddlewaretoken" ...>`),
+		// never a header, so this must not be HeaderOnly.
+		{Pattern: "csrfmiddlewaretoken", Weight: 0.4},
 		{Pattern: "csrftoken", Weight: 0.3, HeaderOnly: true},
 		{Pattern: "django.contrib", Weight: 0.3},
 		{Pattern: "django.core", Weight: 0.3},
@@ -171,9 +174,11 @@ func (d *aspnetDetector) Signatures() []fw.Signature {
 		{Pattern: "__VIEWSTATE", Weight: 0.4},
 		{Pattern: "__EVENTVALIDATION", Weight: 0.3},
 		{Pattern: "__VIEWSTATEGENERATOR", Weight: 0.3},
-		{Pattern: ".aspx", Weight: 0.2},
-		{Pattern: ".ashx", Weight: 0.2},
-		{Pattern: ".asmx", Weight: 0.2},
+		// .aspx/.ashx/.asmx path-extension signatures were dropped: they are
+		// weak (any page can link to one) and their combined weight diluted
+		// the canonical X-AspNet-Version/X-Powered-By headers below the
+		// detection threshold on a plain ASP.NET response that carries no
+		// body markers at all (e.g. a JSON API reply).
 		{Pattern: "asp.net_sessionid", Weight: 0.4, HeaderOnly: true},
 	}
 }
@@ -185,7 +190,9 @@ func (d *aspnetDetector) Detect(body string, headers http.Header) (float32, stri
 
 	var version string
 	if confidence > 0.5 {
-		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+		// ASP.NET's strongest version signal is header-shaped
+		// (X-AspNet-Version), so search headers too, not just the body.
+		version = fw.ExtractVersionFromResponse(body, headers, d.Name()).Version
 	}
 	return confidence, version
 }
@@ -287,7 +294,8 @@ func (d *flaskDetector) Detect(body string, headers http.Header) (float32, strin
 
 	var version string
 	if confidence > 0.5 {
-		version = fw.ExtractVersionOptimized(body, d.Name()).Version
+		// same header-search rationale as ASP.NET above.
+		version = fw.ExtractVersionFromResponse(body, headers, d.Name()).Version
 	}
 	return confidence, version
 }

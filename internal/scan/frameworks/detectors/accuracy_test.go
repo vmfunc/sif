@@ -39,6 +39,8 @@ func TestDetectorAccuracy_FalsePositives(t *testing.T) {
 		{"Shopify cdn body only", &shopifyDetector{}, `<script src="https://cdn.shopify.com/s/buy-button.js"></script>`, http.Header{}},
 		{"Spring Boot tutorial prose", &springBootDetector{}, `<article>To fix the Whitelabel Error Page in Spring Boot, add a controller.</article>`, http.Header{}},
 		{"Remix audio asset", &remixDetector{}, `<audio src="/audio/track_remix.mp3"></audio>`, http.Header{}},
+		{"Gatsby plugin comparison prose", &gatsbyDetector{}, `<article>gatsby-image and gatsby-plugin-sharp used to be the standard way to handle images before gatsby-plugin-image.</article>`, http.Header{}},
+		{"Svelte ecosystem comparison prose", &svelteDetector{}, `<article>popular svelte-native and svelte-check tools round out the ecosystem.</article>`, http.Header{}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -62,6 +64,8 @@ func TestDetectorAccuracy_TruePositives(t *testing.T) {
 		{"Shopify storefront header", &shopifyDetector{}, "", accHeader("X-Shopify-Stage", "production")},
 		{"Spring Boot whitelabel page", &springBootDetector{}, `<html><body><h1>Whitelabel Error Page</h1><p>This application has no explicit mapping for /error</p><div>There was an unexpected error (type=Not Found, status=404).</div></body></html>`, http.Header{}},
 		{"Remix context", &remixDetector{}, `<script>window.__remixContext = {"state":{}};</script>`, http.Header{}},
+		{"Gatsby root div and page-data", &gatsbyDetector{}, `<html><body><div id="___gatsby"><script src="/page-data/index/page-data.json"></script></div></body></html>`, http.Header{}},
+		{"Svelte runtime global and internal import", &svelteDetector{}, `<script>window.__svelte = {}; import { onMount } from "svelte/internal";</script>`, http.Header{}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

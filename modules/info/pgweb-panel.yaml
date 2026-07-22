@@ -1,0 +1,34 @@
+# pgweb Panel Detection Module
+
+id: pgweb-panel
+info:
+  name: pgweb Panel
+  author: sif
+  severity: high
+  description: Detects an exposed pgweb PostgreSQL browser, which ships with no built-in authentication
+  tags: [pgweb, postgresql, database, panel, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "static/js/ace-pgsql.js"
+
+    - type: word
+      part: body
+      condition: or
+      words:
+        - '<title>pgweb</title>'
+        - 'id="table_connection"'
+        - 'id="close_connection"'

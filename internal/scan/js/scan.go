@@ -95,12 +95,14 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 
 	doc, err := htmlquery.Parse(io.LimitReader(resp.Body, maxHTMLBodySize))
 	if err != nil {
+		spin.Stop()
 		return nil, err
 	}
 
 	var scripts []string
 	nodes, err := htmlquery.QueryAll(doc, "//script/@src")
 	if err != nil {
+		spin.Stop()
 		return nil, err
 	}
 	for _, node := range nodes {
@@ -120,7 +122,7 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 	for _, script := range scripts {
 		if strings.Contains(script, "/_buildManifest.js") {
 			log.Info("Detected Next.JS pages router! Getting all scripts from %s", script)
-			nextScripts, err := frameworks.GetPagesRouterScripts(script)
+			nextScripts, err := frameworks.GetPagesRouterScripts(script, timeout)
 			if err != nil {
 				spin.Stop()
 				return nil, err
