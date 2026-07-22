@@ -194,7 +194,7 @@ func executeHTTPChain(ctx context.Context, client *http.Client, target string, d
 			// a transport error breaks the chain; return whatever matched earlier.
 			return result, nil
 		}
-		respBody, err := io.ReadAll(io.LimitReader(resp.Body, MaxBodySize))
+		respBody, err := httpx.ReadCappedBody(resp)
 		resp.Body.Close()
 		if err != nil {
 			return result, nil
