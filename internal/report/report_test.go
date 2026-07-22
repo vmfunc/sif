@@ -98,6 +98,45 @@ func TestSARIF_DedupesRulesAcrossTargets(t *testing.T) {
 	}
 }
 
+func TestSARIF_LevelFromSeverity(t *testing.T) {
+	// each severity string must map onto the right sarif level, and an absent
+	// severity falls back to the neutral "warning".
+	results := []Result{
+		{Target: "https://t", Module: "critical-mod", Severity: "critical", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "high-mod", Severity: "high", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "medium-mod", Severity: "medium", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "low-mod", Severity: "low", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "info-mod", Severity: "info", Data: json.RawMessage(`{}`)},
+		{Target: "https://t", Module: "none-mod", Severity: "", Data: json.RawMessage(`{}`)},
+	}
+	out, err := SARIF(results)
+	if err != nil {
+		t.Fatalf("SARIF: %v", err)
+	}
+	var doc sarifLog
+	if err := json.Unmarshal(out, &doc); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+
+	want := map[string]string{
+		"critical-mod": "error",
+		"high-mod":     "error",
+		"medium-mod":   "warning",
+		"low-mod":      "note",
+		"info-mod":     "note",
+		"none-mod":     "warning",
+	}
+	got := make(map[string]string)
+	for _, r := range doc.Runs[0].Results {
+		got[r.RuleID] = r.Level
+	}
+	for mod, level := range want {
+		if got[mod] != level {
+			t.Errorf("module %q: expected level %q, got %q", mod, level, got[mod])
+		}
+	}
+}
+
 func TestSARIF_Empty(t *testing.T) {
 	out, err := SARIF(nil)
 	if err != nil {
