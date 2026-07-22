@@ -1,0 +1,49 @@
+id: ssti-reflected
+info:
+  name: Server-Side Template Injection
+  author: sif
+  severity: high
+  description: Detects server-side template injection by confirming the engine evaluated an injected arithmetic expression
+  tags: [ssti, injection, template, rce, owasp-top10]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/?q={{payload}}"
+    - "{{BaseURL}}/?search={{payload}}"
+    - "{{BaseURL}}/?name={{payload}}"
+    - "{{BaseURL}}/?input={{payload}}"
+    - "{{BaseURL}}/?id={{payload}}"
+    - "{{BaseURL}}/?page={{payload}}"
+    - "{{BaseURL}}/?message={{payload}}"
+
+  # each payload evaluates to a distinctive product whose digits appear
+  # nowhere in the payload text, so a match proves the template engine
+  # computed the expression rather than reflecting the input verbatim.
+  payloads:
+    - "{{1337*1337}}"
+    - "${1337*1337}"
+    - "#{1337*1337}"
+    - "{1337*1337}"
+    - "<%= 1337*1337 %>"
+    - "${{1337*1337}}"
+    - "%7B%7B1337*1337%7D%7D"
+    - "%24%7B1337*1337%7D"
+
+  threads: 10
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "1787569"
+
+  extractors:
+    - type: regex
+      name: evaluated
+      part: body
+      regex:
+        - "(1787569)"
+      group: 1
