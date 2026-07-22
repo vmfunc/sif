@@ -36,10 +36,17 @@ func init() {
 	fw.RegisterCDN(&netlifyDetector{})
 }
 
-// all CDN signatures are HeaderOnly and scoped to the specific edge-injected
-// header the provider controls, never a bare brand substring: a page that
-// merely mentions "cloudflare" in its body (a badge, a blog post, a status
-// widget) must not fire, only the response the edge itself stamped.
+// all CDN signatures are HeaderOnly and scoped to a specific header the
+// provider controls, never a bare substring matched across every header.
+//
+// vendor markers match on Presence, because the value is an opaque request id
+// and what identifies the provider is that the header was stamped at all. that
+// also keeps them off header values: an origin advertising
+// "Access-Control-Expose-Headers: CF-Ray" is naming a header, not sitting
+// behind cloudflare.
+//
+// brand words are scoped to the header that carries them (Server, Via), so a
+// CSP or Link header referencing a cdn-hosted asset cannot fire them.
 
 type cloudflareDetector struct{}
 
@@ -48,7 +55,7 @@ func (d *cloudflareDetector) Name() string { return "Cloudflare" }
 func (d *cloudflareDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
 		// header name cf-ray is injected by every Cloudflare-proxied response.
-		{Pattern: "cf-ray", Weight: 0.6, HeaderOnly: true},
+		{Header: "CF-Ray", Presence: true, Weight: 0.6, HeaderOnly: true},
 		{Pattern: "cloudflare", Weight: 0.4, HeaderOnly: true, Header: "Server"},
 	}
 }
@@ -67,7 +74,7 @@ func (d *fastlyDetector) Signatures() []fw.Signature {
 		// x-fastly-request-id is only emitted by fastly's own edge; a plain
 		// varnish deployment (fastly is varnish-based) never sends it, so this
 		// stays clear of the generic "Via: 1.1 varnish" false positive.
-		{Pattern: "x-fastly-request-id", Weight: 0.6, HeaderOnly: true},
+		{Header: "X-Fastly-Request-ID", Presence: true, Weight: 0.6, HeaderOnly: true},
 		{Pattern: "fastly", Weight: 0.4, HeaderOnly: true, Header: "Via"},
 	}
 }
@@ -83,8 +90,8 @@ func (d *akamaiDetector) Name() string { return "Akamai" }
 
 func (d *akamaiDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "akamai-grn", Weight: 0.5, HeaderOnly: true},
-		{Pattern: "x-akamai", Weight: 0.5, HeaderOnly: true},
+		{Header: "Akamai-GRN", Presence: true, Weight: 0.5, HeaderOnly: true},
+		{Header: "X-Akamai-Transformed", Presence: true, Weight: 0.5, HeaderOnly: true},
 	}
 }
 
@@ -99,7 +106,7 @@ func (d *cloudfrontDetector) Name() string { return "Amazon CloudFront" }
 
 func (d *cloudfrontDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "x-amz-cf-id", Weight: 0.5, HeaderOnly: true},
+		{Header: "X-Amz-Cf-Id", Presence: true, Weight: 0.5, HeaderOnly: true},
 		{Pattern: "cloudfront", Weight: 0.5, HeaderOnly: true, Header: "Via"},
 	}
 }
@@ -115,7 +122,7 @@ func (d *vercelDetector) Name() string { return "Vercel" }
 
 func (d *vercelDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "x-vercel-id", Weight: 0.5, HeaderOnly: true},
+		{Header: "X-Vercel-Id", Presence: true, Weight: 0.5, HeaderOnly: true},
 		{Pattern: "vercel", Weight: 0.5, HeaderOnly: true, Header: "Server"},
 	}
 }
@@ -131,7 +138,7 @@ func (d *netlifyDetector) Name() string { return "Netlify" }
 
 func (d *netlifyDetector) Signatures() []fw.Signature {
 	return []fw.Signature{
-		{Pattern: "x-nf-request-id", Weight: 0.5, HeaderOnly: true},
+		{Header: "X-Nf-Request-Id", Presence: true, Weight: 0.5, HeaderOnly: true},
 		{Pattern: "netlify", Weight: 0.5, HeaderOnly: true, Header: "Server"},
 	}
 }
