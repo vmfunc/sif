@@ -15,6 +15,7 @@ package modules
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/vmfunc/sif/internal/fingerprint"
 )
@@ -67,18 +68,30 @@ func faviconEvidence(matchers []Matcher, body string) (string, bool) {
 }
 
 // validateMatchers fails favicon matchers that would silently never fire (no
-// hash, or one out of 32-bit range) at load rather than at match time.
+// hash, or one out of 32-bit range) and malformed range matchers at load
+// rather than at match time.
 func validateMatchers(matchers []Matcher) error {
 	for i := range matchers {
-		if matchers[i].Type != "favicon" {
-			continue
+		if matchers[i].Type == "favicon" {
+			if len(matchers[i].Hash) == 0 {
+				return fmt.Errorf("favicon matcher requires at least one hash")
+			}
+			for _, h := range matchers[i].Hash {
+				if _, ok := normalizeFaviconHash(h); !ok {
+					return fmt.Errorf("favicon hash %d out of range (use a signed int32 or unsigned uint32 value)", h)
+				}
+			}
 		}
-		if len(matchers[i].Hash) == 0 {
-			return fmt.Errorf("favicon matcher requires at least one hash")
-		}
-		for _, h := range matchers[i].Hash {
-			if _, ok := normalizeFaviconHash(h); !ok {
-				return fmt.Errorf("favicon hash %d out of range (use a signed int32 or unsigned uint32 value)", h)
+
+		if matchers[i].Type == "range" {
+			if matchers[i].Min == nil && matchers[i].Max == nil {
+				return fmt.Errorf("range matcher requires min or max")
+			}
+			if s := strings.ToLower(matchers[i].Source); s != "" && s != "size" && s != "status" {
+				return fmt.Errorf("range matcher source %q not supported (use size or status)", matchers[i].Source)
+			}
+			if matchers[i].Min != nil && matchers[i].Max != nil && *matchers[i].Min > *matchers[i].Max {
+				return fmt.Errorf("range matcher min %d greater than max %d", *matchers[i].Min, *matchers[i].Max)
 			}
 		}
 	}

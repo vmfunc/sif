@@ -400,9 +400,30 @@ func checkMatcher(m *Matcher, resp *http.Response, body string) bool {
 		}
 		return false
 
+	case "range":
+		switch strings.ToLower(m.Source) {
+		case "status":
+			return inRange(resp.StatusCode, m.Min, m.Max)
+		case "size", "":
+			return inRange(len(body), m.Min, m.Max)
+		default:
+			return false
+		}
+
 	default:
 		return false
 	}
+}
+
+// inRange reports whether v is within the inclusive bounds; a nil bound is open.
+func inRange(v int, lo, hi *int) bool {
+	if lo != nil && v < *lo {
+		return false
+	}
+	if hi != nil && v > *hi {
+		return false
+	}
+	return true
 }
 
 // getPart extracts the relevant part of the response.
