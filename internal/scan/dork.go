@@ -18,8 +18,8 @@ package scan
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"sync"
 	"time"
@@ -44,11 +44,18 @@ type DorkResult struct {
 	Count int    `json:"count"` // The number of times this URL appeared in the dork's results
 }
 
+// dorkQuery percent-encodes the dork and host together. the google-search
+// client drops the term into the query string verbatim, so an unencoded '#'
+// or '&' (both common in the dork list) truncates or splits the query.
+func dorkQuery(dork, host string) string {
+	return url.QueryEscape(dork + " " + host)
+}
+
 // Dork performs Google dorking operations on the target URL.
 // It uses a predefined list of dorks to search for potentially sensitive information.
 //
 // Parameters:
-//   - url: The target URL to dork
+//   - targetURL: The target URL to dork
 //   - timeout: Maximum duration for each dork search
 //   - threads: Number of concurrent threads to use
 //   - logdir: Directory to store log files (empty string for no logging)
@@ -56,13 +63,13 @@ type DorkResult struct {
 // Returns:
 //   - []DorkResult: A slice of results from the dorking operation
 //   - error: Any error encountered during the dorking process
-func Dork(url string, timeout time.Duration, threads int, logdir string) ([]DorkResult, error) {
+func Dork(targetURL string, timeout time.Duration, threads int, logdir string) ([]DorkResult, error) {
 	output.ScanStart("URL dorking")
 
 	spin := output.NewSpinner("Running Google dorks")
 	spin.Start()
 
-	sanitizedURL := stripScheme(url)
+	sanitizedURL := stripScheme(targetURL)
 
 	if logdir != "" {
 		if err := logger.WriteHeader(sanitizedURL, logdir, "URL dorking"); err != nil {
@@ -98,7 +105,7 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 
 	dorkResults := []DorkResult{}
 	pool.Each(dorks, threads, func(dork string) {
-		results, err := googlesearch.Search(context.TODO(), fmt.Sprintf("%s %s", dork, sanitizedURL))
+		results, err := googlesearch.Search(context.TODO(), dorkQuery(dork, sanitizedURL))
 		if err != nil {
 			log.Debugf("error searching for dork %s: %v", dork, err)
 			return
