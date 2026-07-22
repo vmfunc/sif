@@ -25,10 +25,11 @@ import (
 type ModuleType string
 
 const (
-	TypeHTTP   ModuleType = "http"
-	TypeDNS    ModuleType = "dns"
-	TypeTCP    ModuleType = "tcp"
-	TypeScript ModuleType = "script"
+	TypeHTTP        ModuleType = "http"
+	TypeDNS         ModuleType = "dns"
+	TypeTCP         ModuleType = "tcp"
+	TypeScript      ModuleType = "script"
+	TypeFingerprint ModuleType = "fingerprint"
 )
 
 // Module is the interface all modules implement.
@@ -77,10 +78,11 @@ func (r *Result) ResultType() string {
 
 // Finding represents a discovered issue.
 type Finding struct {
-	URL       string            `json:"url,omitempty"`
-	Severity  string            `json:"severity"`
-	Evidence  string            `json:"evidence,omitempty"`
-	Extracted map[string]string `json:"extracted,omitempty"`
+	URL        string            `json:"url,omitempty"`
+	Severity   string            `json:"severity"`
+	Evidence   string            `json:"evidence,omitempty"`
+	Extracted  map[string]string `json:"extracted,omitempty"`
+	Confidence float32           `json:"confidence,omitempty"` // set only for fingerprint modules
 }
 
 // Matcher defines matching logic for module responses.

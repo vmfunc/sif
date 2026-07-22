@@ -59,6 +59,22 @@ func Register(d Detector) {
 	registry[d.Name()] = d
 }
 
+// RegisterIfAbsent registers d only when its name is free, and reports whether
+// it did. Register clobbers by name, which is fine for the builtin detectors
+// (each owns its name at init) but not for names derived from user-supplied
+// module ids: a module called "WordPress" would silently replace the builtin.
+// the check and the insert share one lock so two callers cannot both see the
+// name as free.
+func RegisterIfAbsent(d Detector) bool {
+	registryMu.Lock()
+	defer registryMu.Unlock()
+	if _, exists := registry[d.Name()]; exists {
+		return false
+	}
+	registry[d.Name()] = d
+	return true
+}
+
 // GetDetectors returns all registered detectors.
 func GetDetectors() map[string]Detector {
 	registryMu.RLock()

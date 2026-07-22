@@ -34,12 +34,13 @@ import (
 
 // YAMLModule represents a parsed YAML module file
 type YAMLModule struct {
-	ID   string         `yaml:"id"`
-	Info YAMLModuleInfo `yaml:"info"`
-	Type ModuleType     `yaml:"type"`
-	HTTP *HTTPConfig    `yaml:"http,omitempty"`
-	DNS  *DNSConfig     `yaml:"dns,omitempty"`
-	TCP  *TCPConfig     `yaml:"tcp,omitempty"`
+	ID          string             `yaml:"id"`
+	Info        YAMLModuleInfo     `yaml:"info"`
+	Type        ModuleType         `yaml:"type"`
+	HTTP        *HTTPConfig        `yaml:"http,omitempty"`
+	DNS         *DNSConfig         `yaml:"dns,omitempty"`
+	TCP         *TCPConfig         `yaml:"tcp,omitempty"`
+	Fingerprint *FingerprintConfig `yaml:"fingerprint,omitempty"`
 }
 
 // YAMLModuleInfo contains module metadata
@@ -165,6 +166,12 @@ func ParseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 		return nil, fmt.Errorf("module %q: %w", ym.ID, err)
 	}
 
+	if ym.Type == TypeFingerprint {
+		if err := validateFingerprint(ym.Fingerprint); err != nil {
+			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
+		}
+	}
+
 	return &ym, nil
 }
 
@@ -177,6 +184,12 @@ type yamlModuleWrapper struct {
 // newYAMLModuleWrapper creates a Module from a YAMLModule definition
 func newYAMLModuleWrapper(def *YAMLModule, path string) *yamlModuleWrapper {
 	return &yamlModuleWrapper{def: def, path: path}
+}
+
+// definition returns the wrapped YAMLModule so same-package callers (the
+// fingerprint bridge) can reach fields the Module interface does not expose.
+func (m *yamlModuleWrapper) definition() *YAMLModule {
+	return m.def
 }
 
 // Info returns the module metadata
@@ -214,6 +227,11 @@ func (m *yamlModuleWrapper) Execute(ctx context.Context, target string, opts Opt
 			return nil, fmt.Errorf("TCP module missing tcp configuration")
 		}
 		return ExecuteTCPModule(ctx, target, m.def, opts)
+	case TypeFingerprint:
+		if m.def.Fingerprint == nil {
+			return nil, fmt.Errorf("fingerprint module missing fingerprint configuration")
+		}
+		return ExecuteFingerprintModule(ctx, target, m.def, opts)
 	default:
 		return nil, fmt.Errorf("unsupported module type: %s", m.def.Type)
 	}
