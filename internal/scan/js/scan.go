@@ -95,12 +95,14 @@ func JavascriptScan(url string, timeout time.Duration, threads int, logdir strin
 
 	doc, err := htmlquery.Parse(io.LimitReader(resp.Body, maxHTMLBodySize))
 	if err != nil {
+		spin.Stop()
 		return nil, err
 	}
 
 	var scripts []string
 	nodes, err := htmlquery.QueryAll(doc, "//script/@src")
 	if err != nil {
+		spin.Stop()
 		return nil, err
 	}
 	for _, node := range nodes {
