@@ -233,7 +233,7 @@ func checkTCPMatchers(matchers []Matcher, condition string, data string) bool {
 func checkTCPMatcher(m *Matcher, data string) bool {
 	switch m.Type {
 	case "word":
-		return checkWords(data, m.Words, m.Condition)
+		return checkWords(data, m.Words, m.Condition, m.CaseInsensitive)
 	case "regex":
 		return checkRegex(data, m.Regex, m.Condition)
 	case "size":
