@@ -14,6 +14,7 @@ package scan
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"sort"
 	"sync"
@@ -43,9 +44,19 @@ func (r *CrawlResult) ResultType() string { return "crawl" }
 // compile-time check so a result-type drift fails the build, not a run.
 var _ ScanResult = (*CrawlResult)(nil)
 
+// maxCrawlRequests caps the total pages a single Crawl call will fetch, so a
+// hostile page fanning out to an attacker-controlled number of links can't
+// turn a bounded-depth crawl into an unbounded one (b^d).
+const maxCrawlRequests = 2000
+
+// maxRedirectHops mirrors net/http's own default redirect cap, which we lose
+// once we install a custom CheckRedirect below.
+const maxRedirectHops = 10
+
 // Crawl spiders the target up to depth, following same-host links/scripts/forms.
 // all traffic flows through the shared httpx client so proxy/headers/rate-limit
-// apply, and robots.txt is respected (colly honors it by default).
+// apply. robots.txt is intentionally NOT honored: this is a recon/pentest
+// crawler and Disallow rules are not a scope boundary we want to respect.
 func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*CrawlResult, error) {
 	log := output.Module("CRAWL")
 	log.Start()
@@ -72,10 +83,26 @@ func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*
 	collector := colly.NewCollector(
 		colly.MaxDepth(depth),
 		colly.AllowedDomains(host),
+		colly.MaxRequests(maxCrawlRequests),
 	)
-	// reuse the shared client so proxy/cookie/-H/rate-limit are honored and the
-	// configured timeout applies to every fetch, robots.txt included.
-	collector.SetClient(httpx.Client(timeout))
+	// reuse the shared transport so proxy/-H/rate-limit still apply, but scope
+	// redirects ourselves: colly's CheckRedirect only re-checks AllowedDomains,
+	// which matches on hostname alone, so a same-host redirect to a different
+	// port would still be followed. also re-cap the hop count, since installing
+	// a custom CheckRedirect drops net/http's own 10-redirect default.
+	collector.SetClient(&http.Client{
+		Timeout:   timeout,
+		Transport: httpx.Client(timeout).Transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= maxRedirectHops {
+				return fmt.Errorf("stopped after %d redirects", maxRedirectHops)
+			}
+			if req.URL.Host != via[0].URL.Host {
+				return fmt.Errorf("redirect to %q leaves crawl scope %q", req.URL, via[0].URL.Host)
+			}
+			return nil
+		},
+	})
 
 	// dedupe across the concurrent callbacks colly may fire.
 	var mu sync.Mutex
