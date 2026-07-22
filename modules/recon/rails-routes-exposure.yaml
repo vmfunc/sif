@@ -1,0 +1,31 @@
+# Rails Routes Info Page Exposure Detection Module
+
+id: rails-routes-exposure
+info:
+  name: Rails Routes Info Page Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed rails /rails/info/routes page that only renders in development mode and leaks the full route map
+  tags: [rails, ruby, debug, routes, exposure, misconfiguration, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/rails/info/routes"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "Controller#Action"
+
+    - type: word
+      part: body
+      words:
+        - "HTTP Verb"
