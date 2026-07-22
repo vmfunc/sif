@@ -1,0 +1,37 @@
+# Kubeflow Pipelines API Exposure Detection Module
+
+id: kubeflow-pipelines-exposure
+info:
+  name: Kubeflow Pipelines API Exposure
+  author: sif
+  severity: high
+  description: Detects a Kubeflow Pipelines api server reachable without going through the istio/dex auth proxy, listing registered pipelines over its rest api; the same api accepts pipeline run submission, which executes arbitrary containers on the backing cluster
+  tags: [kubeflow, mlops, pipelines, kubernetes, data-orchestration, rce, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/apis/v1beta1/pipelines"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"pipelines\""
+        - "\"total_size\""
+        - "\"next_page_token\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: kubeflow_pipeline_count
+      part: body
+      regex:
+        - '"total_size"\s*:\s*([0-9]+)'
+      group: 1

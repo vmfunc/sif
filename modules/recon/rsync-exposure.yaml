@@ -1,0 +1,26 @@
+# Rsync Daemon Exposure Detection Module
+
+id: rsync-exposure
+info:
+  name: Rsync Daemon Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed rsync daemon by the @RSYNCD greeting it sends on connect, confirming a network-reachable rsync service that often permits anonymous module listing and unauthenticated file transfer
+  tags: [rsync, file-transfer, tcp, exposure, recon]
+
+type: tcp
+
+tcp:
+  port: 873
+
+  matchers:
+    - type: word
+      words:
+        - "@RSYNCD:"
+
+  extractors:
+    - type: regex
+      name: rsync_protocol
+      regex:
+        - "@RSYNCD: ([0-9.]+)"
+      group: 1

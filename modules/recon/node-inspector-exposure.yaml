@@ -1,0 +1,47 @@
+# Node.js V8 Inspector Exposure Detection Module
+
+id: node-inspector-exposure
+info:
+  name: Node.js V8 Inspector Exposure
+  author: sif
+  severity: high
+  description: Detects an open node.js v8 inspector whose websocket debugger allows arbitrary code execution in the process
+  tags: [node, inspector, debugger, rce, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/json"
+    - "{{BaseURL}}/json/list"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: regex
+      part: body
+      regex:
+        - '"webSocketDebuggerUrl"\s*:\s*"ws://'
+
+    - type: word
+      part: body
+      words:
+        - "\"devtoolsFrontendUrl\""
+
+  extractors:
+    - type: regex
+      name: ws_debugger_url
+      part: body
+      regex:
+        - '"webSocketDebuggerUrl"\s*:\s*"(ws://[^"]+)"'
+      group: 1
+
+    - type: regex
+      name: inspector_title
+      part: body
+      regex:
+        - '"title"\s*:\s*"([^"]+)"'
+      group: 1

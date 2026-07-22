@@ -1,0 +1,40 @@
+# Redfish Service Root Fingerprint Detection Module
+
+id: redfish-service-root
+info:
+  name: Redfish Service Root
+  author: sif
+  severity: info
+  description: Detects a reachable DMTF Redfish service root, confirming an out-of-band BMC management API is exposed on the network even though the root document is spec-mandated to answer without authentication
+  tags: [redfish, bmc, dmtf, out-of-band, panel, detection]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/redfish/v1/"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "RedfishVersion"
+        - "Managers"
+
+    - type: regex
+      part: body
+      regex:
+        - '"@odata\.type"\s*:\s*"#ServiceRoot\.'
+
+  extractors:
+    - type: regex
+      name: redfish_version
+      part: body
+      regex:
+        - '"RedfishVersion"\s*:\s*"([^"]+)"'
+      group: 1

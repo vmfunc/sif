@@ -260,8 +260,8 @@ func truncateBanner(banner string, maxLen int) string {
 	banner = strings.ReplaceAll(banner, "\r\n", " ")
 	banner = strings.ReplaceAll(banner, "\n", " ")
 
-	if len(banner) > maxLen {
-		return banner[:maxLen] + "..."
+	if runes := []rune(banner); len(runes) > maxLen {
+		return string(runes[:maxLen]) + "..."
 	}
 	return banner
 }
