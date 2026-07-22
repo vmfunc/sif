@@ -709,8 +709,23 @@ func TestDetectorRegistry(t *testing.T) {
 		t.Fatal("expected registered detectors, got none")
 	}
 
-	// Check that some expected detectors are registered
-	expectedDetectors := []string{"Laravel", "Django", "React", "Vue.js", "Angular", "Next.js", "WordPress", "Astro"}
+	// Check that expected detectors are registered: a spot-check of the
+	// originals plus every detector added to the backend, cms, and meta sets.
+	expectedDetectors := []string{
+		"Laravel", "Django", "React", "Vue.js", "Angular", "Next.js", "WordPress", "Astro",
+		"Tornado", "CherryPy", "Play Framework", "Sails.js", "Beego",
+		"JavaServer Faces", "Google Web Toolkit", "Vaadin", "ColdFusion",
+		"TYPO3", "Contao", "Wix", "Webflow", "HubSpot", "PrestaShop",
+		"Sitecore", "OpenCart", "DotNetNuke", "Liferay",
+		"Hugo", "Jekyll", "Docusaurus", "MkDocs",
+		"Alpine.js", "Qwik",
+		"Squarespace", "WooCommerce", "Craft CMS", "Concrete CMS", "Bitrix", "Blogger",
+		"Eleventy", "Hexo", "VuePress", "Sphinx",
+		"MediaWiki", "Discourse", "XenForo", "Moodle", "Plone", "Grav",
+		"Textpattern", "October CMS", "Statamic", "Livewire",
+		"Stimulus", "Turbo", "Knockout.js", "Unpoly", "Flarum", "NodeBB",
+		"XWiki", "Bolt CMS", "Nikola", "Publii", "ExpressionEngine",
+	}
 	for _, name := range expectedDetectors {
 		if _, ok := frameworks.GetDetector(name); !ok {
 			t.Errorf("expected detector %q to be registered", name)
@@ -842,8 +857,9 @@ func TestDetectFramework_Backbone(t *testing.T) {
 func TestDetectFramework_CakePHPFalsePositive(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<!DOCTYPE html><html><body><p>our cupcake and cheesecake recipes,
-		plus the best pancake stack in town.</p></body></html>`))
+		// a Q&A/listicle page that merely names the framework, as on the live
+		// stackoverflow homepage that the bare body substring used to misfire on
+		w.Write([]byte(`<!DOCTYPE html><html><body><a href="/questions/tagged/cakephp">cakephp</a></body></html>`))
 	}))
 	defer server.Close()
 
@@ -852,7 +868,7 @@ func TestDetectFramework_CakePHPFalsePositive(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if result != nil && result.Name == "CakePHP" {
-		t.Errorf("false positive: detected CakePHP (confidence %.2f) on prose about cakes", result.Confidence)
+		t.Errorf("false positive: detected CakePHP (confidence %.2f) on prose naming cakephp", result.Confidence)
 	}
 }
 
@@ -893,7 +909,8 @@ func TestDetectFramework_SvelteFalsePositive(t *testing.T) {
 func TestDetectFramework_StrapiFalsePositive(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<!DOCTYPE html><html><body><script>fetch("/api/v1/users")</script></body></html>`))
+		// prose naming the CMS plus a plain /api/ path: neither is the powered-by header
+		w.Write([]byte(`<!DOCTYPE html><html><body><p>built with Strapi</p><script>fetch("/api/v1/users")</script></body></html>`))
 	}))
 	defer server.Close()
 
@@ -902,14 +919,16 @@ func TestDetectFramework_StrapiFalsePositive(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if result != nil && result.Name == "Strapi" {
-		t.Errorf("false positive: detected Strapi (confidence %.2f) on a plain /api/ path", result.Confidence)
+		t.Errorf("false positive: detected Strapi (confidence %.2f) on prose naming strapi", result.Confidence)
 	}
 }
 
 func TestDetectFramework_Strapi(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// the default poweredBy middleware sets this header on every response
+		w.Header().Set("X-Powered-By", "Strapi <strapi.io>")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<!DOCTYPE html><html><body><div>powered by strapi</div></body></html>`))
+		w.Write([]byte(`<!DOCTYPE html><html><body><div>welcome</div></body></html>`))
 	}))
 	defer server.Close()
 
