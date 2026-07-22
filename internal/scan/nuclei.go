@@ -32,7 +32,7 @@ func Nuclei(url string, timeout time.Duration, threads int, logdir string) ([]ou
 	spin := sifoutput.NewSpinner("Running nuclei templates")
 	spin.Start()
 
-	nucleilog := log.NewWithOptions(os.Stderr, log.Options{
+	nucleilog := log.NewWithOptions(sifoutput.Writer(), log.Options{
 		Prefix: "nuclei",
 	}).With("url", url)
 
