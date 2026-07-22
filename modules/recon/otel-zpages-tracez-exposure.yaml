@@ -1,0 +1,42 @@
+# OpenTelemetry Collector zPages TraceZ Exposure Detection Module
+
+id: otel-zpages-tracez-exposure
+info:
+  name: OpenTelemetry Collector zPages TraceZ Exposure
+  author: sif
+  severity: medium
+  description: Detects an exposed OpenTelemetry Collector zPages tracez debug page that reveals in-process span names, active span counts and error samples without authentication
+  tags: [opentelemetry, otel, zpages, tracing, distributed-tracing, observability, topology, exposure, unauth, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/debug/tracez"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '<title>Trace Spans</title>'
+
+    - type: word
+      part: body
+      words:
+        - "Latency Samples"
+        - "Error Samples"
+        - "Span Name"
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: otel_span_name
+      part: body
+      regex:
+        - 'zspanname=([^&"]+)'
+      group: 1
