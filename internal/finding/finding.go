@@ -19,6 +19,8 @@ package finding
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/output"
@@ -83,78 +85,79 @@ func key(module, identifier string) string {
 // keyed "module:unhandled" so a new scanner surfaces loudly instead of
 // vanishing - the guard test asserts this never happens for a known type.
 func Flatten(target, module string, result any) []Finding {
+	var out []Finding
 	switch r := result.(type) {
 	case *scan.ShodanResult:
-		return flattenShodan(target, r)
+		out = flattenShodan(target, r)
 	case *scan.SQLResult:
-		return flattenSQL(target, r)
+		out = flattenSQL(target, r)
 	case *scan.LFIResult:
-		return flattenLFI(target, r)
+		out = flattenLFI(target, r)
 	case *scan.JWTResult:
-		return flattenJWT(target, r)
+		out = flattenJWT(target, r)
 	case *scan.OpenAPIResult:
-		return flattenOpenAPI(target, r)
+		out = flattenOpenAPI(target, r)
 	case *scan.FaviconResult:
-		return flattenFavicon(target, r)
+		out = flattenFavicon(target, r)
 	case *scan.CMSResult:
-		return flattenCMS(target, r)
+		out = flattenCMS(target, r)
 	case *scan.SecurityTrailsResult:
-		return flattenSecurityTrails(target, r)
+		out = flattenSecurityTrails(target, r)
 	case *scan.CORSResult:
-		return flattenCORS(target, r)
+		out = flattenCORS(target, r)
 	case *scan.RedirectResult:
-		return flattenRedirect(target, r)
+		out = flattenRedirect(target, r)
 	case *scan.XSSResult:
-		return flattenXSS(target, r)
+		out = flattenXSS(target, r)
 	case *scan.CrawlResult:
-		return flattenCrawl(target, r)
+		out = flattenCrawl(target, r)
 	case *scan.PassiveResult:
-		return flattenPassive(target, r)
+		out = flattenPassive(target, r)
 	case *scan.ProbeResult:
-		return flattenProbe(target, r)
+		out = flattenProbe(target, r)
 	case scan.HeaderResults:
-		return flattenHeaders(target, r)
+		out = flattenHeaders(target, r)
 	case []scan.HeaderResult:
 		// the headers module appends a literal []HeaderResult, not the named
 		// slice type; both reach here so cover both.
-		return flattenHeaders(target, r)
+		out = flattenHeaders(target, r)
 	case scan.SecurityHeaderResults:
-		return flattenSecurityHeaders(target, r)
+		out = flattenSecurityHeaders(target, r)
 	case []scan.SecurityHeaderResult:
-		return flattenSecurityHeaders(target, r)
+		out = flattenSecurityHeaders(target, r)
 	case scan.DirectoryResults:
-		return flattenDirlist(target, r)
+		out = flattenDirlist(target, r)
 	case []scan.DirectoryResult:
-		return flattenDirlist(target, r)
+		out = flattenDirlist(target, r)
 	case scan.CloudStorageResults:
-		return flattenCloudStorage(target, r)
+		out = flattenCloudStorage(target, r)
 	case []scan.CloudStorageResult:
-		return flattenCloudStorage(target, r)
+		out = flattenCloudStorage(target, r)
 	case scan.DorkResults:
-		return flattenDork(target, r)
+		out = flattenDork(target, r)
 	case []scan.DorkResult:
-		return flattenDork(target, r)
+		out = flattenDork(target, r)
 	case scan.SubdomainTakeoverResults:
-		return flattenTakeover(target, r)
+		out = flattenTakeover(target, r)
 	case []scan.SubdomainTakeoverResult:
-		return flattenTakeover(target, r)
+		out = flattenTakeover(target, r)
 	case *frameworks.FrameworkResult:
-		return flattenFramework(target, r)
+		out = flattenFramework(target, r)
 	case *js.JavascriptScanResult:
-		return flattenJS(target, r)
+		out = flattenJS(target, r)
 	case *modules.Result:
 		// yaml/builtin modules carry their own module id; honor it over the
 		// passed-in module so per-module findings stay attributed correctly.
-		return flattenModule(target, r)
+		out = flattenModule(target, r)
 	case []output.ResultEvent:
-		return flattenNuclei(target, r)
+		out = flattenNuclei(target, r)
 	case []string:
 		// dnslist/portscan/git all hand back a bare []string of discovered
 		// items; module disambiguates which inventory it is.
-		return flattenStrings(target, module, r)
+		out = flattenStrings(target, module, r)
 	default:
 		// unknown type: emit a loud placeholder rather than dropping it.
-		return []Finding{{
+		out = []Finding{{
 			Target:   target,
 			Module:   module,
 			Severity: SeverityUnknown,
@@ -163,6 +166,10 @@ func Flatten(target, module string, result any) []Finding {
 			Raw:      fmt.Sprintf("%T", result),
 		}}
 	}
+	// some flatten* funcs iterate a Go map (js env vars), which randomizes
+	// order per run; sort by Key here once so all report output is stable.
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+	return out
 }
 
 func flattenShodan(target string, r *scan.ShodanResult) []Finding {
@@ -476,13 +483,34 @@ func flattenProbe(target string, r *scan.ProbeResult) []Finding {
 
 func flattenHeaders(target string, rs []scan.HeaderResult) []Finding {
 	out := make([]Finding, 0, len(rs))
+	// a multi-valued header (Set-Cookie is the canonical case) emits one
+	// HeaderResult per value, and keying on the name alone collapses every
+	// value but the first onto one dedup Key. disambiguate by how many times
+	// the name has been seen rather than by the value: the value would
+	// destabilize every volatile single-valued header (Date, ETag, Age, CF-Ray)
+	// against the run-stable Key contract.
+	//
+	// the count is per name, not the slice index. headers.go ranges over
+	// resp.Header, so a name's position in the slice is randomized per run
+	// while the order of values within one name is preserved.
+	//
+	// the separator is ":", which rfc7230 excludes from a header field-name, so
+	// the suffix cannot collide with a real header. "#" would: it is a valid
+	// tchar, so a header literally named "Foo#1" would take the key of the
+	// second "Foo".
+	seen := make(map[string]int, len(rs))
 	for i := 0; i < len(rs); i++ {
 		h := rs[i]
+		identifier := h.Name
+		if n := seen[h.Name]; n > 0 {
+			identifier += ":" + strconv.Itoa(n)
+		}
+		seen[h.Name]++
 		out = append(out, Finding{
 			Target:   target,
 			Module:   "headers",
 			Severity: sevRecon,
-			Key:      key("headers", h.Name),
+			Key:      key("headers", identifier),
 			Title:    h.Name,
 			Raw:      h.Value,
 		})
@@ -665,8 +693,7 @@ func flattenJS(target string, r *js.JavascriptScanResult) []Finding {
 			Raw:      e,
 		})
 	}
-	// env vars are a map; sort-free since the Key carries the name, and diff
-	// keys on the Key not on iteration order.
+	// map order is random here; Flatten sorts by Key (see comment above sort.SliceStable).
 	for name, value := range r.FoundEnvironmentVars {
 		out = append(out, Finding{
 			Target:   target,

@@ -402,3 +402,99 @@ func TestDeadProbeIsNotAFinding(t *testing.T) {
 		t.Errorf("dead probe produced %d findings, want 0", len(findings))
 	}
 }
+
+func TestMultiValuedHeaderGetsDistinctKeys(t *testing.T) {
+	hdrs := []scan.HeaderResult{
+		{Name: "Set-Cookie", Value: "session=aaa; HttpOnly"},
+		{Name: "Set-Cookie", Value: "tracking=bbb"},
+	}
+	fs := Flatten(target, "headers", hdrs)
+	if len(fs) != 2 {
+		t.Fatalf("flatten len = %d, want 2", len(fs))
+	}
+	if fs[0].Key == fs[1].Key {
+		t.Fatalf("distinct header values %q and %q share dedup Key %q", fs[0].Raw, fs[1].Raw, fs[0].Key)
+	}
+}
+
+// Key is documented to be run-stable, so a header whose value changes every
+// response (Date is on nearly all of them, plus ETag/Age/CF-Ray/X-Request-Id)
+// must keep the same Key across scans. folding the value into the key would
+// churn a fresh key each run and make the diff/notify layer report every such
+// header as added+removed on every scan of every target.
+func TestVolatileHeaderKeyIsRunStable(t *testing.T) {
+	run1 := Flatten(target, "headers", []scan.HeaderResult{{Name: "Date", Value: "Mon, 07 Jul 2026 12:00:00 GMT"}})
+	run2 := Flatten(target, "headers", []scan.HeaderResult{{Name: "Date", Value: "Mon, 07 Jul 2026 12:00:01 GMT"}})
+	if run1[0].Key != run2[0].Key {
+		t.Fatalf("Date key churned across runs: %q then %q", run1[0].Key, run2[0].Key)
+	}
+}
+
+// the slice position of a header is randomized per run, so the disambiguator
+// must count occurrences within a name rather than use the slice index.
+func TestHeaderKeyIndependentOfEmissionOrder(t *testing.T) {
+	cookieA := scan.HeaderResult{Name: "Set-Cookie", Value: "session=aaa"}
+	cookieB := scan.HeaderResult{Name: "Set-Cookie", Value: "tracking=bbb"}
+	server := scan.HeaderResult{Name: "Server", Value: "nginx"}
+	date := scan.HeaderResult{Name: "Date", Value: "Mon, 07 Jul 2026 12:00:00 GMT"}
+
+	keysFor := func(rs []scan.HeaderResult) map[string]string {
+		got := make(map[string]string)
+		for _, f := range Flatten(target, "headers", rs) {
+			got[f.Raw] = f.Key
+		}
+		return got
+	}
+
+	// same headers, the map handed them to us in a different order.
+	first := keysFor([]scan.HeaderResult{server, cookieA, cookieB, date})
+	second := keysFor([]scan.HeaderResult{date, cookieA, cookieB, server})
+
+	for value, key := range first {
+		if second[value] != key {
+			t.Errorf("header %q key changed with emission order: %q then %q", value, key, second[value])
+		}
+	}
+	if first["session=aaa"] == first["tracking=bbb"] {
+		t.Fatalf("the two Set-Cookie values still share key %q", first["session=aaa"])
+	}
+}
+
+// the occurrence suffix must use a separator that cannot appear in a header
+// field-name, or it collides with a real header of that literal name.
+func TestHeaderOccurrenceSuffixCannotCollide(t *testing.T) {
+	fs := Flatten(target, "headers", []scan.HeaderResult{
+		{Name: "Foo", Value: "first"},
+		{Name: "Foo", Value: "second"},
+		{Name: "Foo#1", Value: "a genuinely different header"},
+	})
+	seen := make(map[string]string, len(fs))
+	for _, f := range fs {
+		if prev, dup := seen[f.Key]; dup {
+			t.Errorf("key collision on %q: %q and %q", f.Key, prev, f.Raw)
+		}
+		seen[f.Key] = f.Raw
+	}
+}
+
+func TestJSEnvVarOrderingIsStable(t *testing.T) {
+	res := &js.JavascriptScanResult{
+		FoundEnvironmentVars: map[string]string{
+			"A_KEY": "1", "B_KEY": "2", "C_KEY": "3",
+			"D_KEY": "4", "E_KEY": "5", "F_KEY": "6",
+		},
+	}
+
+	orderings := make(map[string]struct{})
+	for i := 0; i < 200; i++ {
+		fs := Flatten(target, "js", res)
+		keys := make([]string, 0, len(fs))
+		for _, f := range fs {
+			keys = append(keys, f.Key)
+		}
+		orderings[strings.Join(keys, ",")] = struct{}{}
+	}
+	if len(orderings) != 1 {
+		t.Errorf("Flatten produced %d distinct env-var orderings over 200 runs, want 1", len(orderings))
+	}
+}
