@@ -49,22 +49,6 @@ var faviconLinkRegex = regexp.MustCompile(`(?i)<link[^>]+rel=["'][^"']*icon[^"']
 // faviconHrefRegex extracts the href attribute value from a matched link tag.
 var faviconHrefRegex = regexp.MustCompile(`(?i)href=["']([^"']+)["']`)
 
-// faviconHashes maps a known shodan favicon hash to the tech that ships it.
-// these are stable default icons for panels/frameworks/c2; a hit is a strong
-// fingerprint. kept small on purpose - high-signal defaults, not an exhaustive db.
-var faviconHashes = map[int32]string{
-	116323821:   "Apache Tomcat",
-	81586312:    "Spring Boot (default whitelabel)",
-	-235701012:  "Jenkins",
-	-1255347784: "GitLab",
-	1278322581:  "Grafana",
-	743365239:   "Kibana",
-	-1462443472: "phpMyAdmin",
-	999357577:   "Cobalt Strike (default beacon)",
-	-1521704893: "Metasploit",
-	-1893514588: "Gitea",
-}
-
 // Favicon fetches the target's favicon, computes the shodan mmh3 hash and matches
 // it against the bundled fingerprint map.
 func Favicon(targetURL string, timeout time.Duration, logdir string) (*FaviconResult, error) {
@@ -91,10 +75,11 @@ func Favicon(targetURL string, timeout time.Duration, logdir string) (*FaviconRe
 	}
 
 	hash := fingerprint.FaviconHash(data)
+	tech, _ := fingerprint.LookupFaviconTech(hash)
 	result := &FaviconResult{
 		FaviconURL: iconURL,
 		Hash:       hash,
-		Tech:       faviconHashes[hash],
+		Tech:       tech,
 		ShodanQ:    fmt.Sprintf("http.favicon.hash:%d", hash),
 	}
 
