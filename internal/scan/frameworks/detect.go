@@ -15,7 +15,6 @@ package frameworks
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -30,9 +29,6 @@ import (
 
 // detectionThreshold is the minimum confidence for a detection to be reported.
 const detectionThreshold = 0.5
-
-// maxBodySize limits response body to prevent memory exhaustion.
-const maxBodySize = 5 * 1024 * 1024
 
 // detectionResult holds the result from a single detector.
 type detectionResult struct {
@@ -66,7 +62,7 @@ func gatherDetections(url string, timeout time.Duration) ([]detectionResult, str
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
+	body, err := httpx.ReadCappedBody(resp)
 	if err != nil {
 		return nil, "", err
 	}

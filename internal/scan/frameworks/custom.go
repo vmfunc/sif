@@ -26,11 +26,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 
 	charmlog "github.com/charmbracelet/log"
 	"github.com/vmfunc/sif/internal/output"
+	"github.com/vmfunc/sif/internal/sifpath"
 	"gopkg.in/yaml.v3"
 )
 
@@ -129,14 +129,7 @@ func parseCustomDetector(path string) (Detector, error) {
 // customSignaturesDir is the per-user directory that holds yaml-defined
 // detectors, alongside the user modules directory.
 func customSignaturesDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	if runtime.GOOS == "windows" {
-		return filepath.Join(home, "AppData", "Local", "sif", "signatures"), nil
-	}
-	return filepath.Join(home, ".config", "sif", "signatures"), nil
+	return sifpath.UserSubdir("signatures")
 }
 
 // loadCustomDetectors registers every signature file under the user directory.
