@@ -57,6 +57,9 @@ func TestImmichVersionExposureModule(t *testing.T) {
 		if v := immichExtract(res, "immich_major"); v != "3" {
 			t.Errorf("immich_major=%q, want 3", v)
 		}
+		if v := immichExtract(res, "immich_minor"); v != "0" {
+			t.Errorf("immich_minor=%q, want 0", v)
+		}
 		if v := immichExtract(res, "immich_patch"); v != "1" {
 			t.Errorf("immich_patch=%q, want 1", v)
 		}
