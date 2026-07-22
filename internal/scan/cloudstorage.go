@@ -15,6 +15,7 @@ package scan
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -26,13 +27,33 @@ import (
 	"github.com/vmfunc/sif/internal/styles"
 )
 
+// maxBucketBodyReadBytes bounds how much of a bucket response we buffer to
+// look for the listing markers below. an XML/JSON listing root or an error
+// code always shows up well within this window; the rest is drained and
+// discarded by httpx.DrainClose.
+const maxBucketBodyReadBytes = 8 << 10
+
+// s3ListingMarker is the root element of a real S3 ListBucketResult XML
+// listing. its presence is what actually proves anonymous listing access;
+// AccessDenied/NoSuchBucket/redirect bodies also come back with status 200
+// and must not be mistaken for a listing.
+const s3ListingMarker = "<ListBucketResult"
+
+// s3DeniedMarkers are S3 error codes that can accompany a 200 (or that we
+// check regardless of status) and rule out a listing even if the listing
+// marker were somehow also present.
+var s3DeniedMarkers = []string{"AccessDenied", "NoSuchBucket", "PermanentRedirect", "AllAccessDisabled"}
+
 // s3EndpointFmt is a var so integration tests can repoint it at a fixture; the
 // %s is the bucket name.
 var s3EndpointFmt = "https://%s.s3.amazonaws.com"
 
 type CloudStorageResult struct {
 	BucketName string `json:"bucket_name"`
-	IsPublic   bool   `json:"is_public"`
+	// IsPublic means the bucket's listing was actually retrieved (the
+	// response body contains a ListBucketResult with no denial marker), not
+	// merely that the request returned 200.
+	IsPublic bool `json:"is_public"`
 }
 
 func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStorageResult, error) {
@@ -115,9 +136,36 @@ func checkS3Bucket(ctx context.Context, bucket string, client *http.Client) (boo
 	if err != nil {
 		return false, err
 	}
-	// status only; drain on close so the conn returns to the pool.
+	// any remainder past maxBucketBodyReadBytes is drained on close so the
+	// conn returns to the pool.
 	defer httpx.DrainClose(resp)
 
-	// If we can access the bucket listing, it's public
-	return resp.StatusCode == http.StatusOK, nil
+	if resp.StatusCode != http.StatusOK {
+		return false, nil
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBucketBodyReadBytes))
+	if err != nil {
+		return false, err
+	}
+
+	return isListableBucketBody(body), nil
+}
+
+// isListableBucketBody reports whether body proves an S3 bucket is
+// anonymously listable. a 200 status alone does not: AccessDenied pages,
+// provider landing pages, and locked buckets can all return 200, so the
+// listing root element must actually be present and no denial marker may
+// be present alongside it.
+func isListableBucketBody(body []byte) bool {
+	s := string(body)
+	if !strings.Contains(s, s3ListingMarker) {
+		return false
+	}
+	for _, marker := range s3DeniedMarkers {
+		if strings.Contains(s, marker) {
+			return false
+		}
+	}
+	return true
 }
