@@ -20,6 +20,7 @@ package finding
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/output"
@@ -482,16 +483,34 @@ func flattenProbe(target string, r *scan.ProbeResult) []Finding {
 
 func flattenHeaders(target string, rs []scan.HeaderResult) []Finding {
 	out := make([]Finding, 0, len(rs))
+	// a multi-valued header (Set-Cookie is the canonical case) emits one
+	// HeaderResult per value, and keying on the name alone collapses every
+	// value but the first onto one dedup Key. disambiguate by how many times
+	// the name has been seen rather than by the value: the value would
+	// destabilize every volatile single-valued header (Date, ETag, Age, CF-Ray)
+	// against the run-stable Key contract.
+	//
+	// the count is per name, not the slice index. headers.go ranges over
+	// resp.Header, so a name's position in the slice is randomized per run
+	// while the order of values within one name is preserved.
+	//
+	// the separator is ":", which rfc7230 excludes from a header field-name, so
+	// the suffix cannot collide with a real header. "#" would: it is a valid
+	// tchar, so a header literally named "Foo#1" would take the key of the
+	// second "Foo".
+	seen := make(map[string]int, len(rs))
 	for i := 0; i < len(rs); i++ {
 		h := rs[i]
-		// a multi-valued header (Set-Cookie is the canonical case) emits one
-		// HeaderResult per value; the value must ride in the identifier or
-		// every value but the first collapses onto one dedup Key.
+		identifier := h.Name
+		if n := seen[h.Name]; n > 0 {
+			identifier += ":" + strconv.Itoa(n)
+		}
+		seen[h.Name]++
 		out = append(out, Finding{
 			Target:   target,
 			Module:   "headers",
 			Severity: sevRecon,
-			Key:      key("headers", h.Name+":"+h.Value),
+			Key:      key("headers", identifier),
 			Title:    h.Name,
 			Raw:      h.Value,
 		})
