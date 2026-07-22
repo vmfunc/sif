@@ -19,14 +19,6 @@ import (
 	fw "github.com/vmfunc/sif/internal/scan/frameworks"
 )
 
-func hdr(pairs ...string) http.Header {
-	h := http.Header{}
-	for i := 0; i+1 < len(pairs); i += 2 {
-		h.Add(pairs[i], pairs[i+1])
-	}
-	return h
-}
-
 func TestWebFrameworkDetectors_Positive(t *testing.T) {
 	tests := []struct {
 		name     string

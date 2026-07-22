@@ -36,7 +36,6 @@ func init() {
 	fw.Register(&meteorDetector{})
 	fw.Register(&htmxDetector{})
 	fw.Register(&alpineDetector{})
-	fw.Register(&jqueryDetector{})
 	fw.Register(&knockoutDetector{})
 	fw.Register(&livewireDetector{})
 	fw.Register(&qwikDetector{})
@@ -285,31 +284,6 @@ func (d *qwikDetector) Detect(body string, headers http.Header) (float32, string
 	return confidence, version
 }
 
-type jqueryDetector struct{}
-
-func (d *jqueryDetector) Name() string { return "jQuery" }
-
-func (d *jqueryDetector) Signatures() []fw.Signature {
-	return []fw.Signature{
-		{Pattern: "jquery.min.js", Weight: 0.5},
-		{Pattern: "jquery-", Weight: 0.5},
-		{Pattern: "jQuery.fn.jquery", Weight: 0.4},
-	}
-}
-
-func (d *jqueryDetector) Detect(body string, headers http.Header) (float32, string) {
-	base := fw.NewBaseDetector(d.Name(), d.Signatures())
-	score := base.MatchSignatures(body, headers)
-	confidence := sigmoidConfidence(score)
-
-	var version string
-	if confidence > 0.5 {
-		version = fw.ExtractVersionOptimized(body, d.Name()).Version
-	}
-	return confidence, version
-}
-
-// livewireDetector detects Laravel Livewire.
 type livewireDetector struct{}
 
 func (d *livewireDetector) Name() string { return "Livewire" }

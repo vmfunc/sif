@@ -718,15 +718,13 @@ func TestDetectorRegistry(t *testing.T) {
 		"TYPO3", "Contao", "Wix", "Webflow", "HubSpot", "PrestaShop",
 		"Sitecore", "OpenCart", "DotNetNuke", "Liferay",
 		"Hugo", "Jekyll", "Docusaurus", "MkDocs",
-		"Alpine.js", "Qwik", "jQuery",
+		"Alpine.js", "Qwik",
 		"Squarespace", "WooCommerce", "Craft CMS", "Concrete CMS", "Bitrix", "Blogger",
 		"Eleventy", "Hexo", "VuePress", "Sphinx",
 		"MediaWiki", "Discourse", "XenForo", "Moodle", "Plone", "Grav",
 		"Textpattern", "October CMS", "Statamic", "Livewire",
 		"Stimulus", "Turbo", "Knockout.js", "Unpoly", "Flarum", "NodeBB",
 		"XWiki", "Bolt CMS", "Nikola", "Publii", "ExpressionEngine",
-		"Vercel", "Netlify", "GitHub Pages", "Cloudflare",
-		"Amazon CloudFront", "Akamai", "Fly.io", "Amazon S3",
 	}
 	for _, name := range expectedDetectors {
 		if _, ok := frameworks.GetDetector(name); !ok {

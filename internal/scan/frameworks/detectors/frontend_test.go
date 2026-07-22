@@ -29,9 +29,6 @@ func TestFrontendLibDetectors_Positive(t *testing.T) {
 		{"Alpine cdn plus cloak", &alpineDetector{}, `<script src="//unpkg.com/alpinejs@3.13.0/dist/cdn.min.js" defer></script><div x-cloak></div>`},
 		{"Qwik container only", &qwikDetector{}, `<html q:container="resumable" lang="en">`},
 		{"Qwik bootstrap", &qwikDetector{}, `<html q:container="paused" q:version="1.5.0" q:base="/build/"><script>qwikloader</script>`},
-		{"jQuery cdn", &jqueryDetector{}, `<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>`},
-		{"jQuery googleapis", &jqueryDetector{}, `<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>`},
-		{"jQuery wp bundled", &jqueryDetector{}, `<script src="/wp-includes/js/jquery/jquery.min.js?ver=3.7.1"></script>`},
 		{"Livewire component", &livewireDetector{}, `<div wire:id="aZ19" wire:snapshot="{&quot;data&quot;:[]}"><input wire:model="name"></div>`},
 		{"Stimulus controller", &stimulusDetector{}, `<div data-controller="hello" data-action="click->hello#greet"><button>x</button></div>`},
 		{"Stimulus script reference", &stimulusDetector{}, `<script type="module">import { Application } from "@hotwired/stimulus"</script>`},
@@ -61,7 +58,6 @@ func TestFrontendLibDetectors_Negative(t *testing.T) {
 		{"Vue at-click not Alpine", &alpineDetector{}, `<div id="app" @click="toggle"><button :class="x">go</button></div>`},
 		{"Alpine max-data substring", &alpineDetector{}, `<table class="max-data-grid" id="webflux-data">x</table>`},
 		{"Qwik prose", &qwikDetector{}, `<p>Qwik is a resumable framework, see qwik.dev for details.</p>`},
-		{"jQuery prose", &jqueryDetector{}, `<meta property="og:title" content="We dropped jquery"><p>migrating off jquery this year.</p>`},
 		{"Livewire single directive", &livewireDetector{}, `<button wire:click="save">save</button>`},
 		{"Livewire prose", &livewireDetector{}, `<p>Livewire is a full-stack framework for Laravel.</p>`},
 		{"Stimulus prose", &stimulusDetector{}, `<p>Stimulus is a modest JavaScript framework for the HTML you already have.</p>`},
@@ -90,8 +86,6 @@ func TestFrontendLibDetectors_Version(t *testing.T) {
 		body     string
 		want     string
 	}{
-		{"jQuery filename", &jqueryDetector{}, `<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>`, "3.6.0"},
-		{"jQuery googleapis path", &jqueryDetector{}, `<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>`, "3.7.1"},
 		{"Alpine cdn", &alpineDetector{}, `<div x-data></div><script src="//unpkg.com/alpinejs@3.13.0/dist/cdn.min.js"></script>`, "3.13.0"},
 		{"Qwik attr", &qwikDetector{}, `<html q:container="paused" q:version="1.5.0">`, "1.5.0"},
 		{"Knockout filename", &knockoutDetector{}, `<span data-bind="x"></span><script src="/js/knockout-3.5.1.js"></script>`, "3.5.1"},
