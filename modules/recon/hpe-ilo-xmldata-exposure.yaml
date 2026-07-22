@@ -1,0 +1,55 @@
+# HPE iLO Unauthenticated XML Data Exposure Detection Module
+
+id: hpe-ilo-xmldata-exposure
+info:
+  name: HPE iLO Unauthenticated XML Data Exposure
+  author: sif
+  severity: high
+  description: Detects an HPE iLO management processor answering /xmldata?item=all without authentication, leaking the host server serial number, product name and iLO firmware revision
+  tags: [ilo, hpe, bmc, out-of-band, exposure, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/xmldata?item=all"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      words:
+        - "<RIMP>"
+        - "<HSI>"
+        - "<MP>"
+
+    - type: word
+      part: body
+      words:
+        - "Integrated Lights-Out"
+
+  extractors:
+    - type: regex
+      name: ilo_server_serial
+      part: body
+      regex:
+        - '<SBSN>\s*([^<]*?)\s*</SBSN>'
+      group: 1
+
+    - type: regex
+      name: ilo_server_product
+      part: body
+      regex:
+        - '<SPN>([^<]+)</SPN>'
+      group: 1
+
+    - type: regex
+      name: ilo_firmware
+      part: body
+      regex:
+        - '<FWRI>([^<]+)</FWRI>'
+      group: 1
