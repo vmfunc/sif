@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -26,9 +27,15 @@ import (
 	"github.com/vmfunc/sif/internal/output"
 )
 
+// maxCrawlPages bounds total fetches independent of depth: MaxDepth caps
+// recursion depth but not breadth, so a link-heavy page (pagination, faceted
+// search) otherwise grows request count as branching^depth with no ceiling.
+const maxCrawlPages = 500
+
 // CrawlResult holds the deduped set of urls discovered by the spider.
 type CrawlResult struct {
-	URLs []string `json:"urls"`
+	URLs      []string `json:"urls"`
+	Truncated bool     `json:"truncated,omitempty"` // hit maxCrawlPages before the spider ran out of links
 }
 
 func (r *CrawlResult) ResultType() string { return "crawl" }
@@ -74,6 +81,11 @@ func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*
 	var mu sync.Mutex
 	seen := make(map[string]struct{})
 
+	// visited caps the total pages fetched (see maxCrawlPages); atomic since
+	// colly's callbacks can fire from multiple goroutines.
+	var visited int64
+	var truncated int32
+
 	record := func(raw string) {
 		if raw == "" {
 			return
@@ -93,6 +105,15 @@ func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*
 		}
 		mu.Unlock()
 	}
+
+	// count every request toward the budget (the seed included) and abort once
+	// it is exceeded, before the dial, so a link-heavy target can't run away.
+	collector.OnRequest(func(r *colly.Request) {
+		if atomic.AddInt64(&visited, 1) > maxCrawlPages {
+			atomic.StoreInt32(&truncated, 1)
+			r.Abort()
+		}
+	})
 
 	// links drive recursion; scripts/forms are recorded but not followed.
 	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -120,7 +141,10 @@ func Crawl(targetURL string, depth int, timeout time.Duration, logdir string) (*
 	}
 	collector.Wait()
 
-	result := &CrawlResult{URLs: sortedKeys(seen)}
+	result := &CrawlResult{URLs: sortedKeys(seen), Truncated: atomic.LoadInt32(&truncated) != 0}
+	if result.Truncated {
+		log.Warn("crawl hit the %d-page budget and stopped early; results are partial", maxCrawlPages)
+	}
 
 	log.Complete(len(result.URLs), "urls")
 	return result, nil
