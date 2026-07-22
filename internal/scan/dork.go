@@ -37,10 +37,11 @@ const (
 	dorkFile = "dork.txt"
 )
 
-// DorkResult represents the result of a Google dork search.
+// DorkResult represents a single URL found by a Google dork search.
 type DorkResult struct {
 	Url   string `json:"url"`   // The URL found by the dork
-	Count int    `json:"count"` // The number of times this URL was found
+	Dork  string `json:"dork"`  // The dork query that surfaced this URL
+	Count int    `json:"count"` // The number of times this URL appeared in the dork's results
 }
 
 // Dork performs Google dorking operations on the target URL.
@@ -110,13 +111,8 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 				_ = logger.Write(sanitizedURL, logdir, strconv.Itoa(len(results))+" dork results found for dork ["+dork+"]\n")
 			}
 
-			result := DorkResult{
-				Url:   dork,
-				Count: len(results),
-			}
-
 			mu.Lock()
-			dorkResults = append(dorkResults, result)
+			dorkResults = append(dorkResults, groupDorkResults(dork, results)...)
 			mu.Unlock()
 		}
 	})
@@ -124,4 +120,32 @@ func Dork(url string, timeout time.Duration, threads int, logdir string) ([]Dork
 
 	output.ScanComplete("URL dorking", len(dorkResults), "found")
 	return dorkResults, nil
+}
+
+// groupDorkResults turns the raw search hits for a single dork query into
+// DorkResults, one per unique URL found, with Count tracking how many times
+// that URL showed up in the query's results. Results with an empty URL are
+// dropped since there is nothing to report.
+func groupDorkResults(dork string, results []googlesearch.Result) []DorkResult {
+	counts := make(map[string]int, len(results))
+	order := make([]string, 0, len(results))
+	for _, r := range results {
+		if r.URL == "" {
+			continue
+		}
+		if counts[r.URL] == 0 {
+			order = append(order, r.URL)
+		}
+		counts[r.URL]++
+	}
+
+	out := make([]DorkResult, 0, len(order))
+	for _, foundURL := range order {
+		out = append(out, DorkResult{
+			Url:   foundURL,
+			Dork:  dork,
+			Count: counts[foundURL],
+		})
+	}
+	return out
 }
