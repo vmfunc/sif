@@ -472,11 +472,10 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 			log.Errorf("Error while running dns scan: %s", err)
 		} else {
 			moduleResults = append(moduleResults, ModuleResult{"dnslist", result})
-			dnsResults = result // Store the DNS results
+			dnsResults = result
 			scansRun = append(scansRun, "DNS Scan")
 		}
 
-		// Only run subdomain takeover check if DNS scan is enabled
 		if app.settings.SubdomainTakeover {
 			result, err := scan.SubdomainTakeover(url, dnsResults, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 			if err != nil {
