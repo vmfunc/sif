@@ -15,6 +15,8 @@ package modules
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -494,7 +496,14 @@ func checkMatcher(m *Matcher, resp *http.Response, body string) bool {
 		return false
 
 	case "word":
-		return checkWords(getPart(m.Part, resp, body), m.Words, m.Condition, m.CaseInsensitive)
+		words := m.Words
+		if m.Encoding != "" {
+			words = encodeMatcherWords(m.Words, m.Encoding)
+			if len(words) == 0 {
+				return false
+			}
+		}
+		return checkWords(getPart(m.Part, resp, body), words, m.Condition, m.CaseInsensitive)
 
 	case "regex":
 		return checkRegex(getPart(m.Part, resp, body), m.Regex, m.Condition)
@@ -593,6 +602,36 @@ func checkWords(content string, words []string, condition string, caseInsensitiv
 		}
 	}
 	return true
+}
+
+// encodeMatcherWord renders a plaintext word into the given encoding so a
+// marker that appears encoded in a response (a base64 blob, a hex dump) can
+// still be matched by its known plaintext form.
+func encodeMatcherWord(word, encoding string) (string, error) {
+	switch encoding {
+	case "":
+		return word, nil
+	case "hex":
+		return hex.EncodeToString([]byte(word)), nil
+	case "base64":
+		return base64.StdEncoding.EncodeToString([]byte(word)), nil
+	default:
+		return "", fmt.Errorf("unknown word encoding %q (use hex or base64)", encoding)
+	}
+}
+
+// encodeMatcherWords renders every word into the given encoding. an unknown
+// encoding drops all words, leaving nothing to match.
+func encodeMatcherWords(words []string, encoding string) []string {
+	out := make([]string, 0, len(words))
+	for _, w := range words {
+		e, err := encodeMatcherWord(w, encoding)
+		if err != nil {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
 }
 
 // checkRegex checks if any/all regex patterns match.

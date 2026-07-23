@@ -84,6 +84,72 @@ func TestCheckMatcherWord(t *testing.T) {
 	}
 }
 
+func TestCheckMatcherWordEncoding(t *testing.T) {
+	// base64("secretmarker") and hex("secretmarker") embedded in a larger body.
+	const b64Body = "prefix c2VjcmV0bWFya2Vy suffix"
+	const hexBody = "prefix 7365637265746d61726b6572 suffix"
+
+	tests := []struct {
+		name     string
+		words    []string
+		encoding string
+		body     string
+		expect   bool
+	}{
+		{name: "base64 word matches encoded body", words: []string{"secretmarker"}, encoding: "base64", body: b64Body, expect: true},
+		{name: "hex word matches encoded body", words: []string{"secretmarker"}, encoding: "hex", body: hexBody, expect: true},
+		// without encoding the plaintext word is not present in the encoded body.
+		{name: "no encoding does not match encoded body", words: []string{"secretmarker"}, encoding: "", body: b64Body, expect: false},
+		// a different marker encodes to something not present in the body.
+		{name: "base64 word absent from body misses", words: []string{"othermarker"}, encoding: "base64", body: b64Body, expect: false},
+		// unknown encoding drops every word, so nothing matches.
+		{name: "unknown encoding misses", words: []string{"secretmarker"}, encoding: "rot13", body: b64Body, expect: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &Matcher{Type: "word", Part: "body", Words: tt.words, Encoding: tt.encoding}
+			resp := fakeResponse(t, 200, nil)
+			if got := checkMatcher(m, resp, tt.body); got != tt.expect {
+				t.Errorf("checkMatcher word encoding = %v, want %v", got, tt.expect)
+			}
+		})
+	}
+
+	// an empty encoding must leave the default literal path byte-identical.
+	t.Run("empty encoding equals literal path", func(t *testing.T) {
+		const body = "welcome admin dashboard"
+		resp := fakeResponse(t, 200, nil)
+		lit := &Matcher{Type: "word", Part: "body", Words: []string{"admin"}}
+		enc := &Matcher{Type: "word", Part: "body", Words: []string{"admin"}, Encoding: ""}
+		if checkMatcher(lit, resp, body) != checkMatcher(enc, resp, body) {
+			t.Error("empty encoding diverged from literal matching")
+		}
+	})
+}
+
+func TestValidateMatchersEncoding(t *testing.T) {
+	tests := []struct {
+		name    string
+		matcher Matcher
+		wantErr bool
+	}{
+		{name: "no encoding is fine", matcher: Matcher{Type: "word", Words: []string{"anything"}}, wantErr: false},
+		{name: "base64 encoding accepted", matcher: Matcher{Type: "word", Words: []string{"secret"}, Encoding: "base64"}, wantErr: false},
+		{name: "hex encoding accepted", matcher: Matcher{Type: "word", Words: []string{"secret"}, Encoding: "hex"}, wantErr: false},
+		{name: "unknown encoding rejected", matcher: Matcher{Type: "word", Words: []string{"x"}, Encoding: "rot13"}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateMatchers([]Matcher{tt.matcher})
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateMatchers err = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestCheckMatcherRegex(t *testing.T) {
 	const body = "version 1.2.3 build 99"
 
