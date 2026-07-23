@@ -65,7 +65,8 @@ info:
 
 ### type (required)
 
-module type. `http` and `tcp` are supported.
+module type. `http` (request and match), `tcp` (raw connection probe) and
+`fingerprint` (weighted technology detection) are supported.
 
 ```yaml
 type: http
@@ -391,6 +392,44 @@ extractors:
       - "version"
       - "data.version"
 ```
+
+## fingerprint modules
+
+a `fingerprint` module identifies a technology by weighted signatures rather
+than a pass/fail match. each signature contributes its `weight` when it appears
+in the body (or, with `header: true`, in a response header name or value). the
+matched fraction of the total weight is the confidence; the module fires a
+single finding, carrying that confidence, once it reaches the threshold.
+
+this is the same scoring the built-in framework detectors use, in the module
+format, so a custom technology fingerprint lives alongside your other modules.
+
+```yaml
+id: acme-server
+info:
+  name: ACME Server
+  author: you
+  severity: info
+  tags: [tech, fingerprint]
+
+type: fingerprint
+
+fingerprint:
+  path: /                  # request path, defaults to /
+  confidence: 0.5          # minimum score to fire, defaults to 0.5
+  signatures:
+    - pattern: "acme"      # matched against header name/value
+      weight: 0.6
+      header: true
+    - pattern: "powered by acme"
+      weight: 0.4          # body match; omit weight to default to 1
+  version:                 # optional: pull a version out of the body
+    regex: "acme/([0-9.]+)"
+    group: 1
+```
+
+a response with both signatures scores `1.0`; the header alone scores `0.6` and
+still clears the `0.5` threshold, while the body alone (`0.4`) does not.
 
 ## examples
 
