@@ -13,6 +13,7 @@
 package js
 
 import (
+	"encoding/base64"
 	"math"
 	"regexp"
 	"strings"
@@ -39,12 +40,14 @@ const (
 
 // secretRules is the credential regex bank. the matching group (or the whole
 // match when there's no group) is what gets reported; minEntropy gates the
-// generic high-entropy rules so we don't flag every short literal.
+// generic high-entropy rules so we don't flag every short literal. validate
+// runs after the gates for rules where shape alone isn't proof.
 var secretRules = []struct {
 	name         string
 	re           *regexp.Regexp
 	minEntropy   float64
 	requireDigit bool
+	validate     func(string) bool
 }{
 	{
 		// aws access key ids are fixed-shape and unmistakable.
@@ -143,6 +146,76 @@ var secretRules = []struct {
 		minEntropy: noEntropyGate,
 	},
 	{
+		// pypi tokens all share the pypi-AgEIcHlwaS5vcmc prefix, the base64
+		// encoding of a fixed macaroon header, so it's effectively unforgeable.
+		name:       "pypi api token",
+		re:         regexp.MustCompile(`\b(pypi-AgEIcHlwaS5vcmc[0-9A-Za-z_-]{50,})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// legacy openai secret keys embed a fixed T3BlbkFJ marker (base64 for
+		// "OpenAI") between two random halves.
+		name:       "openai api key",
+		re:         regexp.MustCompile(`\b(sk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// current-generation project and service-account keys.
+		name:       "openai project api key",
+		re:         regexp.MustCompile(`\b(sk-(?:proj|svcacct)-[A-Za-z0-9_-]{20,})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		name:       "square access token",
+		re:         regexp.MustCompile(`\b(sq0atp-[0-9A-Za-z_-]{22}|sq0csp-[0-9A-Za-z_-]{43})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// mailgun api keys, key- then a 32-char hex blob.
+		name:       "mailgun api key",
+		re:         regexp.MustCompile(`\b(key-[0-9a-f]{32})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// discord bot tokens: base64 user id, a timestamp segment, then an HMAC.
+		name:       "discord bot token",
+		re:         regexp.MustCompile(`\b([MNOP][A-Za-z0-9_-]{23}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,38})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// discord incoming-webhook urls embed the secret in the path.
+		name:       "discord webhook url",
+		re:         regexp.MustCompile(`\b(discord(?:app)?\.com/api/webhooks/[0-9]{17,20}/[A-Za-z0-9_-]{60,68})`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		name:       "new relic license key",
+		re:         regexp.MustCompile(`\b(NRAK-[A-Z0-9]{27})\b`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// cloudinary connection urls carry the api key and secret in the userinfo.
+		name:       "cloudinary url",
+		re:         regexp.MustCompile(`\b(cloudinary://[0-9]{10,20}:[A-Za-z0-9_-]{20,}@[A-Za-z0-9_-]+)`),
+		minEntropy: noEntropyGate,
+	},
+	{
+		// jwts have no fixed prefix; validate decodes the header to rule out
+		// arbitrary dotted base64url blobs.
+		name:       "jwt",
+		re:         regexp.MustCompile(`\b(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})\b`),
+		minEntropy: noEntropyGate,
+		validate:   isStructuredJWT,
+	},
+	{
+		// validate drops the countless doc/template examples that use a
+		// placeholder password.
+		name:       "database connection string",
+		re:         regexp.MustCompile(`\b((?:mongodb(?:\+srv)?|postgres(?:ql)?|mysql|redis|rediss|amqp|amqps)://[^:\s"'` + "`" + `/@]+:[^@\s"'` + "`" + `/]+@[^\s"'` + "`" + `]+)`),
+		minEntropy: noEntropyGate,
+		validate:   hasRealConnStringPassword,
+	},
+	{
 		// generic apikey/secret/token = "<value>" assignments; the value is in
 		// group 2 and only reported if it looks random (entropy gate) and carries
 		// a digit, which weeds out camelCase identifiers sitting just over the gate.
@@ -185,6 +258,11 @@ func ScanSecrets(content, srcURL string) []SecretMatch {
 				continue
 			}
 
+			// structural validation for rules whose shape alone isn't proof.
+			if rule.validate != nil && !rule.validate(value) {
+				continue
+			}
+
 			// dedupe per source so a key referenced twice is one finding.
 			key := rule.name + "\x00" + value
 			if _, ok := seen[key]; ok {
@@ -215,6 +293,53 @@ func hasDigit(s string) bool {
 		}
 	}
 	return false
+}
+
+// alg is mandatory per RFC 7519; requiring both fields keeps arbitrary
+// dot-separated base64url blobs from being mistaken for a jwt.
+const (
+	jwtAlgField = `"alg"`
+	jwtTypField = `"typ"`
+)
+
+// connStringPasswordRe pulls the userinfo password out of a scheme://user:pass@host
+// connection string, for filtering placeholder credentials post-match.
+var connStringPasswordRe = regexp.MustCompile(`://[^:@/\s]*:([^@/\s]+)@`)
+
+// placeholderPasswords are stand-ins that show up constantly in docs, sample
+// configs and .env.example files; matching one means the string isn't a real
+// leaked credential.
+var placeholderPasswords = map[string]struct{}{
+	"password": {}, "pass": {}, "passwd": {}, "xxxx": {}, "xxxxx": {},
+	"changeme": {}, "yourpassword": {}, "example": {}, "test": {},
+	"123456": {}, "secret": {}, "admin": {}, "root": {}, "pwd": {},
+}
+
+// isStructuredJWT confirms the header segment decodes to jwt-shaped json.
+func isStructuredJWT(token string) bool {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return false
+	}
+
+	header, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return false
+	}
+
+	h := string(header)
+	return strings.Contains(h, jwtAlgField) && strings.Contains(h, jwtTypField)
+}
+
+// hasRealConnStringPassword rejects known placeholder passwords.
+func hasRealConnStringPassword(value string) bool {
+	m := connStringPasswordRe.FindStringSubmatch(value)
+	if len(m) < 2 {
+		return true
+	}
+
+	_, placeholder := placeholderPasswords[strings.ToLower(m[1])]
+	return !placeholder
 }
 
 // shannonEntropy is the per-character shannon entropy (bits) of s, used to tell
