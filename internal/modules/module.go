@@ -57,10 +57,11 @@ type Info struct {
 
 // Options for module execution.
 type Options struct {
-	Timeout time.Duration
-	Threads int
-	LogDir  string
-	Client  *http.Client
+	Timeout   time.Duration
+	Threads   int
+	LogDir    string
+	Client    *http.Client
+	Resolvers []string // dns modules: overrides the bundled resolver pool (-resolvers)
 }
 
 // Result from module execution.

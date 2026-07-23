@@ -677,10 +677,3 @@ func truncateEvidence(s string) string {
 	}
 	return s
 }
-
-// ExecuteDNSModule runs a DNS-based module (not yet implemented).
-// returns ErrUnsupportedModuleType so the caller logs a clear failure rather
-// than reporting an empty (but successful-looking) result.
-func ExecuteDNSModule(_ context.Context, _ string, def *YAMLModule, _ Options) (*Result, error) {
-	return nil, fmt.Errorf("dns module %q: %w", def.ID, ErrUnsupportedModuleType)
-}
