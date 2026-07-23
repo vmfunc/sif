@@ -1,0 +1,35 @@
+# DNS SPF Record Recon Module
+
+id: dns-spf-record
+info:
+  name: DNS SPF Record
+  author: sif
+  severity: info
+  description: Resolves the domain's TXT records and reports its SPF policy, surfacing the sender hosts and the enforcement qualifier (~all/-all/?all) used for email authentication
+  tags: [dns, txt, spf, email, recon]
+
+type: dns
+
+dns:
+  type: txt
+  # name defaults to the target host; the apex TXT set carries the SPF record.
+
+  matchers:
+    - type: word
+      part: answer
+      words:
+        - "v=spf1"
+
+  extractors:
+    - type: regex
+      name: spf_policy
+      part: answer
+      regex:
+        - "v=spf1[^\"]*"
+      group: 0
+    - type: regex
+      name: spf_qualifier
+      part: answer
+      regex:
+        - "([-~?+]all)"
+      group: 1
