@@ -234,7 +234,7 @@ func normalizeTarget(target string) (string, error) {
 
 // Run runs the pentesting suite, with the targets specified, according to the
 // settings specified.
-func (app *App) Run() error {
+func (app *App) Run(ctx context.Context) error {
 	// Handle --list-modules before any other processing
 	if app.settings.ListModules {
 		loader, err := modules.NewLoader()
@@ -298,6 +298,15 @@ func (app *App) Run() error {
 		}
 	}
 
+	// bound the whole run when -max-time is set; the deadline rides on the same
+	// ctx as the interrupt handler, so either one cancels the in-flight scanners
+	// that take a context and stops the target loop between steps.
+	if app.settings.MaxTime > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, app.settings.MaxTime)
+		defer cancel()
+	}
+
 	scansRun := make([]string, 0, 16)
 
 	// accumulate every module result across targets so the report writers can
@@ -323,7 +332,7 @@ func (app *App) Run() error {
 		}
 	}
 
-	results, err := app.scanAllTargets(storeDir, wantReport)
+	results, err := app.scanAllTargets(ctx, storeDir, wantReport)
 	if err != nil {
 		return err
 	}
@@ -339,7 +348,7 @@ func (app *App) Run() error {
 		}
 	}
 
-	return app.finishRun(scansRun, allFindings, reportResults, wantReport)
+	return app.finishRun(ctx, scansRun, allFindings, reportResults, wantReport)
 }
 
 // targetScan holds one target's isolated scan output: its findings, report rows,
@@ -358,7 +367,7 @@ type targetScan struct {
 // console, which output.SetConcurrent serializes and de-animates. Results are
 // indexed by target position, so the caller merges them in a stable order no
 // matter which worker finished first.
-func (app *App) scanAllTargets(storeDir string, wantReport bool) ([]targetScan, error) {
+func (app *App) scanAllTargets(ctx context.Context, storeDir string, wantReport bool) ([]targetScan, error) {
 	results := make([]targetScan, len(app.targets))
 
 	concurrency := app.settings.Concurrency
@@ -371,7 +380,13 @@ func (app *App) scanAllTargets(storeDir string, wantReport bool) ([]targetScan, 
 
 	if concurrency <= 1 {
 		for i, url := range app.targets {
-			ts, err := app.scanTarget(url, storeDir, wantReport)
+			// stop cleanly on interrupt or -max-time rather than starting another
+			// target; whatever was collected so far still gets reported.
+			if ctx.Err() != nil {
+				log.Warnf("scan cancelled, not starting further targets: %v", ctx.Err())
+				break
+			}
+			ts, err := app.scanTarget(ctx, url, storeDir, wantReport)
 			if err != nil {
 				return nil, err
 			}
@@ -386,6 +401,10 @@ func (app *App) scanAllTargets(storeDir string, wantReport bool) ([]targetScan, 
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 	for i, url := range app.targets {
+		if ctx.Err() != nil {
+			log.Warnf("scan cancelled, not starting further targets: %v", ctx.Err())
+			break
+		}
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(i int, url string) {
@@ -399,7 +418,7 @@ func (app *App) scanAllTargets(storeDir string, wantReport bool) ([]targetScan, 
 					errs[i] = fmt.Errorf("panic scanning %s: %v", url, r)
 				}
 			}()
-			results[i], errs[i] = app.scanTarget(url, storeDir, wantReport)
+			results[i], errs[i] = app.scanTarget(ctx, url, storeDir, wantReport)
 		}(i, url)
 	}
 	wg.Wait()
@@ -414,7 +433,7 @@ func (app *App) scanAllTargets(storeDir string, wantReport bool) ([]targetScan, 
 
 // scanTarget runs the full scanner set for one target and returns its isolated
 // accumulators without mutating run-wide state.
-func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, error) {
+func (app *App) scanTarget(ctx context.Context, url, storeDir string, wantReport bool) (targetScan, error) {
 	var scansRun []string
 	var logFiles []string
 
@@ -501,7 +520,7 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 	}
 
 	if app.settings.Ports != "none" {
-		result, err := scan.Ports(context.Background(), app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
+		result, err := scan.Ports(ctx, app.settings.Ports, url, app.settings.Timeout, app.settings.Threads, app.settings.LogDir)
 		if err != nil {
 			log.Errorf("Error while running port scan: %s", err)
 		} else {
@@ -769,6 +788,9 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 			}
 
 			for _, m := range toRun {
+				if ctx.Err() != nil {
+					break
+				}
 				switch m.Info().ID {
 				case "nuclei-scan":
 					if app.settings.Nuclei {
@@ -789,7 +811,7 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 				}
 				modLog := output.Module(m.Info().ID)
 				modLog.Start()
-				result, err := m.Execute(context.Background(), url, opts)
+				result, err := m.Execute(ctx, url, opts)
 				if err != nil {
 					modLog.Error("failed: %v", err)
 					continue
@@ -846,7 +868,7 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 // finishRun performs the run-wide steps after every target has been scanned:
 // notify, the silent findings stream, report files and the summary. It consumes
 // the merged accumulators so per-target scanning stays isolated in scanTarget.
-func (app *App) finishRun(scansRun []string, allFindings []finding.Finding, reportResults []report.Result, wantReport bool) error {
+func (app *App) finishRun(ctx context.Context, scansRun []string, allFindings []finding.Finding, reportResults []report.Result, wantReport bool) error {
 	// the normalized findings are the handoff point for notify/diff; surface the
 	// count now so the path is live and observable without changing output.
 	log.Debugf("normalized %d findings across %d targets", len(allFindings), len(app.targets))
@@ -854,7 +876,7 @@ func (app *App) finishRun(scansRun []string, allFindings []finding.Finding, repo
 	// notify: ship the severity-filtered findings to any configured provider.
 	// kept as an isolated block so it merges cleanly with the diff-store bundle.
 	if app.settings.Notify {
-		if err := app.notifyFindings(context.Background(), allFindings); err != nil {
+		if err := app.notifyFindings(ctx, allFindings); err != nil {
 			log.Errorf("notify: %v", err)
 		}
 	}
