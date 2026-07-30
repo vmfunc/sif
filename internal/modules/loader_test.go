@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 )
 
 // writeModule drops a yaml file into a temp dir and returns its path.
@@ -219,6 +220,63 @@ func TestLoaderLoadAll(t *testing.T) {
 	}
 }
 
+// TestLoaderMergesEmbeddedAndDiskByID confirms embedded and on-disk builtins
+// merge by module id, rather than the disk set winning outright whenever
+// anything on disk loads: every embedded-only id must still register, and a
+// disk module sharing an embedded id must override just that one entry.
+func TestLoaderMergesEmbeddedAndDiskByID(t *testing.T) {
+	Clear()
+	t.Cleanup(Clear)
+
+	embedded := fstest.MapFS{
+		"shared.yaml": &fstest.MapFile{Data: []byte("id: shared\ntype: http\ninfo:\n  description: embedded\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")},
+		"solo-a.yaml": &fstest.MapFile{Data: []byte("id: solo-a\ntype: http\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")},
+		"solo-b.yaml": &fstest.MapFile{Data: []byte("id: solo-b\ntype: http\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")},
+	}
+
+	dir := t.TempDir()
+	writeModule(t, dir, "shared.yaml", "id: shared\ntype: http\ninfo:\n  description: disk\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")
+
+	l := &Loader{builtinDir: dir, userDir: filepath.Join(dir, "nonexistent-user"), embedded: embedded}
+	if err := l.LoadAll(); err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+
+	for _, id := range []string{"shared", "solo-a", "solo-b"} {
+		if _, ok := Get(id); !ok {
+			t.Errorf("%s not registered; embedded modules must survive a disk override elsewhere", id)
+		}
+	}
+
+	shared, ok := Get("shared")
+	if !ok {
+		t.Fatal("shared not registered")
+	}
+	if got := shared.Info().Description; got != "disk" {
+		t.Errorf("shared module description = %q, want %q (disk should override the embedded copy)", got, "disk")
+	}
+}
+
+// TestNewLoaderPrefersTrustedBuiltinOverCWD confirms that once an embedded
+// builtin set exists, NewLoader does not fall back to trusting a bare
+// "modules" directory relative to the current working directory: a release
+// binary run from an unrelated directory that happens to contain a modules/
+// folder must not have it silently treated as a builtin source.
+func TestNewLoaderPrefersTrustedBuiltinOverCWD(t *testing.T) {
+	origFS := builtinFS
+	t.Cleanup(func() { builtinFS = origFS })
+
+	SetBuiltinFS(fstest.MapFS{"x.yaml": &fstest.MapFile{Data: []byte("id: x\ntype: http\nhttp:\n  paths: [\"/\"]\n")}})
+
+	l, err := NewLoader()
+	if err != nil {
+		t.Fatalf("NewLoader: %v", err)
+	}
+	if l.BuiltinDir() == "modules" {
+		t.Error("BuiltinDir() fell back to the bare CWD-relative \"modules\" path while an embedded builtin set was available")
+	}
+}
+
 func TestNewLoaderDirs(t *testing.T) {
 	l, err := NewLoader()
 	if err != nil {
@@ -379,5 +437,57 @@ func TestShippedModulesLoadClean(t *testing.T) {
 		if _, err := ParseYAMLModule(f); err != nil {
 			t.Errorf("%s: %v", f, err)
 		}
+	}
+}
+
+// TestBuiltinDirCandidatesCwdTrust pins both halves of the working-directory
+// rule: a sif checkout keeps the bare "modules" candidate, so editing modules/
+// and re-running the binary still works, while any other directory loses it
+// once an embedded set exists. Getting this wrong is silent either way - a
+// dropped candidate makes on-disk edits invisible, an extra one makes a
+// stranger's modules/ dir a trusted builtin source.
+func TestBuiltinDirCandidatesCwdTrust(t *testing.T) {
+	hasCwd := func(candidates []string) bool {
+		for _, c := range candidates {
+			if c == "modules" {
+				return true
+			}
+		}
+		return false
+	}
+
+	prev := builtinFS
+	t.Cleanup(func() { builtinFS = prev })
+	builtinFS = fstest.MapFS{}
+
+	t.Chdir(t.TempDir())
+	if hasCwd(builtinDirCandidates()) {
+		t.Error("a non-checkout working directory must not offer the bare modules candidate")
+	}
+
+	checkout := t.TempDir()
+	if err := os.WriteFile(filepath.Join(checkout, "go.mod"), []byte("module "+sifModulePath+"\n\ngo 1.25\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(checkout)
+	if !hasCwd(builtinDirCandidates()) {
+		t.Error("a sif checkout must keep the bare modules candidate so on-disk edits are seen")
+	}
+
+	other := t.TempDir()
+	if err := os.WriteFile(filepath.Join(other, "go.mod"), []byte("module example.com/other\n\ngo 1.25\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(other)
+	if hasCwd(builtinDirCandidates()) {
+		t.Error("another project's checkout must not offer the bare modules candidate")
+	}
+
+	// with no embedded set there is nothing to fall back on, so cwd is offered
+	// regardless of where the binary is run from.
+	builtinFS = nil
+	t.Chdir(t.TempDir())
+	if !hasCwd(builtinDirCandidates()) {
+		t.Error("without an embedded set the bare modules candidate must remain")
 	}
 }
