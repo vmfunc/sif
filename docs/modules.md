@@ -163,6 +163,9 @@ http:
 
 - `clusterbomb` (default) - every path is tried with every payload
 - `pitchfork` - path and payload are paired by index, stopping at the shorter list
+- `batteringram` - one value at a time from the first set is broadcast into every
+  named position, stopping at that set's length. use it when the same value has
+  to appear in several places of one request at once
 
 #### wordlist
 

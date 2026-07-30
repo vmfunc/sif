@@ -61,6 +61,11 @@ whole scan.
 ./sif -u https://example.com -all-modules -fuzz-max-requests 5000
 ```
 
+`-fuzz-global-max-requests <n>` - total fuzz requests across every module and
+every target in the run (default 100000, `0` for unlimited). the per-module cap
+above bounds one module; this bounds the whole scan, so a target list full of
+fuzzing modules cannot multiply past it.
+
 #### response filters
 
 modern apps serve a catch-all 200 for unknown routes, so a naive scan reports
