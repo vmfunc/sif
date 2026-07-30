@@ -116,6 +116,42 @@ http:
 
 each payload creates a separate request for each path.
 
+payloads can also be **named sets**, one per fuzzing position, which lets a
+single module vary more than one place in the request at once. write a mapping
+instead of a list, and reference each set by its name:
+
+```yaml
+http:
+  paths:
+    - "{{BaseURL}}/?user={{user}}&role={{role}}"
+
+  payloads:
+    user:
+      - "admin"
+      - "root"
+    role:
+      - "1"
+      - "2"
+```
+
+set order is the order you declare them, which is what `attack` pairs on. a
+plain list is still accepted and desugars to one set named `payload`, so
+`{{payload}}` keeps working unchanged.
+
+a set whose value is a single string is read from that file, one payload per
+line, so a large wordlist does not have to live inside the module:
+
+```yaml
+  payloads:
+    user: "/usr/share/sif/wordlists/users.txt"
+```
+
+requests are generated lazily, one combination at a time, so a module crossing
+several large sets does not build the whole product in memory first.
+`-fuzz-max-requests` (default 25000, 0 for unlimited) caps how many requests one
+fuzzing module may send per target, so a combinatorial blowup stops itself
+instead of running until the scan is killed.
+
 #### attack
 
 how paths and payloads combine into requests.

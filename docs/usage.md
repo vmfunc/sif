@@ -50,6 +50,17 @@ sizes: `small`, `medium`, `large`
 ./sif -u https://example.com -dirlist medium
 ```
 
+#### fuzzing budget
+
+`-fuzz-max-requests <n>` - cap the requests a single fuzzing module may send per
+target (default 25000, `0` for unlimited). a module crossing several payload sets
+multiplies them out, so this is the stop that keeps one module from consuming the
+whole scan.
+
+```bash
+./sif -u https://example.com -all-modules -fuzz-max-requests 5000
+```
+
 #### response filters
 
 modern apps serve a catch-all 200 for unknown routes, so a naive scan reports
