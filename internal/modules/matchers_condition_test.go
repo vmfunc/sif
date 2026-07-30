@@ -53,7 +53,7 @@ func TestCheckMatchersCondition(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := checkMatchers(tt.matchers, tt.condition, resp, body); got != tt.expect {
+			if got := checkMatchers(tt.matchers, tt.condition, &MatchContext{Resp: resp, Body: body}); got != tt.expect {
 				t.Errorf("checkMatchers(%q) = %v, want %v", tt.condition, got, tt.expect)
 			}
 		})

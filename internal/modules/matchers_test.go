@@ -50,7 +50,7 @@ func TestCheckMatcherStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Matcher{Type: "status", Status: tt.want}
 			resp := fakeResponse(t, tt.status, nil)
-			if got := checkMatcher(m, resp, ""); got != tt.expect {
+			if got := checkMatcher(m, &MatchContext{Resp: resp, Body: ""}); got != tt.expect {
 				t.Errorf("checkMatcher status = %v, want %v", got, tt.expect)
 			}
 		})
@@ -77,7 +77,7 @@ func TestCheckMatcherWord(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Matcher{Type: "word", Part: "body", Words: tt.words, Condition: tt.condition}
 			resp := fakeResponse(t, 200, nil)
-			if got := checkMatcher(m, resp, body); got != tt.expect {
+			if got := checkMatcher(m, &MatchContext{Resp: resp, Body: body}); got != tt.expect {
 				t.Errorf("checkMatcher word = %v, want %v", got, tt.expect)
 			}
 		})
@@ -107,7 +107,7 @@ func TestCheckMatcherRegex(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Matcher{Type: "regex", Part: "body", Regex: tt.patterns, Condition: tt.condition}
 			resp := fakeResponse(t, 200, nil)
-			if got := checkMatcher(m, resp, body); got != tt.expect {
+			if got := checkMatcher(m, &MatchContext{Resp: resp, Body: body}); got != tt.expect {
 				t.Errorf("checkMatcher regex = %v, want %v", got, tt.expect)
 			}
 		})
@@ -119,13 +119,13 @@ func TestCheckMatcherHeaderPart(t *testing.T) {
 	resp := fakeResponse(t, 200, header)
 
 	m := &Matcher{Type: "word", Part: "header", Words: []string{"PHP/8.1"}}
-	if !checkMatcher(m, resp, "body-content") {
+	if !checkMatcher(m, &MatchContext{Resp: resp, Body: "body-content"}) {
 		t.Error("expected header-part word matcher to hit on header value")
 	}
 
 	// the same word lives only in the header, so a body-part matcher must miss.
 	mBody := &Matcher{Type: "word", Part: "body", Words: []string{"PHP/8.1"}}
-	if checkMatcher(mBody, resp, "body-content") {
+	if checkMatcher(mBody, &MatchContext{Resp: resp, Body: "body-content"}) {
 		t.Error("body-part matcher should not see header-only value")
 	}
 }
@@ -133,7 +133,7 @@ func TestCheckMatcherHeaderPart(t *testing.T) {
 func TestCheckMatcherUnknownType(t *testing.T) {
 	m := &Matcher{Type: "size", Part: "body"}
 	resp := fakeResponse(t, 200, nil)
-	if checkMatcher(m, resp, "anything") {
+	if checkMatcher(m, &MatchContext{Resp: resp, Body: "anything"}) {
 		t.Error("unknown matcher type should not match")
 	}
 }
@@ -186,7 +186,7 @@ func TestCheckMatchers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := checkMatchers(tt.matchers, "", resp, body); got != tt.expect {
+			if got := checkMatchers(tt.matchers, "", &MatchContext{Resp: resp, Body: body}); got != tt.expect {
 				t.Errorf("checkMatchers = %v, want %v", got, tt.expect)
 			}
 		})

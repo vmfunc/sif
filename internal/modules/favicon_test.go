@@ -54,7 +54,7 @@ func TestCheckMatcherFavicon(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Matcher{Type: "favicon", Hash: tt.hashes}
 			resp := fakeResponse(t, 200, nil)
-			if got := checkMatcher(m, resp, body); got != tt.expect {
+			if got := checkMatcher(m, &MatchContext{Resp: resp, Body: body}); got != tt.expect {
 				t.Errorf("checkMatcher favicon = %v, want %v", got, tt.expect)
 			}
 		})
@@ -212,7 +212,7 @@ func TestCheckMatcherFaviconNegative(t *testing.T) {
 	signed := int64(fingerprint.FaviconHash(faviconFixture))
 	matchers := []Matcher{{Type: "favicon", Hash: []int64{signed}, Negative: true}}
 	resp := fakeResponse(t, 200, nil)
-	if checkMatchers(matchers, "", resp, string(faviconFixture)) {
+	if checkMatchers(matchers, "", &MatchContext{Resp: resp, Body: string(faviconFixture)}) {
 		t.Error("negative favicon matcher should not match its own hash")
 	}
 }
