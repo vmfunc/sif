@@ -455,3 +455,33 @@ func TestCheckSSLMatcher(t *testing.T) {
 		t.Error("no matchers should not match")
 	}
 }
+
+// TestSSLMatchContextHasNoResponse pins the nil *http.Response path an ssl
+// MatchContext takes. The dsl and word matchers share the http helpers, so a
+// helper that dereferenced mc.Resp would panic on every ssl module rather than
+// on a rare input.
+func TestSSLMatchContextHasNoResponse(t *testing.T) {
+	mc := &MatchContext{
+		Body:  "subject: CN=example.com",
+		URL:   "example.com:443",
+		Extra: map[string]interface{}{"expired": true, "self_signed": false},
+	}
+
+	if got := getPart("header", mc.Resp, mc.Body); got != "" {
+		t.Errorf("getPart(header) on a nil response = %q, want empty", got)
+	}
+	if got := getPart("all", mc.Resp, mc.Body); got != "\n"+mc.Body {
+		t.Errorf("getPart(all) on a nil response = %q", got)
+	}
+
+	vars := dslVars(mc)
+	if vars["status_code"] != 0 {
+		t.Errorf("status_code = %v, want 0 with no response", vars["status_code"])
+	}
+	if vars["all_headers"] != "" {
+		t.Errorf("all_headers = %v, want empty with no response", vars["all_headers"])
+	}
+	if vars["expired"] != true {
+		t.Errorf("ssl builtin expired lost from vars: %v", vars["expired"])
+	}
+}
