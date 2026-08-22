@@ -14,16 +14,12 @@ package builtin
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/vmfunc/sif/internal/httpx"
 	"github.com/vmfunc/sif/internal/modules"
 	"github.com/vmfunc/sif/internal/scan/frameworks"
 )
-
-// cdnMaxBodySize caps the response body read, mirroring frameworks.maxBodySize.
-const cdnMaxBodySize = 5 * 1024 * 1024
 
 type CDNModule struct{}
 
@@ -55,16 +51,13 @@ func (m *CDNModule) Execute(ctx context.Context, target string, opts modules.Opt
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:bodyclose // drained and closed via httpx.DrainClose
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, cdnMaxBodySize))
-	if err != nil {
-		return nil, err
-	}
+	// every CDN signature is HeaderOnly, so the body is never inspected; drain
+	// and close it (no per-target body allocation) and detect on headers alone.
+	defer httpx.DrainClose(resp)
 
 	result := &modules.Result{
 		ModuleID: m.Info().ID,
@@ -72,7 +65,7 @@ func (m *CDNModule) Execute(ctx context.Context, target string, opts modules.Opt
 		Findings: []modules.Finding{},
 	}
 
-	cdn := frameworks.DetectCDN(string(body), resp.Header)
+	cdn := frameworks.DetectCDN("", resp.Header)
 	if cdn == nil {
 		return result, nil
 	}
