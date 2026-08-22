@@ -48,6 +48,90 @@ type App struct {
 	settings *config.Settings
 	targets  []string
 	logFiles []string
+
+	// both are written once in Run before any scanTarget goroutine starts and
+	// only read afterwards, so the worker pool sees them without a lock.
+	modulesLoaded       bool
+	bridgedFingerprints map[string]bool
+}
+
+// loadModules populates the module registry once and is a no-op afterwards. it
+// must not be called from scanTarget: modulesLoaded is unguarded and that runs
+// on the worker pool. a loader that cannot be built is returned so -list-modules
+// stays fatal while a scan can downgrade it to a warning.
+func (app *App) loadModules() error {
+	if app.modulesLoaded {
+		return nil
+	}
+	loader, err := modules.NewLoader()
+	if err != nil {
+		return fmt.Errorf("failed to create module loader: %w", err)
+	}
+	if err := loader.LoadAll(); err != nil {
+		log.Warnf("Failed to load modules: %v", err)
+	}
+	builtin.Register()
+	app.modulesLoaded = true
+	return nil
+}
+
+// wantsModules reports whether this run needs the module registry populated,
+// either to run modules directly or to bridge fingerprints into framework
+// detection.
+func (app *App) wantsModules() bool {
+	return app.settings.Framework || app.settings.AllModules ||
+		app.settings.Modules != "" || app.settings.ModuleTags != ""
+}
+
+// selectModules resolves the module selection flags into the set to run for one
+// target. a bridged fingerprint is already reported by the framework engine, so
+// it is dropped from the implicit selections; naming it with -modules is a
+// direct request and still runs it.
+func (app *App) selectModules() []modules.Module {
+	var toRun []modules.Module
+	switch {
+	case app.settings.AllModules:
+		toRun = app.dropBridged(modules.All())
+	case app.settings.ModuleTags != "":
+		for _, tag := range strings.Split(app.settings.ModuleTags, ",") {
+			toRun = append(toRun, modules.ByTag(strings.TrimSpace(tag))...)
+		}
+		toRun = app.dropBridged(toRun)
+	case app.settings.Modules != "":
+		for _, id := range strings.Split(app.settings.Modules, ",") {
+			if m, ok := modules.Get(strings.TrimSpace(id)); ok {
+				toRun = append(toRun, m)
+			} else {
+				log.Warnf("Module not found: %s", id)
+			}
+		}
+	}
+
+	seen := make(map[string]bool, len(toRun))
+	deduped := make([]modules.Module, 0, len(toRun))
+	for _, m := range toRun {
+		if id := m.Info().ID; !seen[id] {
+			seen[id] = true
+			deduped = append(deduped, m)
+		}
+	}
+	return deduped
+}
+
+// dropBridged removes the modules framework detection already covers.
+func (app *App) dropBridged(ms []modules.Module) []modules.Module {
+	if len(app.bridgedFingerprints) == 0 {
+		return ms
+	}
+	out := make([]modules.Module, 0, len(ms))
+	for _, m := range ms {
+		if id := m.Info().ID; app.bridgedFingerprints[id] {
+			log.Debugf("Skipping %s: covered by framework detection", id)
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
 }
 
 // Version is set by main to the resolved build version and shown on the banner.
@@ -237,16 +321,9 @@ func normalizeTarget(target string) (string, error) {
 func (app *App) Run() error {
 	// Handle --list-modules before any other processing
 	if app.settings.ListModules {
-		loader, err := modules.NewLoader()
-		if err != nil {
-			return fmt.Errorf("failed to create module loader: %w", err)
+		if err := app.loadModules(); err != nil {
+			return err
 		}
-		if err := loader.LoadAll(); err != nil {
-			log.Warnf("Failed to load modules: %v", err)
-		}
-
-		// Register built-in Go modules
-		builtin.Register()
 
 		fmt.Println("Available modules:")
 		for _, m := range modules.All() {
@@ -321,6 +398,18 @@ func (app *App) Run() error {
 		} else {
 			storeDir = dir
 		}
+	}
+
+	// load once for the whole run and bridge before scanAllTargets: the
+	// per-target framework scan runs inside the worker pool, so a later
+	// registry write would both miss it and race.
+	if app.wantsModules() {
+		if err := app.loadModules(); err != nil {
+			log.Warnf("%v", err)
+		}
+	}
+	if app.settings.Framework {
+		app.bridgedFingerprints = modules.BridgeFingerprints()
 	}
 
 	results, err := app.scanAllTargets(storeDir, wantReport)
@@ -716,47 +805,12 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 
 	// Load and run modules
 	if app.settings.AllModules || app.settings.Modules != "" || app.settings.ModuleTags != "" {
-		loader, err := modules.NewLoader()
-		if err != nil {
-			log.Warnf("Failed to create module loader: %v", err)
-		} else {
-			if err := loader.LoadAll(); err != nil {
-				log.Warnf("Failed to load modules: %v", err)
-			}
+		{
+			// the registry was populated once in Run; loading it per target
+			// would re-walk the module dirs on every url and, under
+			// -concurrency, from several workers at once.
+			toRun := app.selectModules()
 
-			// Register built-in Go modules
-			builtin.Register()
-
-			// Determine which modules to run
-			var toRun []modules.Module
-			switch {
-			case app.settings.AllModules:
-				toRun = modules.All()
-			case app.settings.ModuleTags != "":
-				for _, tag := range strings.Split(app.settings.ModuleTags, ",") {
-					toRun = append(toRun, modules.ByTag(strings.TrimSpace(tag))...)
-				}
-			case app.settings.Modules != "":
-				for _, id := range strings.Split(app.settings.Modules, ",") {
-					if m, ok := modules.Get(strings.TrimSpace(id)); ok {
-						toRun = append(toRun, m)
-					} else {
-						log.Warnf("Module not found: %s", id)
-					}
-				}
-			}
-
-			seen := make(map[string]bool, len(toRun))
-			deduped := make([]modules.Module, 0, len(toRun))
-			for _, m := range toRun {
-				if id := m.Info().ID; !seen[id] {
-					seen[id] = true
-					deduped = append(deduped, m)
-				}
-			}
-			toRun = deduped
-
-			// Execute modules
 			// Execute modules. Client routes through the shared httpx transport so
 			// -proxy/-H/-cookie/-rate-limit apply to module scans the same as every
 			// other scanner instead of each module dialing out on a bare client.
