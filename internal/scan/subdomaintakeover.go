@@ -18,7 +18,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -86,7 +85,7 @@ func SubdomainTakeover(url string, dnsResults []string, timeout time.Duration, t
 		}
 	}
 
-	subdomainlog := log.NewWithOptions(os.Stderr, log.Options{
+	subdomainlog := log.NewWithOptions(output.Writer(), log.Options{
 		Prefix: "Subdomain Takeover",
 	})
 

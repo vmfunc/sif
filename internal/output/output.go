@@ -18,6 +18,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -42,9 +43,9 @@ var (
 
 // Text styles
 var (
-	Highlight = lipgloss.NewStyle().Bold(true).Foreground(ColorWhite)
-	Muted     = lipgloss.NewStyle().Foreground(ColorGray)
-	Status    = lipgloss.NewStyle().Bold(true).Foreground(ColorGreen)
+	Highlight = Style{lipgloss.NewStyle().Bold(true).Foreground(ColorWhite)}
+	Muted     = Style{lipgloss.NewStyle().Foreground(ColorGray)}
+	Status    = Style{lipgloss.NewStyle().Bold(true).Foreground(ColorGreen)}
 )
 
 // Box style for banners
@@ -68,10 +69,10 @@ var Subheading = lipgloss.NewStyle().
 
 // Severity styles
 var (
-	SeverityLow      = lipgloss.NewStyle().Foreground(ColorGreen)
-	SeverityMedium   = lipgloss.NewStyle().Foreground(ColorYellow)
-	SeverityHigh     = lipgloss.NewStyle().Foreground(lipgloss.Color("#f97316")) // orange
-	SeverityCritical = lipgloss.NewStyle().Foreground(ColorRed).Bold(true)
+	SeverityLow      = Style{lipgloss.NewStyle().Foreground(ColorGreen)}
+	SeverityMedium   = Style{lipgloss.NewStyle().Foreground(ColorYellow)}
+	SeverityHigh     = Style{lipgloss.NewStyle().Foreground(lipgloss.Color("#f97316"))}
+	SeverityCritical = Style{lipgloss.NewStyle().Foreground(ColorRed).Bold(true)}
 )
 
 // Module color palette - visually distinct, nice colors
@@ -196,6 +197,94 @@ func Writer() io.Writer {
 	return sink
 }
 
+// Style wraps a lipgloss.Style so Render sanitizes its arguments first. Styles
+// used to highlight response-derived content are declared with this type so
+// every call site gets the control-byte stripping in Sanitize for free,
+// instead of every caller having to remember to sanitize before styling.
+type Style struct {
+	lipgloss.Style
+}
+
+// Render sanitizes strs before delegating to the wrapped lipgloss.Style.
+func (s *Style) Render(strs ...string) string {
+	clean := make([]string, len(strs))
+	for i, v := range strs {
+		clean[i] = Sanitize(v)
+	}
+	return s.Style.Render(clean...)
+}
+
+// Sanitize strips terminal control bytes from s so attacker-controlled
+// content (page titles, response bodies, whois records, ...) can't rewrite
+// the terminal title, move the cursor, or clear the screen. \t, \n, and SGR
+// color sequences (ESC [ ... m, what lipgloss emits) survive; every other
+// C0/C1 control byte, DEL, OSC sequence, and non-SGR CSI sequence is dropped.
+func Sanitize(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+
+	for i := 0; i < len(s); {
+		c := s[i]
+
+		if c == 0x1b { // ESC
+			if i+1 < len(s) && s[i+1] == '[' { // CSI: ESC [ params... final
+				j := i + 2
+				for j < len(s) && s[j] >= 0x20 && s[j] <= 0x3f {
+					j++
+				}
+				if j < len(s) && s[j] >= 0x40 && s[j] <= 0x7e {
+					final := s[j]
+					j++
+					if final == 'm' {
+						b.WriteString(s[i:j]) // SGR: keep (color/bold/reset)
+					}
+					i = j
+					continue
+				}
+				// malformed/unterminated CSI: drop what we've consumed
+				i = j
+				continue
+			}
+			if i+1 < len(s) && s[i+1] == ']' { // OSC: ESC ] ... BEL | ESC \
+				j := i + 2
+				for j < len(s) {
+					if s[j] == 0x07 {
+						j++
+						break
+					}
+					if s[j] == 0x1b && j+1 < len(s) && s[j+1] == '\\' {
+						j += 2
+						break
+					}
+					j++
+				}
+				i = j
+				continue
+			}
+			// bare/unrecognized ESC: drop just the byte
+			i++
+			continue
+		}
+
+		r, size := utf8.DecodeRuneInString(s[i:])
+		switch {
+		case r == '\t' || r == '\n':
+			b.WriteRune(r)
+		case r < 0x20:
+			// other C0 controls (CR, BEL, backspace, ...): drop
+		case r == 0x7f:
+			// DEL: drop
+		case r >= 0x80 && r <= 0x9f:
+			// C1 controls: drop
+		default:
+			b.WriteRune(r)
+		}
+		i += size
+	}
+
+	return b.String()
+}
+
 // Sink is a routable output destination: the writer chrome lands on, plus
 // whether interactive widgets (spinners, live progress) may animate on it. A
 // scan can be handed its own Sink so its chrome routes to a chosen writer.
@@ -228,7 +317,7 @@ func (s *Sink) Info(format string, args ...interface{}) {
 	if apiMode {
 		return
 	}
-	fmt.Fprintf(s.w, "%s %s\n", prefixInfo.Render("[*]"), fmt.Sprintf(format, args...))
+	fmt.Fprintf(s.w, "%s %s\n", prefixInfo.Render("[*]"), Sanitize(fmt.Sprintf(format, args...)))
 }
 
 // Success logs a [+]-prefixed message; a no-op in API mode.
@@ -236,7 +325,7 @@ func (s *Sink) Success(format string, args ...interface{}) {
 	if apiMode {
 		return
 	}
-	fmt.Fprintf(s.w, "%s %s\n", prefixSuccess.Render("[+]"), fmt.Sprintf(format, args...))
+	fmt.Fprintf(s.w, "%s %s\n", prefixSuccess.Render("[+]"), Sanitize(fmt.Sprintf(format, args...)))
 }
 
 // Warn logs a [!]-prefixed message; a no-op in API mode.
@@ -244,7 +333,7 @@ func (s *Sink) Warn(format string, args ...interface{}) {
 	if apiMode {
 		return
 	}
-	fmt.Fprintf(s.w, "%s %s\n", prefixWarning.Render("[!]"), fmt.Sprintf(format, args...))
+	fmt.Fprintf(s.w, "%s %s\n", prefixWarning.Render("[!]"), Sanitize(fmt.Sprintf(format, args...)))
 }
 
 // Error logs a [-]-prefixed message; a no-op in API mode.
@@ -252,7 +341,7 @@ func (s *Sink) Error(format string, args ...interface{}) {
 	if apiMode {
 		return
 	}
-	fmt.Fprintf(s.w, "%s %s\n", prefixError.Render("[-]"), fmt.Sprintf(format, args...))
+	fmt.Fprintf(s.w, "%s %s\n", prefixError.Render("[-]"), Sanitize(fmt.Sprintf(format, args...)))
 }
 
 func Info(format string, args ...interface{}) { DefaultSink().Info(format, args...) }
@@ -308,7 +397,7 @@ func (m *ModuleLogger) Info(format string, args ...interface{}) {
 	if apiMode {
 		return
 	}
-	msg := fmt.Sprintf(format, args...)
+	msg := Sanitize(fmt.Sprintf(format, args...))
 	fmt.Fprintf(m.sink.w, "%s %s\n", m.prefix(), msg)
 }
 
@@ -317,7 +406,7 @@ func (m *ModuleLogger) Success(format string, args ...interface{}) {
 	if apiMode {
 		return
 	}
-	msg := fmt.Sprintf(format, args...)
+	msg := Sanitize(fmt.Sprintf(format, args...))
 	fmt.Fprintf(m.sink.w, "%s %s %s\n", m.prefix(), prefixSuccess.Render("✓"), msg)
 }
 
@@ -326,7 +415,7 @@ func (m *ModuleLogger) Warn(format string, args ...interface{}) {
 	if apiMode {
 		return
 	}
-	msg := fmt.Sprintf(format, args...)
+	msg := Sanitize(fmt.Sprintf(format, args...))
 	fmt.Fprintf(m.sink.w, "%s %s %s\n", m.prefix(), prefixWarning.Render("!"), msg)
 }
 
@@ -335,7 +424,7 @@ func (m *ModuleLogger) Error(format string, args ...interface{}) {
 	if apiMode {
 		return
 	}
-	msg := fmt.Sprintf(format, args...)
+	msg := Sanitize(fmt.Sprintf(format, args...))
 	fmt.Fprintf(m.sink.w, "%s %s %s\n", m.prefix(), prefixError.Render("✗"), msg)
 }
 

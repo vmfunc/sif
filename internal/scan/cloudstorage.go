@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -69,7 +68,7 @@ func CloudStorage(url string, timeout time.Duration, logdir string) ([]CloudStor
 		}
 	}
 
-	cloudlog := log.NewWithOptions(os.Stderr, log.Options{
+	cloudlog := log.NewWithOptions(output.Writer(), log.Options{
 		Prefix: "C3",
 	}).With("url", url)
 

@@ -13,7 +13,6 @@
 package scan
 
 import (
-	"github.com/charmbracelet/log"
 	"github.com/likexian/whois"
 	"github.com/vmfunc/sif/internal/logger"
 	"github.com/vmfunc/sif/internal/output"
@@ -32,7 +31,10 @@ func Whois(url string, logdir string) {
 
 	result, err := whois.Whois(sanitizedURL)
 	if err == nil {
-		log.Info(result)
+		// route through the output sink (sanitized, apiMode/silent-aware)
+		// instead of the package-level charmbracelet logger, which wrote raw
+		// whois-response text straight to os.Stderr.
+		output.Info("%s", result)
 		logger.Write(sanitizedURL, logdir, result)
 		output.ScanComplete("WHOIS lookup", 1, "completed")
 	} else {

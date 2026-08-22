@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"slices"
 	"strconv"
@@ -32,6 +31,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif/internal/httpx"
+	"github.com/vmfunc/sif/internal/output"
 )
 
 // jwtRegex matches JWT tokens in JavaScript content.
@@ -175,7 +175,7 @@ func doSupabaseRequest(projectId, path, apikey string, auth *string, timeout tim
 }
 
 func ScanSupabase(jsContent string, jsUrl string, timeout time.Duration) ([]supabaseScanResult, error) {
-	supabaselog := log.NewWithOptions(os.Stderr, log.Options{
+	supabaselog := log.NewWithOptions(output.Writer(), log.Options{
 		Prefix: "JavaScript > Supabase",
 	}).With("url", jsUrl)
 

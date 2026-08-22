@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"unicode/utf8"
 )
 
 // Progress bar configuration
@@ -177,10 +178,12 @@ func (p *Progress) render() {
 		}
 	}
 
-	// Truncate item if too long
+	// rune-aware so a multibyte character straddling the cut point isn't
+	// split into invalid UTF-8.
 	maxItemLen := 30
-	if len(lastItem) > maxItemLen {
-		lastItem = lastItem[:maxItemLen-3] + "..."
+	if runeCount := utf8.RuneCountInString(lastItem); runeCount > maxItemLen {
+		runes := []rune(lastItem)
+		lastItem = string(runes[:maxItemLen-3]) + "..."
 	}
 
 	// Format: [========>          ] 45% (4500/10000) /admin
