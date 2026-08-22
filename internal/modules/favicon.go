@@ -67,9 +67,20 @@ func faviconEvidence(matchers []Matcher, body string) (string, bool) {
 	return fmt.Sprintf("favicon mmh3=%d", hash), true
 }
 
+// hasNonEmpty reports whether at least one entry in vals is non-empty.
+func hasNonEmpty(vals []string) bool {
+	for _, v := range vals {
+		if v != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // validateMatchers fails favicon matchers that would silently never fire (no
-// hash, or one out of 32-bit range) and malformed range matchers at load
-// rather than at match time.
+// hash, or one out of 32-bit range) and malformed range matchers at load rather
+// than at match time. an empty word or regex list matches every response under
+// the default AND condition, so it is rejected here too, for every transport.
 func validateMatchers(matchers []Matcher) error {
 	for i := range matchers {
 		if matchers[i].Type == "favicon" {
@@ -81,6 +92,14 @@ func validateMatchers(matchers []Matcher) error {
 					return fmt.Errorf("favicon hash %d out of range (use a signed int32 or unsigned uint32 value)", h)
 				}
 			}
+		}
+
+		if matchers[i].Type == "word" && !hasNonEmpty(matchers[i].Words) {
+			return fmt.Errorf("word matcher requires at least one non-empty word")
+		}
+
+		if matchers[i].Type == "regex" && !hasNonEmpty(matchers[i].Regex) {
+			return fmt.Errorf("regex matcher requires at least one non-empty pattern")
 		}
 
 		if matchers[i].Type == "range" {
