@@ -1,0 +1,36 @@
+id: zabbix-panel
+info:
+  name: Zabbix Login Panel
+  author: sif
+  severity: info
+  description: Detects exposed Zabbix monitoring frontend login panels
+  tags: [zabbix, monitoring, panel, login, detection, info]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/index.php"
+    - "{{BaseURL}}/zabbix/index.php"
+    - "{{BaseURL}}"
+
+  matchers:
+    - type: status
+      status:
+        - 200
+
+    - type: word
+      part: body
+      condition: and
+      words:
+        - 'class="signin-container"'
+        - 'class="signin-logo"'
+
+  extractors:
+    - type: regex
+      name: zabbix_server_name
+      part: body
+      regex:
+        - '<div class="server-name">([^<]*)</div>'
+      group: 1
