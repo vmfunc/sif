@@ -414,8 +414,11 @@ type cakephpDetector struct{}
 func (d *cakephpDetector) Name() string { return "CakePHP" }
 
 func (d *cakephpDetector) Signatures() []fw.Signature {
+	// scope the cookie name to Set-Cookie: unscoped, a HeaderOnly signature
+	// runs through containsHeader and also matches header values, so an
+	// expose-headers list naming CAKEPHP resolved as CakePHP.
 	return []fw.Signature{
-		{Pattern: "CAKEPHP", Weight: 0.4, HeaderOnly: true},
+		{Pattern: "CAKEPHP", Weight: 0.4, HeaderOnly: true, Header: "Set-Cookie"},
 	}
 }
 
