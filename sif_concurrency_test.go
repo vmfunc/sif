@@ -13,6 +13,7 @@
 package sif
 
 import (
+	"context"
 	"testing"
 
 	"github.com/vmfunc/sif/internal/output"
@@ -36,7 +37,7 @@ func TestScanAllTargetsConcurrentIsolation(t *testing.T) {
 	app.targets = []string{srvA.URL, srvB.URL, srvC.URL}
 	app.settings.Concurrency = 3
 
-	results, err := app.scanAllTargets("", false)
+	results, err := app.scanAllTargets(context.Background(), "", false)
 	if err != nil {
 		t.Fatalf("scanAllTargets: %v", err)
 	}
@@ -62,7 +63,7 @@ func TestScanAllTargetsSequentialMatchesInputOrder(t *testing.T) {
 	app.targets = []string{srvA.URL, srvB.URL}
 	app.settings.Concurrency = 1
 
-	results, err := app.scanAllTargets("", false)
+	results, err := app.scanAllTargets(context.Background(), "", false)
 	if err != nil {
 		t.Fatalf("scanAllTargets: %v", err)
 	}

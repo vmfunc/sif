@@ -44,6 +44,7 @@ type Settings struct {
 	Nuclei            bool
 	JavaScript        bool
 	Timeout           time.Duration
+	MaxTime           time.Duration // abort the whole run after this long (0 = no limit)
 	URLs              goflags.StringSlice
 	File              string
 	ApiMode           bool
@@ -177,6 +178,7 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 	flagSet.CreateGroup("runtime", "Runtime",
 		flagSet.BoolVarP(&settings.Debug, "debug", "d", false, "Enable debug logging"),
 		flagSet.DurationVarP(&settings.Timeout, "timeout", "t", 10*time.Second, "HTTP request timeout"),
+		flagSet.DurationVar(&settings.MaxTime, "max-time", 0, "Abort the whole run after this duration (0 = no limit)"),
 		flagSet.StringVarP(&settings.LogDir, "log", "l", "", "Directory to store logs in"),
 		flagSet.IntVar(&settings.Threads, "threads", 10, "Number of threads to run scans on"),
 		flagSet.IntVar(&settings.Concurrency, "concurrency", 1, "Number of targets to scan in parallel (>1 interleaves console output)"),
