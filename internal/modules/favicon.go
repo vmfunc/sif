@@ -78,9 +78,10 @@ func hasNonEmpty(vals []string) bool {
 }
 
 // validateMatchers fails favicon matchers that would silently never fire (no
-// hash, or one out of 32-bit range) and malformed range matchers at load rather
-// than at match time. an empty word or regex list matches every response under
-// the default AND condition, so it is rejected here too, for every transport.
+// hash, or one out of 32-bit range), malformed range matchers, and dsl matchers
+// that are empty or do not compile, at load rather than at match time. an empty
+// word or regex list matches every response under the default AND condition, so
+// it is rejected here too, for every transport.
 func validateMatchers(matchers []Matcher) error {
 	for i := range matchers {
 		if matchers[i].Type == "favicon" {
@@ -100,6 +101,17 @@ func validateMatchers(matchers []Matcher) error {
 
 		if matchers[i].Type == "regex" && !hasNonEmpty(matchers[i].Regex) {
 			return fmt.Errorf("regex matcher requires at least one non-empty pattern")
+		}
+
+		if matchers[i].Type == "dsl" {
+			if !hasNonEmptyDSL(matchers[i].DSL) {
+				return fmt.Errorf("dsl matcher requires at least one non-empty expression")
+			}
+			for _, expr := range matchers[i].DSL {
+				if _, err := dslCompile(expr); err != nil {
+					return fmt.Errorf("dsl matcher: %w", err)
+				}
+			}
 		}
 
 		if matchers[i].Type == "range" {

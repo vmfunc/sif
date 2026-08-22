@@ -58,10 +58,14 @@ type Info struct {
 
 // Options for module execution.
 type Options struct {
-	Timeout time.Duration
-	Threads int
-	LogDir  string
-	Client  *http.Client
+	Timeout         time.Duration
+	Threads         int
+	LogDir          string
+	FuzzMaxRequests int
+	// FuzzGlobalBudget is a scan-wide request cap shared across every
+	// module/target; nil means unlimited.
+	FuzzGlobalBudget *FuzzBudget
+	Client           *http.Client
 }
 
 // Result from module execution.
@@ -107,6 +111,10 @@ type Matcher struct {
 	Max *int `yaml:"max,omitempty"`
 	// CaseInsensitive folds word matching to lower-case when set (word matcher only).
 	CaseInsensitive bool `yaml:"case-insensitive,omitempty"`
+
+	// DSL holds one or more boolean expressions evaluated against the response
+	// (dsl matchers only). Compiled and validated at module load.
+	DSL []string `yaml:"dsl,omitempty"`
 }
 
 // MatchContext carries everything a matcher can evaluate against one response,
