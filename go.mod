@@ -9,7 +9,9 @@ require (
 	github.com/charmbracelet/log v1.0.0
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/likexian/whois v1.15.7
+	github.com/projectdiscovery/dsl v0.8.20
 	github.com/projectdiscovery/goflags v0.1.76
+	github.com/projectdiscovery/govaluate v0.0.0-20260615100919-5ee2581bbf7e
 	github.com/projectdiscovery/nuclei/v3 v3.11.0
 	github.com/projectdiscovery/retryabledns v1.0.115
 	github.com/projectdiscovery/utils v0.11.1
@@ -272,7 +274,6 @@ require (
 	github.com/projectdiscovery/blackrock v0.0.1 // indirect
 	github.com/projectdiscovery/cdncheck v1.2.42 // indirect
 	github.com/projectdiscovery/clistats v0.1.4 // indirect
-	github.com/projectdiscovery/dsl v0.8.20 // indirect
 	github.com/projectdiscovery/fastdialer v0.5.11 // indirect
 	github.com/projectdiscovery/fasttemplate v0.0.2 // indirect
 	github.com/projectdiscovery/freeport v0.0.7 // indirect
@@ -282,7 +283,6 @@ require (
 	github.com/projectdiscovery/goja_nodejs v0.0.0-20260618132410-8519f75f703d // indirect
 	github.com/projectdiscovery/gologger v1.1.71 // indirect
 	github.com/projectdiscovery/gostruct v0.0.2 // indirect
-	github.com/projectdiscovery/govaluate v0.0.0-20260615100919-5ee2581bbf7e // indirect
 	github.com/projectdiscovery/gozero v0.1.1-0.20260530071156-fa1dad563d76 // indirect
 	github.com/projectdiscovery/hmap v0.0.101 // indirect
 	github.com/projectdiscovery/httpx v1.9.0 // indirect
