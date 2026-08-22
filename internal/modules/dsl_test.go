@@ -203,3 +203,25 @@ func TestCheckMatcherDSLEvalErrorMisses(t *testing.T) {
 		t.Error("or with a valid true expr after a bad-eval expr should match")
 	}
 }
+
+func TestCheckMatcherDSLCompileErrorMisses(t *testing.T) {
+	mc := &MatchContext{Resp: fakeResponse(t, 200, nil), Body: "x"}
+	// load-time validation rejects this, but a matcher built in code bypasses
+	// that path, so evaluation itself must fail closed.
+	m := &Matcher{Type: "dsl", DSL: []string{`status_code ==`}}
+	if checkMatcher(m, mc) {
+		t.Error("an uncompilable expression must miss, not match")
+	}
+}
+
+func TestCheckMatcherDSLNilResponse(t *testing.T) {
+	// a matcher can run without a response; the variable environment must bind
+	// zero values instead of dereferencing nil.
+	mc := &MatchContext{Body: ""}
+	if m := (&Matcher{Type: "dsl", DSL: []string{"status_code == 0"}}); !checkMatcher(m, mc) {
+		t.Error("status_code should bind 0 with no response")
+	}
+	if m := (&Matcher{Type: "dsl", DSL: []string{`all_headers == ""`}}); !checkMatcher(m, mc) {
+		t.Error("all_headers should bind empty with no response")
+	}
+}
