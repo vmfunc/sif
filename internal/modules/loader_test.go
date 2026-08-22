@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 )
 
 // writeModule drops a yaml file into a temp dir and returns its path.
@@ -109,6 +110,46 @@ func TestParseYAMLModuleErrors(t *testing.T) {
 			name:    "type mismatch",
 			content: "id: bad-shape\ntype: http\nhttp: \"should-be-a-map\"\n",
 		},
+		{
+			// type http with no http: section at all: parses fine today and only
+			// fails at Execute, which never runs on a passive scan.
+			name:    "http type with no http section",
+			content: "id: no-http-section\ntype: http\n",
+		},
+		{
+			// a typo'd section name (htttp instead of http) leaves HTTP nil the
+			// same way, since yaml silently ignores unknown top-level keys.
+			name:    "typo'd http section",
+			content: "id: typo-http-section\ntype: http\nhtttp:\n  paths: [\"/\"]\n",
+		},
+		{
+			// a typo'd severity must fail load rather than flow into
+			// Finding.Severity verbatim and never rank against a real one.
+			name:    "unknown severity",
+			content: "id: bad-severity\ntype: http\ninfo:\n  severity: CRTICAL\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n", //nolint:misspell // intentional typo fixture
+		},
+		{
+			name:    "dns type with no dns section",
+			content: "id: no-dns-section\ntype: dns\n",
+		},
+		{
+			name:    "tcp type with no tcp section",
+			content: "id: no-tcp-section\ntype: tcp\n",
+		},
+		{
+			// a chained step's matchers go through the same validation as the
+			// single-request ones; an unknown type there must not load.
+			name:    "chained step unknown matcher type",
+			content: "id: bad-step-matcher\ntype: http\nhttp:\n  requests:\n    - path: \"/\"\n      matchers:\n        - type: stauts\n          status: [200]\n",
+		},
+		{
+			name:    "chained step uncompilable extractor",
+			content: "id: bad-step-extractor\ntype: http\nhttp:\n  requests:\n    - path: \"/\"\n      extractors:\n        - type: regex\n          name: token\n          regex: [\"(unclosed\"]\n",
+		},
+		{
+			name:    "top-level uncompilable extractor",
+			content: "id: bad-http-extractor\ntype: http\nhttp:\n  paths: [\"/\"]\n  extractors:\n    - type: regex\n      name: token\n      regex: [\"(unclosed\"]\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -116,6 +157,54 @@ func TestParseYAMLModuleErrors(t *testing.T) {
 			path := writeModule(t, dir, tt.name+".yaml", tt.content)
 			if _, err := ParseYAMLModule(path); err == nil {
 				t.Fatalf("expected error for %s", tt.name)
+			}
+		})
+	}
+}
+
+// TestParseYAMLModuleStrictFields confirms a typo'd field inside a present
+// config block (as opposed to a missing/typo'd top-level section, covered by
+// TestParseYAMLModuleErrors) is rejected: strict/KnownFields decoding, not
+// just the block-presence check.
+func TestParseYAMLModuleStrictFields(t *testing.T) {
+	dir := t.TempDir()
+
+	typoField := writeModule(t, dir, "typo-field.yaml", "id: tf\ntype: http\nhttp:\n  methdo: GET\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")
+	if _, err := ParseYAMLModule(typoField); err == nil {
+		t.Fatal("typo'd field (methdo) inside http section accepted")
+	}
+
+	correctField := writeModule(t, dir, "correct-field.yaml", "id: cf\ntype: http\nhttp:\n  method: GET\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")
+	if _, err := ParseYAMLModule(correctField); err != nil {
+		t.Fatalf("valid field name rejected: %v", err)
+	}
+}
+
+// TestValidateSeverity pins the known-set check: any casing of the five
+// documented levels passes, an empty severity is left alone (many modules
+// and test fixtures omit it; that is unrelated to catching a typo), and
+// anything else, including a near-miss typo, is rejected.
+func TestValidateSeverity(t *testing.T) {
+	tests := []struct {
+		name     string
+		severity string
+		wantErr  bool
+	}{
+		{name: "info", severity: "info", wantErr: false},
+		{name: "low", severity: "low", wantErr: false},
+		{name: "medium", severity: "medium", wantErr: false},
+		{name: "high", severity: "high", wantErr: false},
+		{name: "critical", severity: "critical", wantErr: false},
+		{name: "uppercase", severity: "HIGH", wantErr: false},
+		{name: "mixed case", severity: "Medium", wantErr: false},
+		{name: "empty is left alone", severity: "", wantErr: false},
+		{name: "typo rejected", severity: "CRTICAL", wantErr: true}, //nolint:misspell // intentional typo fixture
+		{name: "unknown word rejected", severity: "urgent", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateSeverity(tt.severity); (err != nil) != tt.wantErr {
+				t.Errorf("validateSeverity(%q) err = %v, wantErr %v", tt.severity, err, tt.wantErr)
 			}
 		})
 	}
@@ -178,6 +267,101 @@ func TestLoaderLoadAll(t *testing.T) {
 	}
 	if _, ok := Get("bad-mod"); ok {
 		t.Error("bad-mod should not have registered")
+	}
+}
+
+// TestLoaderLoadDirSkipsUnreadableEntry proves one entry the walk cannot read
+// (a directory with its permissions stripped) does not abort the rest of the
+// walk: a module sorted after it must still load. filepath.Walk aborts
+// entirely on the first non-nil error a walkFn returns, and loadDir used to
+// just pass that error straight through.
+func TestLoaderLoadDirSkipsUnreadableEntry(t *testing.T) {
+	Clear()
+	t.Cleanup(Clear)
+
+	if os.Getuid() == 0 {
+		t.Skip("running as root: unreadable-permission trick does not apply")
+	}
+
+	dir := t.TempDir()
+	unreadable := filepath.Join(dir, "a-unreadable")
+	if err := os.Mkdir(unreadable, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeModule(t, unreadable, "inner.yaml", "id: inner-mod\ntype: http\nhttp:\n  paths: [\"/\"]\n")
+	if err := os.Chmod(unreadable, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(unreadable, 0o755) })
+
+	// "zlast" sorts after "a-unreadable" so the walk must reach it only if it
+	// presses on past the unreadable directory instead of aborting there.
+	writeModule(t, dir, "zlast.yaml", "id: zlast-mod\ntype: http\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")
+
+	l := &Loader{builtinDir: dir, userDir: filepath.Join(dir, "nonexistent-user")}
+	if err := l.LoadAll(); err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+
+	if _, ok := Get("zlast-mod"); !ok {
+		t.Error("zlast-mod not registered: an unreadable entry earlier in the walk dropped it")
+	}
+}
+
+// TestLoaderMergesEmbeddedAndDiskByID confirms embedded and on-disk builtins
+// merge by module id, rather than the disk set winning outright whenever
+// anything on disk loads: every embedded-only id must still register, and a
+// disk module sharing an embedded id must override just that one entry.
+func TestLoaderMergesEmbeddedAndDiskByID(t *testing.T) {
+	Clear()
+	t.Cleanup(Clear)
+
+	embedded := fstest.MapFS{
+		"shared.yaml": &fstest.MapFile{Data: []byte("id: shared\ntype: http\ninfo:\n  description: embedded\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")},
+		"solo-a.yaml": &fstest.MapFile{Data: []byte("id: solo-a\ntype: http\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")},
+		"solo-b.yaml": &fstest.MapFile{Data: []byte("id: solo-b\ntype: http\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")},
+	}
+
+	dir := t.TempDir()
+	writeModule(t, dir, "shared.yaml", "id: shared\ntype: http\ninfo:\n  description: disk\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: status\n      status: [200]\n")
+
+	l := &Loader{builtinDir: dir, userDir: filepath.Join(dir, "nonexistent-user"), embedded: embedded}
+	if err := l.LoadAll(); err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+
+	for _, id := range []string{"shared", "solo-a", "solo-b"} {
+		if _, ok := Get(id); !ok {
+			t.Errorf("%s not registered; embedded modules must survive a disk override elsewhere", id)
+		}
+	}
+
+	shared, ok := Get("shared")
+	if !ok {
+		t.Fatal("shared not registered")
+	}
+	if got := shared.Info().Description; got != "disk" {
+		t.Errorf("shared module description = %q, want %q (disk should override the embedded copy)", got, "disk")
+	}
+}
+
+// TestNewLoaderPrefersTrustedBuiltinOverCWD confirms that once an embedded
+// builtin set exists, NewLoader does not fall back to trusting a bare
+// "modules" directory relative to the current working directory: a release
+// binary run from an unrelated directory that happens to contain a modules/
+// folder must not have it silently treated as a builtin source.
+func TestNewLoaderPrefersTrustedBuiltinOverCWD(t *testing.T) {
+	origFS := builtinFS
+	t.Cleanup(func() { builtinFS = origFS })
+
+	SetBuiltinFS(fstest.MapFS{"x.yaml": &fstest.MapFile{Data: []byte("id: x\ntype: http\nhttp:\n  paths: [\"/\"]\n")}})
+
+	l, err := NewLoader()
+	if err != nil {
+		t.Fatalf("NewLoader: %v", err)
+	}
+	if l.BuiltinDir() == "modules" {
+		t.Error("BuiltinDir() fell back to the bare CWD-relative \"modules\" path while an embedded builtin set was available")
 	}
 }
 
@@ -322,5 +506,76 @@ func TestResolveBuiltinDirFindsPackagedModules(t *testing.T) {
 
 	if got := resolveBuiltinDir(); got != pkg {
 		t.Errorf("resolveBuiltinDir = %q, want packaged %q", got, pkg)
+	}
+}
+
+// TestShippedModulesLoadClean parses every module shipped in the repo-root
+// modules/ tree so a new load-time guard is checked against real modules, not
+// just fixtures: it must reject genuinely bad modules without rejecting any
+// of these.
+func TestShippedModulesLoadClean(t *testing.T) {
+	files, err := filepath.Glob("../../modules/*/*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) == 0 {
+		t.Fatal("no shipped modules found; check the glob against modules/")
+	}
+	for _, f := range files {
+		if _, err := ParseYAMLModule(f); err != nil {
+			t.Errorf("%s: %v", f, err)
+		}
+	}
+}
+
+// TestBuiltinDirCandidatesCwdTrust pins both halves of the working-directory
+// rule: a sif checkout keeps the bare "modules" candidate, so editing modules/
+// and re-running the binary still works, while any other directory loses it
+// once an embedded set exists. Getting this wrong is silent either way - a
+// dropped candidate makes on-disk edits invisible, an extra one makes a
+// stranger's modules/ dir a trusted builtin source.
+func TestBuiltinDirCandidatesCwdTrust(t *testing.T) {
+	hasCwd := func(candidates []string) bool {
+		for _, c := range candidates {
+			if c == "modules" {
+				return true
+			}
+		}
+		return false
+	}
+
+	prev := builtinFS
+	t.Cleanup(func() { builtinFS = prev })
+	builtinFS = fstest.MapFS{}
+
+	t.Chdir(t.TempDir())
+	if hasCwd(builtinDirCandidates()) {
+		t.Error("a non-checkout working directory must not offer the bare modules candidate")
+	}
+
+	checkout := t.TempDir()
+	if err := os.WriteFile(filepath.Join(checkout, "go.mod"), []byte("module "+sifModulePath+"\n\ngo 1.25\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(checkout)
+	if !hasCwd(builtinDirCandidates()) {
+		t.Error("a sif checkout must keep the bare modules candidate so on-disk edits are seen")
+	}
+
+	other := t.TempDir()
+	if err := os.WriteFile(filepath.Join(other, "go.mod"), []byte("module example.com/other\n\ngo 1.25\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(other)
+	if hasCwd(builtinDirCandidates()) {
+		t.Error("another project's checkout must not offer the bare modules candidate")
+	}
+
+	// with no embedded set there is nothing to fall back on, so cwd is offered
+	// regardless of where the binary is run from.
+	builtinFS = nil
+	t.Chdir(t.TempDir())
+	if !hasCwd(builtinDirCandidates()) {
+		t.Error("without an embedded set the bare modules candidate must remain")
 	}
 }

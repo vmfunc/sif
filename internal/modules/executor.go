@@ -642,6 +642,24 @@ func checkRegex(content string, patterns []string, condition string) bool {
 	return true
 }
 
+// validateExtractors rejects a regex extractor whose pattern fails to
+// compile, at load rather than at match time: runExtractors (and its dns/tcp
+// counterparts) compile lazily and skip a bad pattern, which would otherwise
+// leave the extractor silently and permanently empty.
+func validateExtractors(extractors []Extractor) error {
+	for i := range extractors {
+		if extractors[i].Type != "regex" {
+			continue
+		}
+		for _, pattern := range extractors[i].Regex {
+			if _, err := regexp.Compile(pattern); err != nil {
+				return fmt.Errorf("regex extractor pattern %q: %w", pattern, err)
+			}
+		}
+	}
+	return nil
+}
+
 // runExtractors extracts data from the response.
 func runExtractors(extractors []Extractor, resp *http.Response, body string) map[string]string {
 	if len(extractors) == 0 {
