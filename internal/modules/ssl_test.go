@@ -383,6 +383,27 @@ ssl:
 	}
 }
 
+// TestParseYAMLModuleBytes_SSLInvalidConfig confirms validateSSL runs from the
+// parser, not only when called directly: a bad ssl block must fail load rather
+// than surface at handshake time.
+func TestParseYAMLModuleBytes_SSLInvalidConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  string
+	}{
+		{"port out of range", "id: bad-port\ntype: ssl\nssl:\n  port: 70000\n  matchers:\n    - type: word\n      words: [x]\n"},
+		{"unsupported matcher type", "id: bad-matcher\ntype: ssl\nssl:\n  port: 443\n  matchers:\n    - type: status\n      status: [200]\n"},
+		{"status range source", "id: bad-range\ntype: ssl\nssl:\n  port: 443\n  matchers:\n    - type: range\n      source: status\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := ParseYAMLModuleBytes([]byte(tt.doc)); err == nil {
+				t.Fatalf("expected a parse error for %s", tt.name)
+			}
+		})
+	}
+}
+
 func TestParseYAMLModuleBytes_SSLMissingBlock(t *testing.T) {
 	data := []byte(`
 id: bad-ssl
