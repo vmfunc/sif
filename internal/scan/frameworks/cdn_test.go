@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -113,4 +114,39 @@ func TestCDNSignatureWouldOutrankFramework(t *testing.T) {
 	if cfScore <= nextScore {
 		t.Fatalf("expected the single-signature CDN score (%.3f) to exceed the diluted framework score (%.3f), the setup that motivated RegisterCDN as a separate pool", cfScore, nextScore)
 	}
+}
+
+// TestDetectCDNTieBreakIsDeterministic locks the ordering rule: GetCDNDetectors
+// returns a map, so two detectors scoring identically would otherwise report a
+// different winner run to run.
+func TestDetectCDNTieBreakIsDeterministic(t *testing.T) {
+	const marker = "sif-tie-break-marker"
+	frameworks.RegisterCDN(tiedDetector{name: "zz-sif-test-cdn", marker: marker})
+	frameworks.RegisterCDN(tiedDetector{name: "aa-sif-test-cdn", marker: marker})
+
+	for i := 0; i < 50; i++ {
+		got := frameworks.DetectCDN("<html>"+marker+"</html>", http.Header{})
+		if got == nil {
+			t.Fatal("expected a tied detector to be reported")
+		}
+		if got.Name != "aa-sif-test-cdn" {
+			t.Fatalf("tie resolved to %q, want the lexicographically first name", got.Name)
+		}
+	}
+}
+
+// tiedDetector scores a fixed 0.9 on its marker, so two of them tie exactly.
+type tiedDetector struct {
+	name   string
+	marker string
+}
+
+func (d tiedDetector) Name() string                       { return d.name }
+func (d tiedDetector) Signatures() []frameworks.Signature { return nil }
+
+func (d tiedDetector) Detect(body string, _ http.Header) (float32, string) {
+	if strings.Contains(body, d.marker) {
+		return 0.9, ""
+	}
+	return 0, ""
 }
