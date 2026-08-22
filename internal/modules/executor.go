@@ -56,12 +56,23 @@ func NewFuzzBudget(maxRequests int) *FuzzBudget {
 }
 
 // Reserve claims one request against the budget and reports whether it fit.
-// Safe for concurrent use; a nil receiver always reports true.
+// Safe for concurrent use; a nil receiver always reports true. A rejected
+// reservation must not consume budget: an unconditional Add would leave sent
+// above max, once per producer that hit the ceiling, and the counter would no
+// longer reflect the number of requests actually issued.
 func (b *FuzzBudget) Reserve() bool {
 	if b == nil {
 		return true
 	}
-	return b.sent.Add(1) <= b.max
+	for {
+		sent := b.sent.Load()
+		if sent >= b.max {
+			return false
+		}
+		if b.sent.CompareAndSwap(sent, sent+1) {
+			return true
+		}
+	}
 }
 
 // warnOnce logs the exhaustion line exactly once no matter how many

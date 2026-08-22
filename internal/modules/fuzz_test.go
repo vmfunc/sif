@@ -562,3 +562,24 @@ func TestNewFuzzBudgetUnlimited(t *testing.T) {
 		t.Error("budget of 2 allowed a third reservation")
 	}
 }
+
+// TestFuzzBudgetRejectedReserveDoesNotConsume pins that a Reserve past the
+// ceiling leaves the counter alone. An unconditional increment overshoots by
+// one per producer that hit the cap, so a later grant would be denied against
+// a count that was never sent.
+func TestFuzzBudgetRejectedReserveDoesNotConsume(t *testing.T) {
+	b := NewFuzzBudget(2)
+	for i := 0; i < 2; i++ {
+		if !b.Reserve() {
+			t.Fatalf("reserve %d denied within budget", i)
+		}
+	}
+	for i := 0; i < 5; i++ {
+		if b.Reserve() {
+			t.Fatalf("reserve past budget granted")
+		}
+	}
+	if got := b.sent.Load(); got != 2 {
+		t.Errorf("sent = %d, want 2 (denied reservations must not consume budget)", got)
+	}
+}
