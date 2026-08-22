@@ -317,3 +317,39 @@ func TestExecuteHTTPModuleCancelMidStream(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+func TestPayloadSetsUnmarshalRejectsBadShapes(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{"scalar payloads", "payloads: \"admin\"\n"},
+		{"named set is a mapping", "payloads:\n  user:\n    a: b\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := yaml.Unmarshal([]byte(tt.src), &HTTPConfig{}); err == nil {
+				t.Errorf("%s accepted; want a shape error", tt.name)
+			}
+		})
+	}
+}
+
+func TestStreamRequestsEmptySetYieldsNothing(t *testing.T) {
+	// an empty set makes the clusterbomb product empty; the generator must send
+	// nothing rather than substitute a blank value into every request.
+	cfg := &HTTPConfig{
+		Paths: []string{"{{BaseURL}}/x?u={{user}}&p={{pass}}"},
+		Payloads: PayloadSets{Sets: []PayloadSet{
+			{Name: "user", Values: []string{"a", "b"}},
+			{Name: "pass", Values: nil},
+		}},
+	}
+	got, err := generateHTTPRequests("http://t", cfg)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("empty payload set produced %d requests (%v), want none", len(got), reqURLs(got))
+	}
+}
