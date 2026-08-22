@@ -13,6 +13,7 @@
 package scan
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -36,11 +37,6 @@ type FaviconResult struct {
 	Tech       string `json:"tech"`        // matched technology, empty when unknown
 	ShodanQ    string `json:"shodan_query"`
 }
-
-// faviconBodyReadCap bounds the icon read. real favicons are tens of kilobytes;
-// a megabyte ceiling covers oversized ones without letting a hostile endpoint
-// stream forever.
-const faviconBodyReadCap = 1 << 20
 
 // faviconLinkRegex pulls the href off a <link rel="...icon..."> tag so we can
 // fall back to a declared icon when /favicon.ico is absent.
@@ -123,8 +119,10 @@ func fetchFavicon(client *http.Client, base string) (string, []byte, error) {
 	return iconURL, data, nil
 }
 
-// getFaviconBytes GETs an icon url and returns the body, erroring on a non-200 or
-// an empty body so a soft-404 html page isn't hashed as if it were an icon.
+// getFaviconBytes GETs an icon url and returns the body, erroring on a non-200,
+// an empty body, or one that doesn't look like an image. many apps answer a
+// missing icon with a 200 html "not found" page rather than a real 404, and
+// that page must not be hashed as if it were the icon.
 func getFaviconBytes(client *http.Client, iconURL string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, iconURL, http.NoBody)
 	if err != nil {
@@ -139,14 +137,55 @@ func getFaviconBytes(client *http.Client, iconURL string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("favicon status %d", resp.StatusCode)
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, faviconBodyReadCap))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpx.MaxBodySize))
 	if err != nil {
 		return nil, fmt.Errorf("read favicon: %w", err)
 	}
 	if len(data) == 0 {
 		return nil, fmt.Errorf("empty favicon body")
 	}
+	if !looksLikeImage(resp.Header.Get("Content-Type"), data) {
+		return nil, fmt.Errorf("favicon body at %s is not image content", iconURL)
+	}
 	return data, nil
+}
+
+// faviconMagic is the set of byte-signature prefixes real icon formats start
+// with, checked when the Content-Type header doesn't already say image/*.
+var faviconMagic = [][]byte{
+	{0x00, 0x00, 0x01, 0x00}, // ICO
+	{0x89, 0x50, 0x4E, 0x47}, // PNG
+	[]byte("GIF8"),           // GIF
+	{0xFF, 0xD8, 0xFF},       // JPEG
+	[]byte("RIFF"),           // WEBP (also needs "WEBP" at offset 8, checked below)
+}
+
+// looksLikeImage reports whether a response should be treated as an icon: an
+// image/* Content-Type is trusted outright, otherwise the body is sniffed
+// against known icon/image magic bytes.
+func looksLikeImage(contentType string, body []byte) bool {
+	ct := strings.ToLower(strings.TrimSpace(contentType))
+	if idx := strings.Index(ct, ";"); idx != -1 {
+		ct = ct[:idx]
+	}
+	if strings.HasPrefix(ct, "image/") {
+		return true
+	}
+
+	for _, magic := range faviconMagic {
+		if bytes.HasPrefix(body, magic) {
+			if string(magic) == "RIFF" {
+				return len(body) >= 12 && string(body[8:12]) == "WEBP"
+			}
+			return true
+		}
+	}
+
+	trimmed := bytes.TrimSpace(body)
+	if bytes.HasPrefix(trimmed, []byte("<?xml")) || bytes.HasPrefix(bytes.ToLower(trimmed), []byte("<svg")) {
+		return true
+	}
+	return false
 }
 
 // declaredFaviconHref fetches the homepage and extracts the href of the first
@@ -162,7 +201,7 @@ func declaredFaviconHref(client *http.Client, base string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, faviconBodyReadCap))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, httpx.MaxBodySize))
 	if err != nil {
 		return "", fmt.Errorf("read homepage: %w", err)
 	}
