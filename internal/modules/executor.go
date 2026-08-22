@@ -189,7 +189,9 @@ func executeHTTPChain(ctx context.Context, client *http.Client, target string, d
 			req.Header.Set("User-Agent", defaultUserAgent)
 		}
 
+		start := time.Now()
 		resp, err := client.Do(req)
+		elapsed := time.Since(start)
 		if err != nil {
 			// a transport error breaks the chain; return whatever matched earlier.
 			return result, nil
@@ -210,7 +212,14 @@ func executeHTTPChain(ctx context.Context, client *http.Client, target string, d
 		// a step with matchers gates the chain: a match records a finding, a miss
 		// means the precondition failed so the chain stops here.
 		if len(step.Matchers) > 0 {
-			if !checkMatchers(step.Matchers, step.MatchersCondition, resp, respStr) {
+			mc := &MatchContext{
+				Resp:      resp,
+				Body:      respStr,
+				URL:       url,
+				Duration:  elapsed,
+				Extracted: vars,
+			}
+			if !checkMatchers(step.Matchers, step.MatchersCondition, mc) {
 				break
 			}
 			result.Findings = append(result.Findings, Finding{
@@ -413,7 +422,9 @@ func executeHTTPRequest(ctx context.Context, client *http.Client, r *httpRequest
 		req.Header.Set("User-Agent", defaultUserAgent)
 	}
 
+	start := time.Now()
 	resp, err := client.Do(req)
+	elapsed := time.Since(start)
 	if err != nil {
 		return Finding{}, false
 	}
@@ -426,13 +437,22 @@ func executeHTTPRequest(ctx context.Context, client *http.Client, r *httpRequest
 	}
 	bodyStr := string(respBody)
 
-	// Check matchers
-	if !checkMatchers(cfg.Matchers, cfg.MatchersCondition, resp, bodyStr) {
-		return Finding{}, false
+	// extract before matching: runExtractors is side-effect-free and the finding
+	// is only built on a match, so hoisting it is behavior-preserving and lets a
+	// matcher read extractor values out of the context.
+	extracted := runExtractors(cfg.Extractors, resp, bodyStr)
+
+	mc := &MatchContext{
+		Resp:      resp,
+		Body:      bodyStr,
+		URL:       r.URL,
+		Duration:  elapsed,
+		Extracted: extracted,
 	}
 
-	// Extract data
-	extracted := runExtractors(cfg.Extractors, resp, bodyStr)
+	if !checkMatchers(cfg.Matchers, cfg.MatchersCondition, mc) {
+		return Finding{}, false
+	}
 
 	// favicon-only matches fire on binary icon bytes; report the hash, not the body.
 	evidence := truncateEvidence(bodyStr)
@@ -449,14 +469,14 @@ func executeHTTPRequest(ctx context.Context, client *http.Client, r *httpRequest
 }
 
 // checkMatchers combines matchers with condition "and" (default, all match) or "or" (any).
-func checkMatchers(matchers []Matcher, condition string, resp *http.Response, body string) bool {
+func checkMatchers(matchers []Matcher, condition string, mc *MatchContext) bool {
 	if len(matchers) == 0 {
 		return false
 	}
 
 	or := strings.EqualFold(condition, "or")
 	for i := range matchers {
-		matched := checkMatcher(&matchers[i], resp, body)
+		matched := checkMatcher(&matchers[i], mc)
 		if matchers[i].Negative {
 			matched = !matched
 		}
@@ -483,29 +503,29 @@ func validateMatchersCondition(condition string) error {
 }
 
 // checkMatcher evaluates a single matcher.
-func checkMatcher(m *Matcher, resp *http.Response, body string) bool {
+func checkMatcher(m *Matcher, mc *MatchContext) bool {
 	switch m.Type {
 	case "status":
 		for _, status := range m.Status {
-			if resp.StatusCode == status {
+			if mc.Resp.StatusCode == status {
 				return true
 			}
 		}
 		return false
 
 	case "word":
-		return checkWords(getPart(m.Part, resp, body), m.Words, m.Condition, m.CaseInsensitive)
+		return checkWords(getPart(m.Part, mc.Resp, mc.Body), m.Words, m.Condition, m.CaseInsensitive)
 
 	case "regex":
-		return checkRegex(getPart(m.Part, resp, body), m.Regex, m.Condition)
+		return checkRegex(getPart(m.Part, mc.Resp, mc.Body), m.Regex, m.Condition)
 
 	case "favicon":
-		return checkFaviconHash(body, m.Hash)
+		return checkFaviconHash(mc.Body, m.Hash)
 
 	case "size":
 		// size matches the response body length against any listed value.
 		for _, n := range m.Size {
-			if len(body) == n {
+			if len(mc.Body) == n {
 				return true
 			}
 		}
@@ -514,9 +534,9 @@ func checkMatcher(m *Matcher, resp *http.Response, body string) bool {
 	case "range":
 		switch strings.ToLower(m.Source) {
 		case "status":
-			return inRange(resp.StatusCode, m.Min, m.Max)
+			return inRange(mc.Resp.StatusCode, m.Min, m.Max)
 		case "size", "":
-			return inRange(len(body), m.Min, m.Max)
+			return inRange(len(mc.Body), m.Min, m.Max)
 		default:
 			return false
 		}

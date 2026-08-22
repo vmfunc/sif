@@ -51,7 +51,7 @@ func TestCheckMatcherRange(t *testing.T) {
 	t.Run("status source in range", func(t *testing.T) {
 		resp := fakeResponse(t, 503, nil)
 		m := &Matcher{Type: "range", Source: "status", Min: intp(500), Max: intp(599)}
-		if !checkMatcher(m, resp, "") {
+		if !checkMatcher(m, &MatchContext{Resp: resp}) {
 			t.Error("expected 503 to be within 500-599")
 		}
 	})
@@ -59,7 +59,7 @@ func TestCheckMatcherRange(t *testing.T) {
 	t.Run("status source out of range", func(t *testing.T) {
 		resp := fakeResponse(t, 200, nil)
 		m := &Matcher{Type: "range", Source: "status", Min: intp(500), Max: intp(599)}
-		if checkMatcher(m, resp, "") {
+		if checkMatcher(m, &MatchContext{Resp: resp}) {
 			t.Error("expected 200 to be outside 500-599")
 		}
 	})
@@ -67,7 +67,7 @@ func TestCheckMatcherRange(t *testing.T) {
 	t.Run("size source default", func(t *testing.T) {
 		resp := fakeResponse(t, 200, nil)
 		m := &Matcher{Type: "range", Min: intp(5), Max: intp(20)}
-		if !checkMatcher(m, resp, "twelve chars") {
+		if !checkMatcher(m, &MatchContext{Resp: resp, Body: "twelve chars"}) {
 			t.Error("expected body length within bounds to match")
 		}
 	})
@@ -75,7 +75,7 @@ func TestCheckMatcherRange(t *testing.T) {
 	t.Run("size source explicit", func(t *testing.T) {
 		resp := fakeResponse(t, 200, nil)
 		m := &Matcher{Type: "range", Source: "size", Min: intp(1000)}
-		if checkMatcher(m, resp, "short") {
+		if checkMatcher(m, &MatchContext{Resp: resp, Body: "short"}) {
 			t.Error("expected short body to miss a high min bound")
 		}
 	})

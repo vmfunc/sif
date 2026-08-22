@@ -109,6 +109,19 @@ type Matcher struct {
 	CaseInsensitive bool `yaml:"case-insensitive,omitempty"`
 }
 
+// MatchContext carries everything a matcher can evaluate against one response,
+// so a new matcher type can read a field the classic ones ignore without
+// changing the signature of the whole engine again.
+type MatchContext struct {
+	Resp     *http.Response
+	Body     string
+	URL      string
+	Duration time.Duration
+	// Extracted is the running variable set in a request chain, so it also
+	// carries earlier steps' values.
+	Extracted map[string]string
+}
+
 // Extractor defines data extraction from responses.
 // Extractors pull specific data from matched responses for reporting.
 type Extractor struct {
