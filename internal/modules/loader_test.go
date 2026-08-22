@@ -136,6 +136,20 @@ func TestParseYAMLModuleErrors(t *testing.T) {
 			name:    "tcp type with no tcp section",
 			content: "id: no-tcp-section\ntype: tcp\n",
 		},
+		{
+			// a chained step's matchers go through the same validation as the
+			// single-request ones; an unknown type there must not load.
+			name:    "chained step unknown matcher type",
+			content: "id: bad-step-matcher\ntype: http\nhttp:\n  requests:\n    - path: \"/\"\n      matchers:\n        - type: stauts\n          status: [200]\n",
+		},
+		{
+			name:    "chained step uncompilable extractor",
+			content: "id: bad-step-extractor\ntype: http\nhttp:\n  requests:\n    - path: \"/\"\n      extractors:\n        - type: regex\n          name: token\n          regex: [\"(unclosed\"]\n",
+		},
+		{
+			name:    "top-level uncompilable extractor",
+			content: "id: bad-http-extractor\ntype: http\nhttp:\n  paths: [\"/\"]\n  extractors:\n    - type: regex\n      name: token\n      regex: [\"(unclosed\"]\n",
+		},
 	}
 
 	for _, tt := range tests {
