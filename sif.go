@@ -761,10 +761,11 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 			// -proxy/-H/-cookie/-rate-limit apply to module scans the same as every
 			// other scanner instead of each module dialing out on a bare client.
 			opts := modules.Options{
-				Timeout: app.settings.Timeout,
-				Threads: app.settings.Threads,
-				LogDir:  app.settings.LogDir,
-				Client:  httpx.Client(app.settings.Timeout),
+				Timeout:         app.settings.Timeout,
+				Threads:         app.settings.Threads,
+				LogDir:          app.settings.LogDir,
+				Client:          httpx.Client(app.settings.Timeout),
+				FuzzMaxRequests: app.settings.FuzzMaxRequests,
 			}
 
 			for _, m := range toRun {

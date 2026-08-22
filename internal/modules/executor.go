@@ -18,13 +18,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/tidwall/gjson"
 	"github.com/vmfunc/sif/internal/httpx"
 )
@@ -89,10 +92,20 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 		return executeHTTPChain(ctx, client, target, def)
 	}
 
-	// Generate requests based on paths and payloads
-	requests, err := generateHTTPRequests(target, cfg)
+	// Resolve paths and payload sets up front (the only failing steps); the
+	// product itself is streamed and never materialized.
+	paths, err := resolvePaths(cfg)
 	if err != nil {
 		return nil, err
+	}
+	sets, err := resolveSets(cfg)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range sets {
+		if len(s.Values) == 0 {
+			log.Warnf("fuzz: module %s has empty payload set %q on %s; no requests sent", def.ID, s.Name, target)
+		}
 	}
 
 	// Determine thread count
@@ -104,43 +117,62 @@ func ExecuteHTTPModule(ctx context.Context, target string, def *YAMLModule, opts
 		threads = 10
 	}
 
-	// Execute requests concurrently
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	resultsChan := make(chan Finding, len(requests))
+	reqCh := make(chan *httpRequest)
+	resultCh := make(chan Finding)
 
-	// Limit concurrency
-	sem := make(chan struct{}, threads)
-
-	for _, req := range requests {
-		select {
-		case <-ctx.Done():
-			return result, ctx.Err()
-		case sem <- struct{}{}:
-		}
-
-		wg.Add(1)
-		go func(r *httpRequest) {
-			defer wg.Done()
-			defer func() { <-sem }()
-
-			finding, ok := executeHTTPRequest(ctx, client, r, cfg, def.Info.Severity)
-			if ok {
-				resultsChan <- finding
-			}
-		}(req)
-	}
-
-	// Collect results
+	// Producer: stream combinations into reqCh, stopping at the request budget
+	// (0 = unlimited) and logging a single truncation line. Watches ctx so a
+	// cancelled run stops pulling promptly.
 	go func() {
-		wg.Wait()
-		close(resultsChan)
+		defer close(reqCh)
+		var sent int
+		budget := opts.FuzzMaxRequests
+		for req := range streamRequests(target, cfg, paths, sets) {
+			if ctx.Err() != nil {
+				return
+			}
+			if budget > 0 && sent >= budget {
+				log.Warnf("fuzz: module %s hit the %d-request budget on %s (further combinations skipped)", def.ID, budget, target)
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case reqCh <- req:
+				sent++
+			}
+		}
 	}()
 
-	for finding := range resultsChan {
-		mu.Lock()
+	// Workers: a fixed pool pulling from reqCh; matches flow to resultCh.
+	var wg sync.WaitGroup
+	wg.Add(threads)
+	for i := 0; i < threads; i++ {
+		go func() {
+			defer wg.Done()
+			for r := range reqCh {
+				if ctx.Err() != nil {
+					return
+				}
+				if finding, ok := executeHTTPRequest(ctx, client, r, cfg, def.Info.Severity); ok {
+					select {
+					case <-ctx.Done():
+						return
+					case resultCh <- finding:
+					}
+				}
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	// Collector: single consumer owns result.Findings, so no mutex is needed.
+	for finding := range resultCh {
 		result.Findings = append(result.Findings, finding)
-		mu.Unlock()
 	}
 
 	return result, nil
@@ -247,58 +279,178 @@ func snapshotVars(vars map[string]string) map[string]string {
 	return out
 }
 
-// generateHTTPRequests creates all requests based on paths and payloads.
+// generateHTTPRequests materializes every fuzz request. The streaming path in
+// ExecuteHTTPModule does not call this; it remains for tests and any caller that
+// wants the full slice. It errors only where path resolution can fail.
 func generateHTTPRequests(target string, cfg *HTTPConfig) ([]*httpRequest, error) {
-	var requests []*httpRequest
-
 	paths, err := resolvePaths(cfg)
 	if err != nil {
 		return nil, err
 	}
+	sets, err := resolveSets(cfg)
+	if err != nil {
+		return nil, err
+	}
+	var requests []*httpRequest
+	for req := range streamRequests(target, cfg, paths, sets) {
+		requests = append(requests, req)
+	}
+	return requests, nil
+}
 
-	// Ensure target has no trailing slash
-	target = strings.TrimSuffix(target, "/")
+// resolveSets loads any file-backed payload sets into inline values, returning
+// the sets ready for streaming. It is the only place set resolution can fail.
+func resolveSets(cfg *HTTPConfig) ([]PayloadSet, error) {
+	sets := cfg.Payloads.Sets
+	out := make([]PayloadSet, len(sets))
+	for i, s := range sets {
+		if s.File == "" {
+			out[i] = s
+			continue
+		}
+		vals, err := loadWordlist(s.File)
+		if err != nil {
+			return nil, fmt.Errorf("payloads[%s]: %w", s.Name, err)
+		}
+		out[i] = PayloadSet{Name: s.Name, Values: vals}
+	}
+	return out, nil
+}
 
+// streamRequests lazily yields one *httpRequest per fuzz combination, so at
+// most one combination exists at a time. clusterbomb crosses paths against
+// every set as a nested odometer, rightmost fastest; pitchfork zips them by
+// index and stops at the shortest.
+func streamRequests(target string, cfg *HTTPConfig, paths []string, sets []PayloadSet) iter.Seq[*httpRequest] {
 	method := cfg.Method
 	if method == "" {
 		method = "GET"
 	}
+	target = strings.TrimSuffix(target, "/")
 
-	// If no payloads, just use paths directly
-	if len(cfg.Payloads) == 0 {
+	return func(yield func(*httpRequest) bool) {
+		if len(sets) == 0 {
+			for _, path := range paths {
+				if !yield(newFuzzRequest(method, target, path, nil, cfg)) {
+					return
+				}
+			}
+			return
+		}
+
+		if strings.EqualFold(cfg.Attack, "pitchfork") {
+			n := pitchforkLen(paths, sets)
+			for i := 0; i < n; i++ {
+				vars := make(map[string]string, len(sets))
+				for _, s := range sets {
+					vars[s.Name] = s.Values[i]
+				}
+				if !yield(newFuzzRequest(method, target, paths[i], vars, cfg)) {
+					return
+				}
+			}
+			return
+		}
+
+		// clusterbomb: an empty set makes the product empty.
+		for _, s := range sets {
+			if len(s.Values) == 0 {
+				return
+			}
+		}
+		idx := make([]int, len(sets))
 		for _, path := range paths {
-			url := substituteVariables(path, target, "")
-			requests = append(requests, &httpRequest{
-				Method:   method,
-				URL:      url,
-				Headers:  cfg.Headers,
-				Body:     cfg.Body,
-				Original: path,
-			})
-		}
-		return requests, nil
-	}
-
-	// pitchfork pairs path[i] with payload[i] and stops at the shorter list;
-	// clusterbomb (default) crosses every path with every payload.
-	if strings.EqualFold(cfg.Attack, "pitchfork") {
-		n := len(paths)
-		if len(cfg.Payloads) < n {
-			n = len(cfg.Payloads)
-		}
-		for i := 0; i < n; i++ {
-			requests = append(requests, newPayloadRequest(method, target, paths[i], cfg.Payloads[i], cfg))
-		}
-		return requests, nil
-	}
-
-	for _, path := range paths {
-		for _, payload := range cfg.Payloads {
-			requests = append(requests, newPayloadRequest(method, target, path, payload, cfg))
+			for {
+				vars := make(map[string]string, len(sets))
+				for k, s := range sets {
+					vars[s.Name] = s.Values[idx[k]]
+				}
+				if !yield(newFuzzRequest(method, target, path, vars, cfg)) {
+					return
+				}
+				if !advance(idx, sets) {
+					break
+				}
+			}
+			for k := range idx {
+				idx[k] = 0
+			}
 		}
 	}
+}
 
-	return requests, nil
+// advance increments the odometer over set value indices, rightmost fastest,
+// and reports whether a next combination exists.
+func advance(idx []int, sets []PayloadSet) bool {
+	for k := len(idx) - 1; k >= 0; k-- {
+		idx[k]++
+		if idx[k] < len(sets[k].Values) {
+			return true
+		}
+		idx[k] = 0
+	}
+	return false
+}
+
+// pitchforkLen is the shortest of the path list and every set, the number of
+// index-paired combinations pitchfork emits.
+func pitchforkLen(paths []string, sets []PayloadSet) int {
+	n := len(paths)
+	for _, s := range sets {
+		if len(s.Values) < n {
+			n = len(s.Values)
+		}
+	}
+	return n
+}
+
+// newFuzzRequest builds one request for a combination. It substitutes
+// {{BaseURL}}, the legacy {{payload}}/{{Payload}} builtin, and every {{name}} in
+// vars into the url, body and each header value. Headers are copied only when a
+// substitution could apply, preserving the shared cfg.Headers map otherwise.
+func newFuzzRequest(method, target, path string, vars map[string]string, cfg *HTTPConfig) *httpRequest {
+	pv := vars["payload"] // drives {{payload}}/{{Payload}}; "" when no such set
+	sub := func(s string) string { return substituteVariablesWithVars(s, target, pv, vars) }
+
+	headers := cfg.Headers
+	if len(cfg.Headers) > 0 {
+		headers = make(map[string]string, len(cfg.Headers))
+		for k, v := range cfg.Headers {
+			headers[k] = sub(v)
+		}
+	}
+	return &httpRequest{
+		Method:   method,
+		URL:      sub(path),
+		Headers:  headers,
+		Body:     sub(cfg.Body),
+		Payload:  payloadLabel(vars),
+		Original: path,
+	}
+}
+
+// payloadLabel renders a combination for the httpRequest.Payload debug field:
+// the lone value for a single set (the legacy shape), else name=value pairs in
+// name order joined by "&". The field is metadata only; findings key off URL.
+func payloadLabel(vars map[string]string) string {
+	switch len(vars) {
+	case 0:
+		return ""
+	case 1:
+		for _, v := range vars {
+			return v
+		}
+	}
+	keys := make([]string, 0, len(vars))
+	for k := range vars {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = k + "=" + vars[k]
+	}
+	return strings.Join(parts, "&")
 }
 
 // resolvePaths expands a wordlist over any {{word}} path templates so one
@@ -352,19 +504,6 @@ func loadWordlist(path string) ([]string, error) {
 	}
 
 	return words, nil
-}
-
-// newPayloadRequest builds one request with the path and body templates
-// substituted for the given payload.
-func newPayloadRequest(method, target, path, payload string, cfg *HTTPConfig) *httpRequest {
-	return &httpRequest{
-		Method:   method,
-		URL:      substituteVariables(path, target, payload),
-		Headers:  cfg.Headers,
-		Body:     substituteVariables(cfg.Body, target, payload),
-		Payload:  payload,
-		Original: path,
-	}
 }
 
 // validateAttack rejects an attack mode that is not "", "clusterbomb", or
@@ -540,6 +679,9 @@ func checkMatcher(m *Matcher, mc *MatchContext) bool {
 		default:
 			return false
 		}
+
+	case "dsl":
+		return evalDSL(m, mc)
 
 	default:
 		return false
