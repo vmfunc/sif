@@ -564,30 +564,34 @@ func inRange(v int, lo, hi *int) bool {
 func getPart(part string, resp *http.Response, body string) string {
 	switch part {
 	case "header", "headers":
-		var sb strings.Builder
-		for k, v := range resp.Header {
-			sb.WriteString(k)
-			sb.WriteString(": ")
-			sb.WriteString(strings.Join(v, ", "))
-			sb.WriteString("\n")
-		}
-		return sb.String()
+		return headersOf(resp)
 	case "body":
 		return body
 	case "all", "":
 		var sb strings.Builder
-		for k, v := range resp.Header {
-			sb.WriteString(k)
-			sb.WriteString(": ")
-			sb.WriteString(strings.Join(v, ", "))
-			sb.WriteString("\n")
-		}
+		sb.WriteString(headersOf(resp))
 		sb.WriteString("\n")
 		sb.WriteString(body)
 		return sb.String()
 	default:
 		return body
 	}
+}
+
+// headersOf tolerates a nil resp (a matcher may run without one) rather than
+// dereferencing it.
+func headersOf(resp *http.Response) string {
+	if resp == nil {
+		return ""
+	}
+	var sb strings.Builder
+	for k, v := range resp.Header {
+		sb.WriteString(k)
+		sb.WriteString(": ")
+		sb.WriteString(strings.Join(v, ", "))
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 // checkWords checks if any/all words are found.
