@@ -1,0 +1,37 @@
+id: jellyfin-version-exposure
+info:
+  name: Jellyfin Version Exposure
+  author: sif
+  severity: medium
+  description: Detects a Jellyfin media server that discloses its version over the unauthenticated public system info endpoint
+  tags: [jellyfin, media, streaming, fingerprint, version, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/System/Info/Public"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"ProductName\":\"Jellyfin Server\""
+
+    - type: word
+      part: body
+      words:
+        - "\"Version\""
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: jellyfin_version
+      part: body
+      regex:
+        - '"Version"\s*:\s*"([^"]+)"'
+      group: 1
