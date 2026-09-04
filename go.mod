@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/log v1.0.0
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/likexian/whois v1.15.7
-	github.com/projectdiscovery/goflags v0.1.76
+	github.com/projectdiscovery/goflags v0.2.0
 	github.com/projectdiscovery/nuclei/v3 v3.11.0
 	github.com/projectdiscovery/retryabledns v1.0.115
 	github.com/projectdiscovery/utils v0.11.1
