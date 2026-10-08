@@ -11,7 +11,7 @@ require (
 	github.com/likexian/whois v1.15.7
 	github.com/projectdiscovery/goflags v0.1.76
 	github.com/projectdiscovery/nuclei/v3 v3.11.0
-	github.com/projectdiscovery/retryabledns v1.0.115
+	github.com/projectdiscovery/retryabledns v1.0.116
 	github.com/projectdiscovery/utils v0.11.1
 	github.com/rocketlaunchr/google-search v1.1.6
 	github.com/tidwall/gjson v1.19.0
@@ -269,7 +269,7 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/praetorian-inc/fingerprintx v1.1.15 // indirect
 	github.com/projectdiscovery/asnmap v1.1.1 // indirect
-	github.com/projectdiscovery/blackrock v0.0.1 // indirect
+	github.com/projectdiscovery/blackrock v0.0.2 // indirect
 	github.com/projectdiscovery/cdncheck v1.2.42 // indirect
 	github.com/projectdiscovery/clistats v0.1.4 // indirect
 	github.com/projectdiscovery/dsl v0.8.20 // indirect
