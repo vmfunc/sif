@@ -207,6 +207,12 @@ func TestValidateMatchers(t *testing.T) {
 		{name: "regex with nil patterns rejected", matchers: []Matcher{{Type: "regex", Regex: nil}}, wantErr: true},
 		{name: "regex with only empty pattern rejected", matchers: []Matcher{{Type: "regex", Regex: []string{""}}}, wantErr: true},
 		{name: "regex with one real pattern allowed", matchers: []Matcher{{Type: "regex", Regex: []string{"real"}}}, wantErr: false},
+		{name: "valid dsl allowed", matchers: []Matcher{{Type: "dsl", DSL: []string{"status_code == 200"}}}, wantErr: false},
+		{name: "bad dsl syntax rejected", matchers: []Matcher{{Type: "dsl", DSL: []string{"status_code =="}}}, wantErr: true},
+		{name: "one bad dsl among good rejected", matchers: []Matcher{{Type: "dsl", DSL: []string{"status_code == 200", "((("}}}, wantErr: true},
+		{name: "non-allowlisted dsl helper rejected", matchers: []Matcher{{Type: "dsl", DSL: []string{"wait_for(1)"}}}, wantErr: true},
+		{name: "empty dsl rejected", matchers: []Matcher{{Type: "dsl"}}, wantErr: true},
+		{name: "only-empty dsl expression rejected", matchers: []Matcher{{Type: "dsl", DSL: []string{""}}}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

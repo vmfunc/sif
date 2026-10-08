@@ -59,7 +59,7 @@ func TestGenerateHTTPRequestsAttack(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &HTTPConfig{Paths: tt.paths, Payloads: tt.payloads, Attack: tt.attack}
+			cfg := &HTTPConfig{Paths: tt.paths, Payloads: legacyPayloads(tt.payloads), Attack: tt.attack}
 			reqs, err := generateHTTPRequests(target, cfg)
 			if err != nil {
 				t.Fatalf("generateHTTPRequests: %v", err)
@@ -127,7 +127,7 @@ func TestExecuteHTTPModulePitchfork(t *testing.T) {
 		HTTP: &HTTPConfig{
 			Attack:   "pitchfork",
 			Paths:    []string{"{{BaseURL}}/a?x={{payload}}", "{{BaseURL}}/b?x={{payload}}"},
-			Payloads: []string{"1", "2"},
+			Payloads: legacyPayloads([]string{"1", "2"}),
 			Matchers: []Matcher{{Type: "word", Part: "body", Words: []string{"ok"}}},
 		},
 	}

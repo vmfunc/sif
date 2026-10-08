@@ -85,6 +85,7 @@ type Settings struct {
 	Cookie            string
 	RateLimit         int
 	MaxRetries        int    // -max-retries: retries on 429/503 (0 = off)
+	FuzzMaxRequests   int    // -fuzz-max-requests: cap per fuzzing module per target (0 = unlimited)
 	Notify            bool   // -notify: ship findings to configured providers
 	NotifySeverity    string // -notify-severity: minimum severity to send (info..critical)
 	NotifyConfig      string // -notify-config: path to a notify-compatible yaml file
@@ -194,6 +195,7 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 		flagSet.StringVar(&settings.Cookie, "cookie", "", "Cookie header to send with every request"),
 		flagSet.IntVar(&settings.RateLimit, "rate-limit", 0, "Max requests per second (0 = unlimited)"),
 		flagSet.IntVar(&settings.MaxRetries, "max-retries", 2, "Retries on 429/503 with Retry-After backoff (0 = off)"),
+		flagSet.IntVar(&settings.FuzzMaxRequests, "fuzz-max-requests", 25000, "Max requests a single fuzzing module may send per target (0 = unlimited)"),
 	)
 
 	flagSet.CreateGroup("output", "Output",

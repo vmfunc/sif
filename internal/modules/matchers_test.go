@@ -250,6 +250,22 @@ func TestCheckRegex(t *testing.T) {
 	}
 }
 
+// a dsl matcher is compiled at load, so an uncompilable expression must fail the
+// whole module rather than silently never matching at scan time.
+func TestParseYAMLModuleDSLMatcher(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) string { return writeModule(t, dir, name, body) }
+
+	badDSL := write("bad-matcher-dsl.yaml", "id: bmd\ntype: http\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: dsl\n      dsl: [\"status_code ==\"]\n")
+	if _, err := ParseYAMLModule(badDSL); err == nil {
+		t.Fatal("uncompilable dsl matcher expression accepted")
+	}
+	goodDSL := write("good-matcher-dsl.yaml", "id: gmd\ntype: http\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: dsl\n      dsl: [\"status_code == 200\"]\n")
+	if _, err := ParseYAMLModule(goodDSL); err != nil {
+		t.Fatalf("valid dsl matcher rejected: %v", err)
+	}
+}
+
 func TestGetPart(t *testing.T) {
 	header := http.Header{"Server": []string{"nginx"}}
 	resp := fakeResponse(t, 200, header)
@@ -447,7 +463,7 @@ func TestGenerateHTTPRequests(t *testing.T) {
 		cfg := &HTTPConfig{
 			Method:   "POST",
 			Paths:    []string{"{{BaseURL}}/q?x={{payload}}"},
-			Payloads: []string{"1", "2", "3"},
+			Payloads: legacyPayloads([]string{"1", "2", "3"}),
 			Body:     "data={{payload}}",
 		}
 		got, err := generateHTTPRequests("http://h", cfg)
@@ -476,7 +492,7 @@ func TestGenerateHTTPRequests(t *testing.T) {
 	t.Run("multiple paths times multiple payloads", func(t *testing.T) {
 		cfg := &HTTPConfig{
 			Paths:    []string{"{{BaseURL}}/a", "{{BaseURL}}/b"},
-			Payloads: []string{"x", "y"},
+			Payloads: legacyPayloads([]string{"x", "y"}),
 		}
 		got, err := generateHTTPRequests("http://h", cfg)
 		if err != nil {
@@ -521,7 +537,7 @@ func TestGenerateHTTPRequests(t *testing.T) {
 		cfg := &HTTPConfig{
 			Paths:    []string{"{{BaseURL}}/{{word}}?q={{payload}}"},
 			Wordlist: list,
-			Payloads: []string{"1", "2", "3"},
+			Payloads: legacyPayloads([]string{"1", "2", "3"}),
 		}
 		got, err := generateHTTPRequests("http://h", cfg)
 		if err != nil {

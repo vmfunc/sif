@@ -116,6 +116,42 @@ http:
 
 each payload creates a separate request for each path.
 
+payloads can also be **named sets**, one per fuzzing position, which lets a
+single module vary more than one place in the request at once. write a mapping
+instead of a list, and reference each set by its name:
+
+```yaml
+http:
+  paths:
+    - "{{BaseURL}}/?user={{user}}&role={{role}}"
+
+  payloads:
+    user:
+      - "admin"
+      - "root"
+    role:
+      - "1"
+      - "2"
+```
+
+set order is the order you declare them, which is what `attack` pairs on. a
+plain list is still accepted and desugars to one set named `payload`, so
+`{{payload}}` keeps working unchanged.
+
+a set whose value is a single string is read from that file, one payload per
+line, so a large wordlist does not have to live inside the module:
+
+```yaml
+  payloads:
+    user: "/usr/share/sif/wordlists/users.txt"
+```
+
+requests are generated lazily, one combination at a time, so a module crossing
+several large sets does not build the whole product in memory first.
+`-fuzz-max-requests` (default 25000, 0 for unlimited) caps how many requests one
+fuzzing module may send per target, so a combinatorial blowup stops itself
+instead of running until the scan is killed.
+
 #### attack
 
 how paths and payloads combine into requests.
@@ -311,6 +347,48 @@ both 32-bit forms are accepted, so values from shodan or any favicon-hash tool
 drop in without conversion. pair it with a `status: 200` matcher so an error
 page served for `/favicon.ico` is not hashed. a finding fires when the body
 hashes to any listed value.
+### dsl matcher
+
+evaluate one or more boolean expressions against the response. the syntax and
+variable names are nuclei's, so an expression written for a nuclei template
+pastes in unchanged.
+
+```yaml
+matchers:
+  - type: dsl
+    dsl:
+      - "status_code == 200 && contains(body, 'admin')"
+      - "content_length > 1024"
+```
+
+the variables bound for every expression:
+
+| variable | type | value |
+|----------|------|-------|
+| `status_code` | int | response status code |
+| `body` | string | response body, after the 5 MB cap |
+| `content_length` | int | length of `body` in bytes |
+| `header` / `all_headers` | string | the response headers, one `Name: value` per line |
+| `duration` | float | round-trip time in seconds |
+| `host` | string | `host[:port]` of the request url |
+
+named extractor values are bound too, so an expression can test something an
+extractor pulled out of the same response; in a request chain it also sees the
+variables earlier steps extracted. an extractor whose name collides with a
+builtin shadows it, matching nuclei's mutation order.
+
+helper functions are an allowlist, not a blocklist: string inspection and
+transforms, `regex`/`regex_all`/`regex_any`, base64/hex/url/html encode and
+decode, `md5`/`sha1`/`sha256`/`mmh3`, and numeric conversion. anything else
+fails at load, so a dependency bump cannot quietly introduce a helper that reads
+files, makes its own requests, or allocates without bound. expressions are also
+capped at 4096 bytes.
+
+expressions are compiled and checked when the module loads, so a typo fails the
+module up front instead of silently never matching. at match time an expression
+that errors or yields a non-boolean counts as a miss. multiple expressions
+combine with AND by default, or with `condition: or`.
+
 ### combining matchers
 
 multiple matchers are combined with AND logic by default.
