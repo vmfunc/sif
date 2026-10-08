@@ -57,16 +57,89 @@ type HTTPConfig struct {
 	Method            string            `yaml:"method"`
 	Paths             []string          `yaml:"paths"`
 	Wordlist          string            `yaml:"wordlist,omitempty"`
-	Payloads          []string          `yaml:"payloads,omitempty"`
+	Payloads          PayloadSets       `yaml:"payloads,omitempty"`
 	Headers           map[string]string `yaml:"headers,omitempty"`
 	Body              string            `yaml:"body,omitempty"`
-	Attack            string            `yaml:"attack,omitempty"` // clusterbomb (default), pitchfork
+	Attack            string            `yaml:"attack,omitempty"` // clusterbomb (default), pitchfork, batteringram
 	Threads           int               `yaml:"threads,omitempty"`
 	DisableRedirects  bool              `yaml:"disable-redirects,omitempty"` // stop at the first response; don't follow 3xx
 	Matchers          []Matcher         `yaml:"matchers"`
 	MatchersCondition string            `yaml:"matchers-condition,omitempty"` // and (default), or
 	Extractors        []Extractor       `yaml:"extractors,omitempty"`
 	Requests          []HTTPStep        `yaml:"requests,omitempty"` // ordered request chain; see HTTPStep
+}
+
+// PayloadSet is one named fuzzing position. Values holds the inline list; when
+// the YAML value was a scalar string, File holds that path and Values stays nil
+// until resolved at execution time.
+type PayloadSet struct {
+	Name   string
+	Values []string
+	File   string
+}
+
+// PayloadSets is the parsed `payloads:` field: an ordered list of named sets.
+// A YAML sequence desugars to one set named "payload" (so {{payload}} keeps
+// working); a YAML mapping becomes one set per key in declaration order.
+type PayloadSets struct {
+	Sets []PayloadSet
+}
+
+// UnmarshalYAML accepts the two payloads shapes. A sequence is the legacy single
+// anonymous list. A mapping is named sets, order-preserved via the raw node
+// (a Go map would scramble order, which clusterbomb/pitchfork depend on). A
+// key whose value is a scalar is a file-backed set; a sequence value is inline.
+func (p *PayloadSets) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.SequenceNode:
+		var vals []string
+		if err := value.Decode(&vals); err != nil {
+			return fmt.Errorf("payloads: %w", err)
+		}
+		if len(vals) > 0 {
+			p.Sets = []PayloadSet{{Name: "payload", Values: vals}}
+		}
+	case yaml.MappingNode:
+		sets := make([]PayloadSet, 0, len(value.Content)/2)
+		for i := 0; i+1 < len(value.Content); i += 2 {
+			name := value.Content[i].Value
+			v := value.Content[i+1]
+			set := PayloadSet{Name: name}
+			switch v.Kind {
+			case yaml.ScalarNode:
+				set.File = v.Value
+			case yaml.SequenceNode:
+				if err := v.Decode(&set.Values); err != nil {
+					return fmt.Errorf("payloads[%s]: %w", name, err)
+				}
+			default:
+				return fmt.Errorf("payloads[%s]: want a list or a file path", name)
+			}
+			sets = append(sets, set)
+		}
+		p.Sets = sets
+	default:
+		return fmt.Errorf("payloads: want a list or a map of named lists")
+	}
+	return p.validate()
+}
+
+// validate rejects ambiguous or reserved set names. A file-backed set (File
+// non-empty) parses cleanly here; resolveSets is where a missing or unreadable
+// wordlist actually fails.
+func (p PayloadSets) validate() error {
+	seen := make(map[string]struct{}, len(p.Sets))
+	for _, s := range p.Sets {
+		switch s.Name {
+		case "BaseURL", "baseurl":
+			return fmt.Errorf("payloads: set name %q collides with the base-url builtin", s.Name)
+		}
+		if _, dup := seen[s.Name]; dup {
+			return fmt.Errorf("payloads: duplicate set name %q", s.Name)
+		}
+		seen[s.Name] = struct{}{}
+	}
+	return nil
 }
 
 // HTTPStep is one request in a chain. steps run in order and share a variable

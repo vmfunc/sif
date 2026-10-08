@@ -59,7 +59,7 @@ func TestGenerateHTTPRequestsAttack(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &HTTPConfig{Paths: tt.paths, Payloads: tt.payloads, Attack: tt.attack}
+			cfg := &HTTPConfig{Paths: tt.paths, Payloads: legacyPayloads(tt.payloads), Attack: tt.attack}
 			reqs, err := generateHTTPRequests(target, cfg)
 			if err != nil {
 				t.Fatalf("generateHTTPRequests: %v", err)
@@ -75,12 +75,12 @@ func TestGenerateHTTPRequestsAttack(t *testing.T) {
 }
 
 func TestValidateAttack(t *testing.T) {
-	for _, ok := range []string{"", "clusterbomb", "pitchfork", "Pitchfork", "CLUSTERBOMB"} {
+	for _, ok := range []string{"", "clusterbomb", "pitchfork", "Pitchfork", "CLUSTERBOMB", "batteringram", "BatteringRam"} {
 		if err := validateAttack(ok); err != nil {
 			t.Errorf("validateAttack(%q) = %v, want nil", ok, err)
 		}
 	}
-	for _, bad := range []string{"sniper", "batteringram", "bogus"} {
+	for _, bad := range []string{"sniper", "bogus"} {
 		if err := validateAttack(bad); err == nil {
 			t.Errorf("validateAttack(%q) = nil, want error", bad)
 		}
@@ -127,7 +127,7 @@ func TestExecuteHTTPModulePitchfork(t *testing.T) {
 		HTTP: &HTTPConfig{
 			Attack:   "pitchfork",
 			Paths:    []string{"{{BaseURL}}/a?x={{payload}}", "{{BaseURL}}/b?x={{payload}}"},
-			Payloads: []string{"1", "2"},
+			Payloads: legacyPayloads([]string{"1", "2"}),
 			Matchers: []Matcher{{Type: "word", Part: "body", Words: []string{"ok"}}},
 		},
 	}

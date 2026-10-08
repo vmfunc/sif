@@ -21,75 +21,77 @@ import (
 )
 
 type Settings struct {
-	Dirlist           string
-	DirMatchCodes     string // -mc dirlist: status codes to keep
-	DirFilterCodes    string // -fc dirlist: status codes to drop
-	DirFilterSizes    string // -fs dirlist: body sizes to drop
-	DirFilterWords    string // -fw dirlist: word counts to drop
-	DirFilterRegex    string // -fr dirlist: regex; body match drops response
-	Calibrate         bool   // -ac auto-calibrate the soft-404 baseline (dirlist, sql)
-	DirWordlist       string // -w  dirlist: custom wordlist (file path or url)
-	DirExtensions     string // -e  dirlist: extensions appended to each word
-	Dnslist           string
-	Resolvers         string // -resolvers dnslist: comma list overriding the bundled pool
-	Debug             bool
-	LogDir            string
-	NoScan            bool
-	Ports             string
-	Dorking           bool
-	Git               bool
-	Whois             bool
-	Threads           int
-	Concurrency       int
-	Nuclei            bool
-	JavaScript        bool
-	Timeout           time.Duration
-	URLs              goflags.StringSlice
-	File              string
-	ApiMode           bool
-	Template          string
-	CMS               bool
-	Headers           bool
-	SecurityHeaders   bool
-	CloudStorage      bool
-	SubdomainTakeover bool
-	Shodan            bool
-	SecurityTrails    bool
-	SQL               bool
-	LFI               bool
-	JWT               bool
-	OpenAPI           bool
-	Favicon           bool
-	CORS              bool
-	Redirect          bool
-	XSS               bool
-	Framework         bool
-	Crawl             bool
-	CrawlDepth        int
-	TLSCert           bool
-	TLSCertPort       int
-	Passive           bool
-	Probe             bool
-	SARIF             string // path to write a sarif 2.1.0 report to ("" = off)
-	Markdown          string // path to write a markdown report to ("" = off)
-	JSONReport        string // path to write a json findings report to ("" = off)
-	Silent            bool   // route chrome to stderr, print one finding per line to stdout
-	Diff              bool   // surface only findings added/removed vs the last snapshot
-	Store             string // snapshot dir for diff mode ("" = default state dir)
-	Modules           string // Comma-separated list of module IDs to run
-	ModuleTags        string // Run modules matching these tags
-	AllModules        bool   // Run all loaded modules
-	ListModules       bool   // List available modules and exit
-	Proxy             string
-	Header            goflags.StringSlice // custom request headers ("Key: Value")
-	Cookie            string
-	RateLimit         int
-	MaxRetries        int    // -max-retries: retries on 429/503 (0 = off)
-	Notify            bool   // -notify: ship findings to configured providers
-	NotifySeverity    string // -notify-severity: minimum severity to send (info..critical)
-	NotifyConfig      string // -notify-config: path to a notify-compatible yaml file
-	ConfigFile        string // -config: path to a yaml config file ("" = default ~/.config/sif/config.yaml)
-	Profile           string // -profile: named profile overlay from the config file
+	Dirlist               string
+	DirMatchCodes         string // -mc dirlist: status codes to keep
+	DirFilterCodes        string // -fc dirlist: status codes to drop
+	DirFilterSizes        string // -fs dirlist: body sizes to drop
+	DirFilterWords        string // -fw dirlist: word counts to drop
+	DirFilterRegex        string // -fr dirlist: regex; body match drops response
+	Calibrate             bool   // -ac auto-calibrate the soft-404 baseline (dirlist, sql)
+	DirWordlist           string // -w  dirlist: custom wordlist (file path or url)
+	DirExtensions         string // -e  dirlist: extensions appended to each word
+	Dnslist               string
+	Resolvers             string // -resolvers dnslist: comma list overriding the bundled pool
+	Debug                 bool
+	LogDir                string
+	NoScan                bool
+	Ports                 string
+	Dorking               bool
+	Git                   bool
+	Whois                 bool
+	Threads               int
+	Concurrency           int
+	Nuclei                bool
+	JavaScript            bool
+	Timeout               time.Duration
+	URLs                  goflags.StringSlice
+	File                  string
+	ApiMode               bool
+	Template              string
+	CMS                   bool
+	Headers               bool
+	SecurityHeaders       bool
+	CloudStorage          bool
+	SubdomainTakeover     bool
+	Shodan                bool
+	SecurityTrails        bool
+	SQL                   bool
+	LFI                   bool
+	JWT                   bool
+	OpenAPI               bool
+	Favicon               bool
+	CORS                  bool
+	Redirect              bool
+	XSS                   bool
+	Framework             bool
+	Crawl                 bool
+	CrawlDepth            int
+	TLSCert               bool
+	TLSCertPort           int
+	Passive               bool
+	Probe                 bool
+	SARIF                 string // path to write a sarif 2.1.0 report to ("" = off)
+	Markdown              string // path to write a markdown report to ("" = off)
+	JSONReport            string // path to write a json findings report to ("" = off)
+	Silent                bool   // route chrome to stderr, print one finding per line to stdout
+	Diff                  bool   // surface only findings added/removed vs the last snapshot
+	Store                 string // snapshot dir for diff mode ("" = default state dir)
+	Modules               string // Comma-separated list of module IDs to run
+	ModuleTags            string // Run modules matching these tags
+	AllModules            bool   // Run all loaded modules
+	ListModules           bool   // List available modules and exit
+	Proxy                 string
+	Header                goflags.StringSlice // custom request headers ("Key: Value")
+	Cookie                string
+	RateLimit             int
+	MaxRetries            int    // -max-retries: retries on 429/503 (0 = off)
+	FuzzMaxRequests       int    // -fuzz-max-requests: cap per fuzzing module per target (0 = unlimited)
+	FuzzGlobalMaxRequests int    // -fuzz-global-max-requests: scan-wide cap shared by every fuzzing module (0 = unlimited)
+	Notify                bool   // -notify: ship findings to configured providers
+	NotifySeverity        string // -notify-severity: minimum severity to send (info..critical)
+	NotifyConfig          string // -notify-config: path to a notify-compatible yaml file
+	ConfigFile            string // -config: path to a yaml config file ("" = default ~/.config/sif/config.yaml)
+	Profile               string // -profile: named profile overlay from the config file
 }
 
 // minThreads is the floor for the worker count. Threads feeds wg.Add across the
@@ -194,6 +196,8 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 		flagSet.StringVar(&settings.Cookie, "cookie", "", "Cookie header to send with every request"),
 		flagSet.IntVar(&settings.RateLimit, "rate-limit", 0, "Max requests per second (0 = unlimited)"),
 		flagSet.IntVar(&settings.MaxRetries, "max-retries", 2, "Retries on 429/503 with Retry-After backoff (0 = off)"),
+		flagSet.IntVar(&settings.FuzzMaxRequests, "fuzz-max-requests", 25000, "Max requests a single fuzzing module may send per target (0 = unlimited)"),
+		flagSet.IntVar(&settings.FuzzGlobalMaxRequests, "fuzz-global-max-requests", 100000, "Max total fuzz requests across every module and target in the scan (0 = unlimited)"),
 	)
 
 	flagSet.CreateGroup("output", "Output",
