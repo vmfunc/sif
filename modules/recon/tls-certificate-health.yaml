@@ -1,0 +1,36 @@
+# TLS Certificate Health Module
+
+id: tls-certificate-health
+info:
+  name: TLS Certificate Health
+  author: sif
+  severity: medium
+  description: Flags an expired certificate or a legacy TLS version (1.0/1.1) negotiated on the target's TLS port, either of which leaves the connection exposed to known protocol weaknesses or a lapsed trust chain
+  tags: [ssl, tls, certificate, exposure, recon]
+
+type: ssl
+
+ssl:
+  port: 443
+
+  matchers:
+    - type: dsl
+      dsl:
+        - 'expired || tls_version == "TLS 1.0" || tls_version == "TLS 1.1"'
+
+  extractors:
+    - type: regex
+      name: cn
+      regex:
+        - "cn: (\\S+)"
+      group: 1
+    - type: regex
+      name: not_after
+      regex:
+        - "not_after: (\\S+)"
+      group: 1
+    - type: regex
+      name: tls_version
+      regex:
+        - "tls_version: (.+)"
+      group: 1

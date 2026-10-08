@@ -28,6 +28,7 @@ const (
 	TypeHTTP        ModuleType = "http"
 	TypeDNS         ModuleType = "dns"
 	TypeTCP         ModuleType = "tcp"
+	TypeSSL         ModuleType = "ssl"
 	TypeScript      ModuleType = "script"
 	TypeFingerprint ModuleType = "fingerprint"
 )
@@ -107,16 +108,24 @@ type Matcher struct {
 	Max *int `yaml:"max,omitempty"`
 	// CaseInsensitive folds word matching to lower-case when set (word matcher only).
 	CaseInsensitive bool `yaml:"case-insensitive,omitempty"`
+
+	// DSL holds one or more boolean expressions evaluated against the response
+	// (dsl matchers only). Compiled and validated at module load.
+	DSL []string `yaml:"dsl,omitempty"`
 }
 
 // MatchContext carries everything a matcher can evaluate against one response,
 // so a new matcher type can read a field the classic ones ignore without
-// changing the signature of the whole engine again.
+// changing the signature of the whole engine again. Resp is nil for a non-http
+// module such as ssl, which getPart and dslVars handle rather than dereferencing.
 type MatchContext struct {
 	Resp     *http.Response
 	Body     string
 	URL      string
 	Duration time.Duration
+	// Extra holds typed builtins a non-http module contributes, such as an ssl
+	// module's expired/self_signed bools.
+	Extra map[string]interface{}
 	// Extracted is the running variable set in a request chain, so it also
 	// carries earlier steps' values.
 	Extracted map[string]string

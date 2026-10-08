@@ -40,6 +40,7 @@ type YAMLModule struct {
 	HTTP        *HTTPConfig        `yaml:"http,omitempty"`
 	DNS         *DNSConfig         `yaml:"dns,omitempty"`
 	TCP         *TCPConfig         `yaml:"tcp,omitempty"`
+	SSL         *SSLConfig         `yaml:"ssl,omitempty"`
 	Fingerprint *FingerprintConfig `yaml:"fingerprint,omitempty"`
 }
 
@@ -103,6 +104,16 @@ type TCPConfig struct {
 	Extractors        []Extractor `yaml:"extractors,omitempty"`
 }
 
+// SSLConfig dials port for a tls handshake only; it never sends or reads
+// application data.
+type SSLConfig struct {
+	Port              int         `yaml:"port"`
+	ServerName        string      `yaml:"servername,omitempty"` // SNI override; defaults to the target host
+	Matchers          []Matcher   `yaml:"matchers"`
+	MatchersCondition string      `yaml:"matchers-condition,omitempty"` // and (default), or
+	Extractors        []Extractor `yaml:"extractors,omitempty"`
+}
+
 // ParseYAMLModule parses a YAML file into a module definition
 func ParseYAMLModule(path string) (*YAMLModule, error) {
 	data, err := os.ReadFile(path)
@@ -126,6 +137,10 @@ func ParseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 
 	if ym.Type == "" {
 		return nil, fmt.Errorf("module missing required field: type")
+	}
+
+	if ym.Type == TypeSSL && ym.SSL == nil {
+		return nil, fmt.Errorf("module %q: type %q requires an ssl configuration block", ym.ID, ym.Type)
 	}
 
 	if ym.HTTP != nil {
@@ -153,6 +168,11 @@ func ParseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
 		}
 	}
+	if ym.SSL != nil {
+		if err := validateSSL(ym.SSL); err != nil {
+			return nil, fmt.Errorf("module %q: %w", ym.ID, err)
+		}
+	}
 	var matchers []Matcher
 	switch {
 	case ym.HTTP != nil:
@@ -161,6 +181,8 @@ func ParseYAMLModuleBytes(data []byte) (*YAMLModule, error) {
 		matchers = ym.DNS.Matchers
 	case ym.TCP != nil:
 		matchers = ym.TCP.Matchers
+	case ym.SSL != nil:
+		matchers = ym.SSL.Matchers
 	}
 	if err := validateMatchers(matchers); err != nil {
 		return nil, fmt.Errorf("module %q: %w", ym.ID, err)
@@ -221,6 +243,11 @@ func (m *yamlModuleWrapper) Execute(ctx context.Context, target string, opts Opt
 			return nil, fmt.Errorf("TCP module missing tcp configuration")
 		}
 		return ExecuteTCPModule(ctx, target, m.def, opts)
+	case TypeSSL:
+		if m.def.SSL == nil {
+			return nil, fmt.Errorf("SSL module missing ssl configuration")
+		}
+		return ExecuteSSLModule(ctx, target, m.def, opts)
 	case TypeFingerprint:
 		if m.def.Fingerprint == nil {
 			return nil, fmt.Errorf("fingerprint module missing fingerprint configuration")
