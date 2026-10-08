@@ -13,8 +13,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif"
@@ -45,11 +48,20 @@ func main() {
 		}
 	}
 
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// run wires up the app and executes it, kept separate from main so its deferred
+// signal cleanup actually fires (main's log.Fatal calls os.Exit, which would
+// skip a defer placed there).
+func run() error {
 	settings := config.Parse()
 
 	app, err := sif.New(settings)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// patchnotes print to stdout; skip them in api/silent mode so the only thing
@@ -58,8 +70,11 @@ func main() {
 		patchnotes.ShowOnce(version)
 	}
 
-	err = app.Run()
-	if err != nil {
-		log.Fatal(err)
-	}
+	// cancel the run on the first interrupt so a ctrl-c stops between scan steps
+	// instead of only killing the process mid-write. a second interrupt still
+	// hard-kills, since NotifyContext stops trapping once fired.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	return app.Run(ctx)
 }

@@ -13,6 +13,7 @@
 package sif
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -55,7 +56,7 @@ func TestScanTargetIsolatesPerTargetState(t *testing.T) {
 
 	app := headersOnlyApp()
 
-	tsA, err := app.scanTarget(srvA.URL, "", false)
+	tsA, err := app.scanTarget(context.Background(), srvA.URL, "", false)
 	if err != nil {
 		t.Fatalf("scanTarget(A): %v", err)
 	}
@@ -63,7 +64,7 @@ func TestScanTargetIsolatesPerTargetState(t *testing.T) {
 		t.Fatalf("target A scansRun = %v, want exactly [HTTP Headers]", tsA.scansRun)
 	}
 
-	tsB, err := app.scanTarget(srvB.URL, "", false)
+	tsB, err := app.scanTarget(context.Background(), srvB.URL, "", false)
 	if err != nil {
 		t.Fatalf("scanTarget(B): %v", err)
 	}
