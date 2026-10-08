@@ -107,6 +107,10 @@ type Matcher struct {
 	Max *int `yaml:"max,omitempty"`
 	// CaseInsensitive folds word matching to lower-case when set (word matcher only).
 	CaseInsensitive bool `yaml:"case-insensitive,omitempty"`
+
+	// DSL holds one or more boolean expressions evaluated against the response
+	// (dsl matchers only). Compiled and validated at module load.
+	DSL []string `yaml:"dsl,omitempty"`
 }
 
 // MatchContext carries everything a matcher can evaluate against one response,
