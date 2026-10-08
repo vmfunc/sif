@@ -250,6 +250,22 @@ func TestCheckRegex(t *testing.T) {
 	}
 }
 
+// a dsl matcher is compiled at load, so an uncompilable expression must fail the
+// whole module rather than silently never matching at scan time.
+func TestParseYAMLModuleDSLMatcher(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) string { return writeModule(t, dir, name, body) }
+
+	badDSL := write("bad-matcher-dsl.yaml", "id: bmd\ntype: http\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: dsl\n      dsl: [\"status_code ==\"]\n")
+	if _, err := ParseYAMLModule(badDSL); err == nil {
+		t.Fatal("uncompilable dsl matcher expression accepted")
+	}
+	goodDSL := write("good-matcher-dsl.yaml", "id: gmd\ntype: http\nhttp:\n  paths: [\"/\"]\n  matchers:\n    - type: dsl\n      dsl: [\"status_code == 200\"]\n")
+	if _, err := ParseYAMLModule(goodDSL); err != nil {
+		t.Fatalf("valid dsl matcher rejected: %v", err)
+	}
+}
+
 func TestGetPart(t *testing.T) {
 	header := http.Header{"Server": []string{"nginx"}}
 	resp := fakeResponse(t, 200, header)
