@@ -3,7 +3,7 @@ module github.com/vmfunc/sif
 go 1.26.0
 
 require (
-	github.com/antchfx/htmlquery v1.3.6
+	github.com/antchfx/htmlquery v1.3.7
 	github.com/charmbracelet/glamour v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/charmbracelet/log v1.0.0
@@ -57,7 +57,7 @@ require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/andygrunwald/go-jira v1.16.1 // indirect
 	github.com/antchfx/xmlquery v1.5.0 // indirect
-	github.com/antchfx/xpath v1.3.6 // indirect
+	github.com/antchfx/xpath v1.3.9 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.5 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.8 // indirect
