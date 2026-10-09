@@ -33,6 +33,11 @@ type Signature struct {
 	// Header, when set, scopes a HeaderOnly match to the named header's value
 	// (canonical form, e.g. "X-Powered-By"). Empty matches across all headers.
 	Header string
+	// Presence, with Header set, matches on the header existing at all rather
+	// than on its value. an edge marker like CF-Ray carries an opaque id, so
+	// there is no value to match; what identifies the provider is that the
+	// header was stamped. Pattern is unused.
+	Presence bool
 }
 
 // Detector is the interface for framework detection plugins.
@@ -111,9 +116,12 @@ func (b BaseDetector) MatchSignatures(body string, headers http.Header) float32 
 
 		if sig.HeaderOnly {
 			var matched bool
-			if sig.Header != "" {
+			switch {
+			case sig.Presence:
+				matched = len(headers.Values(sig.Header)) > 0
+			case sig.Header != "":
 				matched = headerValueContains(headers, sig.Header, sig.Pattern)
-			} else {
+			default:
 				matched = containsHeader(headers, sig.Pattern)
 			}
 			if matched {
