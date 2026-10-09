@@ -186,6 +186,12 @@ func newYAMLModuleWrapper(def *YAMLModule, path string) *yamlModuleWrapper {
 	return &yamlModuleWrapper{def: def, path: path}
 }
 
+// definition returns the wrapped YAMLModule so same-package callers (the
+// fingerprint bridge) can reach fields the Module interface does not expose.
+func (m *yamlModuleWrapper) definition() *YAMLModule {
+	return m.def
+}
+
 // Info returns the module metadata
 func (m *yamlModuleWrapper) Info() Info {
 	return Info{
