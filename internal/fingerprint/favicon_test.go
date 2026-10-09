@@ -48,12 +48,12 @@ func TestFaviconHashGolden(t *testing.T) {
 	}
 }
 
-// TestLookupFaviconTech proves the SSOT table is the single place all ten
+// TestLookupFaviconTech proves the SSOT table is the single place all twelve
 // facts are resolved: every entry round-trips, an unknown hash misses, and the
 // count is pinned so an accidental addition/removal is caught.
 func TestLookupFaviconTech(t *testing.T) {
-	if len(faviconTech) != 10 {
-		t.Fatalf("faviconTech has %d entries, want 10", len(faviconTech))
+	if len(faviconTech) != 12 {
+		t.Fatalf("faviconTech has %d entries, want 12", len(faviconTech))
 	}
 	for hash, want := range faviconTech {
 		got, ok := LookupFaviconTech(hash)
@@ -99,5 +99,20 @@ func TestFaviconBase64Chunking(t *testing.T) {
 	}
 	if !strings.HasSuffix(got, "\n") {
 		t.Errorf("encoding must end in a trailing newline, got %q", got)
+	}
+}
+
+// a tech that reskinned its default icon needs one entry per generation, so
+// pin that every known gitea icon resolves rather than just the newest.
+func TestGiteaFaviconGenerationsAllResolve(t *testing.T) {
+	for _, hash := range []int32{-754147112, -1668137428, -1893514588} {
+		tech, ok := LookupFaviconTech(hash)
+		if !ok {
+			t.Errorf("gitea favicon %d is absent from the table", hash)
+			continue
+		}
+		if tech != "Gitea" {
+			t.Errorf("LookupFaviconTech(%d) = %q, want Gitea", hash, tech)
+		}
 	}
 }
