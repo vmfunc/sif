@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -302,8 +303,9 @@ func TestDrainCloseNil(t *testing.T) {
 }
 
 // countConns wraps a test server with a ConnState hook that tallies how many
-// distinct tcp conns the server saw. distinct conns == failed reuse.
-func countConns(t *testing.T) (*httptest.Server, func() int) {
+// distinct tcp conns the server saw. distinct conns == failed reuse. every
+// response serves body with an explicit Content-Length.
+func countConns(t *testing.T, body string) (*httptest.Server, func() int) {
 	t.Helper()
 
 	var (
@@ -312,7 +314,8 @@ func countConns(t *testing.T) (*httptest.Server, func() int) {
 	)
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// always write a body so reuse depends on the caller draining it.
-		io.WriteString(w, "ok")
+		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		io.WriteString(w, body)
 	}))
 	srv.Config.ConnState = func(c net.Conn, state http.ConnState) {
 		if state != http.StateNew {
@@ -343,7 +346,7 @@ func TestTransportReusesConnections(t *testing.T) {
 		t.Fatalf("Configure: %v", err)
 	}
 
-	srv, distinct := countConns(t)
+	srv, distinct := countConns(t, "ok")
 
 	// fire N sequential requests through the tuned client, draining each body so
 	// the conn returns to the pool. a working pool serves all of them on one conn.
@@ -370,7 +373,13 @@ func TestTransportReusesConnections(t *testing.T) {
 }
 
 func TestBareClientDoesNotReuse(t *testing.T) {
-	srv, distinct := countConns(t)
+	// since go 1.27 the transport itself drains an early-closed body when its
+	// Content-Length is unknown or <= 256KiB (net/http maxPostCloseReadBytes),
+	// so a tiny body gets reused even without draining. a body with a known
+	// length past that cap skips the post-close drain entirely, which keeps
+	// this control deterministic on every go version. keep the size above the
+	// transport's cap if go ever raises it.
+	srv, distinct := countConns(t, strings.Repeat("x", 512<<10))
 
 	// the control: a bare DefaultTransport client whose caller closes but never
 	// drains the body. go can't reuse a half-read conn, so each request dials
