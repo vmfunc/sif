@@ -292,6 +292,15 @@ func (app *App) Run() error {
 		return nil
 	}
 
+	// interactive picker: when the user ran sif with a target but no scan flags
+	// on a real terminal, let them choose scans from a menu instead of needing
+	// to know the flag set. maybePick is a no-op when its conditions aren't met
+	// (piped, -silent, -api, -no-tui, or scans already selected). a cancelled
+	// picker exits cleanly without scanning.
+	if cancelled := app.maybePick(context.Background()); cancelled {
+		return nil
+	}
+
 	if app.settings.Debug {
 		log.SetLevel(log.DebugLevel)
 	}

@@ -4,6 +4,9 @@
 sif \- blazing-fast pentesting suite
 .SH SYNOPSIS
 .B sif
+.I url
+.br
+.B sif
 .B \-u
 .I url
 .RI [ scans ]
@@ -38,6 +41,16 @@ modules. a scheme\-less target defaults to
 or
 .B https://
 is kept; any other scheme is rejected.
+.PP
+Run as
+.B sif
+.I url
+with no scan flags on an interactive terminal and sif opens an interactive
+picker to choose scans from a grouped menu, then runs them. See
+.B \-i
+and
+.B \-no\-tui
+to force the picker on or off, and docs/tui.md for the keybindings.
 .SH TARGETS
 .TP
 .BR \-u ", " \-\-urls " \fIlist\fR"
@@ -180,6 +193,12 @@ number of concurrent workers (default 10). values below 1 are clamped to 1.
 .TP
 .BR \-\-template " \fIname\fR"
 sif runtime template to use.
+.TP
+.BR \-i ", " \-\-interactive ", " \-pick
+force the interactive scan picker, even when scan flags are set.
+.TP
+.BR \-no\-tui
+disable the interactive picker; run with the given flags only.
 .TP
 .BR \-config " \fIpath\fR"
 load flags from a yaml config file (default ~/.config/sif/config.yaml). mutually exclusive with \-\-template.

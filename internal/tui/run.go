@@ -25,6 +25,23 @@ type Config struct {
 	Targets []string
 }
 
+// Pick runs the interactive picker (screen 1) and returns the chosen selection
+// and whether the user launched the scan (false means they quit). The selection
+// is persisted on launch so the next session restores it.
+func Pick(ctx context.Context, version string, spec PickerSpec) (Selection, bool, error) {
+	m := newPickerModel(version, spec)
+	p := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen())
+	fm, err := p.Run()
+	if err != nil {
+		return Selection{}, false, err
+	}
+	pm, ok := fm.(*pickerModel)
+	if !ok {
+		return Selection{}, false, nil
+	}
+	return pm.Selection(), pm.run, nil
+}
+
 // ScanFunc runs the scan, emitting its progress onto the given sink. It must
 // honor ctx cancellation so quitting the dashboard stops the scan promptly.
 type ScanFunc func(ctx context.Context, sink event.Sink) error

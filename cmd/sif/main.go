@@ -15,6 +15,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif"
@@ -45,6 +46,14 @@ func main() {
 			return
 		case "modules", "module":
 			os.Exit(modules.RunCommand(os.Args[2:], os.Stdout, os.Stderr))
+		}
+
+		// bare `sif <url>` (a first arg that isn't a flag or subcommand) is sugar
+		// for `sif -u <url>`, so a newcomer can type just the target and land in
+		// the interactive picker. splice in -u before goflags parses.
+		if first := os.Args[1]; !strings.HasPrefix(first, "-") {
+			rest := append([]string{os.Args[0], "-u", first}, os.Args[2:]...)
+			os.Args = rest
 		}
 	}
 
