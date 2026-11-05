@@ -25,6 +25,7 @@ sif/
 ├── sif.go            # main application logic
 ├── internal/         # private packages
 │   ├── config/       # configuration parsing
+│   ├── event/        # scan event stream (sinks consume findings live)
 │   ├── logger/       # logging utilities
 │   ├── modules/      # module system
 │   ├── scan/         # built-in scans
@@ -131,6 +132,27 @@ the module system is in `internal/modules/`:
 1. add type constant to `module.go`
 2. implement executor in new file
 3. update loader to handle new extension/type
+
+## event stream
+
+a run emits a stream of typed events as it scans, defined in `internal/event`.
+`scanTarget` (in `sif.go`) emits, through `App.sink`, one `TargetStarted`, then
+per scanner a `ScannerStarted` / one `FindingFound` per normalized finding /
+`ScannerDone`, then `TargetDone`; the run ends with a single `RunDone` carrying
+a `Summary`. findings on the stream are flattened through the same
+`finding.Flatten` path the batch consumers use, so a live consumer sees exactly
+what the report/notify output reports.
+
+anything that wants to watch a run live implements `event.Sink` (a single
+`Emit(event.Event)` method) and is attached to the run's `event.Multiplexer`.
+the built-in `event.Collector` sink aggregates findings and scanner labels for
+the run summary; the live TUI is simply a second sink. the scanners themselves
+stay unaware of the stream — only `scanTarget` emits.
+
+`internal/event` lives outside `internal/scan` on purpose: `internal/finding`
+imports `internal/scan` (`finding.Flatten` type-switches on scan result types),
+so `internal/scan` cannot import `finding`. the event stream carries
+`finding.Finding` values, so it sits one level up.
 
 ## testing
 
