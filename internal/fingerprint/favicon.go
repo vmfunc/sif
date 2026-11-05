@@ -47,6 +47,14 @@ var faviconTech = map[int32]string{
 	-1462443472: "phpMyAdmin",
 	999357577:   "Cobalt Strike (default beacon)",
 	-1521704893: "Metasploit",
+	// gitea's default favicon.png changes between major lines, so a single hash
+	// misses most of the deployed population. the two below were computed with
+	// FaviconHash over the icon checked out at the tagged release (identical
+	// bytes whether served from public/img/ pre-v1.21 or public/assets/img/
+	// after): -754147112 covers v1.14 through v1.24, -1668137428 covers v1.25+.
+	// -1893514588 is the pre-existing entry for an earlier default icon.
+	-754147112:  "Gitea",
+	-1668137428: "Gitea",
 	-1893514588: "Gitea",
 }
 
