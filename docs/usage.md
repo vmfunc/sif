@@ -409,6 +409,18 @@ flags passed on the command line take precedence over the template, so `--templa
 
 `--config PATH` loads flags from a yaml config file instead of the ambient `~/.config/sif/config.yaml`. `--profile NAME` selects a named overlay from that file's `profiles` block. see [configuration](configuration.md#config-file-and-profiles) for the schema and precedence. `-config` and `-template` cannot be combined.
 
+### -i, --interactive / -pick / --no-tui
+
+control the interactive scan picker. by default, running `sif <url>` (or `-u <url>`) with no scan flags on an interactive terminal opens a menu to choose scans from; see [the tui guide](tui.md). `-i` (alias `-pick`) forces the picker open even when scan flags are set; `--no-tui` disables it so sif runs with exactly the flags given:
+
+```bash
+sif https://example.com          # opens the picker
+sif -u https://example.com -i    # force the picker even with other flags
+sif -u https://example.com -cors --no-tui   # never open it
+```
+
+the picker never opens under `-silent`, `-api`, or when stdin/stdout is piped, so pipelines are unaffected.
+
 ## http options
 
 these apply to every outbound request across all scanners (proxy, custom headers, cookie and rate limiting share one client). a scanner that sets a header explicitly still wins over the global default.

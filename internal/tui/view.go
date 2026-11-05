@@ -94,7 +94,7 @@ func (m *Model) refreshFindings() {
 		b.WriteByte('\n')
 	}
 	if len(vis) == 0 {
-		b.WriteString(output.Subheading.Render("  no findings yet"))
+		b.WriteString(styleMuted.Render("  no findings yet"))
 	}
 	m.vp.SetContent(b.String())
 	if m.follow {
@@ -112,13 +112,27 @@ func (m *Model) View() string {
 		return m.summaryView()
 	}
 	if m.expanded {
-		return m.header() + "\n" + m.expandView() + "\n" + m.footer()
+		return m.header() + "\n\n" + stylePanel.Width(m.width-2).Render(m.expandView()) + "\n" + m.footer()
 	}
-	body := lipgloss.JoinHorizontal(lipgloss.Top, m.targetPane(), " ", m.vp.View())
+	left := lipgloss.NewStyle().Width(m.leftWidth()).Render(m.targetPane())
+	right := lipgloss.NewStyle().Width(m.vp.Width).Render(
+		styleGroup.Render("FINDINGS") + "\n" + m.vp.View())
+	sep := styleFaint.Render(strings.Repeat("│\n", m.vp.Height+1))
+	body := lipgloss.JoinHorizontal(lipgloss.Top, left, " ", sep, " ", right)
 	return m.header() + "\n" + body + "\n" + m.footer()
 }
 
-// header is the top status line.
+// leftWidth is the target-pane content width.
+func (m *Model) leftWidth() int {
+	left := m.width * leftPaneFrac / 100
+	if left < minLeftWidth {
+		left = minLeftWidth
+	}
+	return left
+}
+
+// header is the top status bar: a colored strip with the product and live run
+// counters.
 func (m *Model) header() string {
 	done := 0
 	for _, t := range m.targets {
@@ -126,62 +140,74 @@ func (m *Model) header() string {
 			done++
 		}
 	}
-	title := output.Highlight.Render(fmt.Sprintf("sif %s", m.version))
+	onBar := lipgloss.NewStyle().Background(colorBarBg)
 	state := "scanning"
 	if m.done {
 		state = "done"
 	}
-	return fmt.Sprintf("%s · %d/%d targets · %d findings · %d scanners · %s",
-		title, done, len(m.targets), len(m.findings), m.scannersRun, state)
+	left := onBar.Foreground(colorText).Bold(true).Render(" sif " + m.version + " ")
+	stats := onBar.Foreground(colorText).Render(fmt.Sprintf(
+		" %d/%d targets · %d findings · %d scanners · %s ",
+		done, len(m.targets), len(m.findings), m.scannersRun, state))
+	gap := m.width - lipgloss.Width(left) - lipgloss.Width(stats)
+	if gap < 0 {
+		gap = 0
+	}
+	return left + onBar.Render(spaces(gap)) + stats
 }
 
 // targetPane renders the left target list with a running spinner or a done
-// glyph and a finding-count badge.
+// glyph and a severity-colored finding-count badge.
 func (m *Model) targetPane() string {
-	left := m.width * leftPaneFrac / 100
-	if left < minLeftWidth {
-		left = minLeftWidth
-	}
+	width := m.leftWidth()
 	var b strings.Builder
+	b.WriteString(styleGroup.Render("TARGETS") + "\n")
 	for i, t := range m.targets {
 		glyph := m.spin.View()
 		if t.done {
-			glyph = output.Status.Render("✓")
+			glyph = styleOn.Render("✓")
 		}
 		cursor := "  "
+		name := styleLabel.Render(truncate(t.url, width-10))
 		if m.focus == focusTargets && i == m.selTarget {
-			cursor = "▸ "
+			cursor = styleCursor.Render("▸ ")
+			name = styleTitle.Render(truncate(t.url, width-10))
 		}
 		badge := severityBadge(t.bySev, t.findings)
-		name := truncate(t.url, left-6)
 		b.WriteString(fmt.Sprintf("%s%s %s %s\n", cursor, glyph, name, badge))
 	}
-	return lipgloss.NewStyle().Width(left).Render(b.String())
+	return b.String()
 }
 
-// footer renders the help line plus the live filter/severity/follow state.
+// footer renders the live filter/severity/follow state plus a key-hint line.
 func (m *Model) footer() string {
-	status := []string{}
+	var state []string
 	if m.sevFloor > finding.SeverityUnknown {
-		status = append(status, "floor:"+m.sevFloor.String())
+		state = append(state, styleKey.Render("floor:")+styleTitle.Render(m.sevFloor.String()))
 	}
 	if m.follow {
-		status = append(status, "follow")
+		state = append(state, styleOn.Render("● follow"))
 	}
 	if m.onlyHits {
-		status = append(status, "hits-only")
+		state = append(state, styleKey.Render("hits-only"))
 	}
 	if m.filtering {
-		status = append(status, "filter: "+m.filter+"▏")
+		state = append(state, styleKey.Render("filter ")+styleTitle.Render(m.filter+"▏"))
 	} else if m.filter != "" {
-		status = append(status, "filter:"+m.filter)
+		state = append(state, styleMuted.Render("filter:"+m.filter))
 	}
 	if m.status != "" {
-		status = append(status, m.status)
+		state = append(state, styleMuted.Render(m.status))
 	}
-	line := m.help.View(&m.keys)
-	if len(status) > 0 {
-		line = strings.Join(status, "  ") + "\n" + line
+
+	hints := []string{
+		keyHint("j/k", "move"), keyHint("tab", "pane"), keyHint("/", "filter"),
+		keyHint("s", "sev"), keyHint("p", "follow"), keyHint("enter", "expand"),
+		keyHint("?", "help"), keyHint("q", "quit"),
+	}
+	line := strings.Join(hints, styleFaint.Render("  ·  "))
+	if len(state) > 0 {
+		line = strings.Join(state, styleFaint.Render("   ")) + "\n" + line
 	}
 	return line
 }
@@ -190,19 +216,22 @@ func (m *Model) footer() string {
 func (m *Model) expandView() string {
 	vis := m.visibleFindings()
 	if m.selFinding < 0 || m.selFinding >= len(vis) {
-		return output.Subheading.Render("no finding selected")
+		return styleMuted.Render("no finding selected")
 	}
 	f := vis[m.selFinding]
-	var b strings.Builder
-	b.WriteString(output.Subheading.Render("finding detail") + "\n\n")
-	b.WriteString("severity : " + sevRender(f.Severity, f.Severity.String()) + "\n")
-	b.WriteString("target   : " + output.Sanitize(f.Target) + "\n")
-	b.WriteString("module   : " + output.Sanitize(f.Module) + "\n")
-	b.WriteString("title    : " + output.Sanitize(f.Title) + "\n")
-	if f.Raw != "" {
-		b.WriteString("evidence : " + output.Sanitize(f.Raw) + "\n")
+	row := func(k, v string) string {
+		return styleFaint.Render(padRight(k, 10)) + v + "\n"
 	}
-	b.WriteString("\n" + output.Subheading.Render("enter to close"))
+	var b strings.Builder
+	b.WriteString(styleGroup.Render("FINDING") + "\n\n")
+	b.WriteString(row("severity", sevRender(f.Severity, f.Severity.String())))
+	b.WriteString(row("target", styleLabel.Render(output.Sanitize(f.Target))))
+	b.WriteString(row("module", styleFlag.Render(output.Sanitize(f.Module))))
+	b.WriteString(row("title", styleTitle.Render(output.Sanitize(f.Title))))
+	if f.Raw != "" {
+		b.WriteString(row("evidence", styleMuted.Render(output.Sanitize(f.Raw))))
+	}
+	b.WriteString("\n" + styleFaint.Render("enter to close"))
 	return b.String()
 }
 
@@ -210,32 +239,47 @@ func (m *Model) expandView() string {
 // does not auto-exit; the footer tells the user to quit or write a report.
 func (m *Model) summaryView() string {
 	s := m.summary
+	w := m.width
+	if w <= 0 || w > 80 {
+		w = 80
+	}
 	var b strings.Builder
-	b.WriteString(output.Highlight.Render(fmt.Sprintf("sif %s · scan complete", m.version)) + "\n\n")
-	b.WriteString(fmt.Sprintf("%d findings across %d targets\n\n", s.Findings, s.Targets))
+	onBar := lipgloss.NewStyle().Background(colorBarBg).Foreground(colorText).Bold(true)
+	b.WriteString(onBar.Width(w).Render(fmt.Sprintf(" sif %s · scan complete", m.version)) + "\n\n")
+	b.WriteString(styleTitle.Render(fmt.Sprintf("%d findings", s.Findings)) +
+		styleMuted.Render(fmt.Sprintf(" across %d targets", s.Targets)) + "\n\n")
 
 	for _, sev := range []finding.Severity{finding.SeverityCritical, finding.SeverityHigh, finding.SeverityMedium, finding.SeverityLow, finding.SeverityInfo} {
 		if n := s.BySeverity[sev.String()]; n > 0 {
-			b.WriteString("  " + sevRender(sev, fmt.Sprintf("%-9s %d", sev.String(), n)) + "\n")
+			bar := strings.Repeat("█", minInt(n, w-20))
+			b.WriteString("  " + sevRender(sev, padRight(sev.String(), 9)) + " " +
+				sevRender(sev, bar) + " " + styleMuted.Render(fmt.Sprintf("%d", n)) + "\n")
 		}
 	}
-	b.WriteString("\n" + output.Subheading.Render("scanners: "+strings.Join(s.ScansRun, ", ")) + "\n")
-	b.WriteString("\n" + output.Subheading.Render("w write report · q quit"))
+	b.WriteString("\n" + styleFaint.Render("scanners  ") + styleMuted.Render(strings.Join(s.ScansRun, ", ")) + "\n")
+	b.WriteString("\n" + keyHint("w", "write report") + styleFaint.Render("  ·  ") + keyHint("q", "quit"))
 	return b.String()
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // severityBadge renders a compact count badge colored by the highest severity
 // present for a target.
 func severityBadge(bySev map[string]int, total int) string {
 	if total == 0 {
-		return output.Subheading.Render("·")
+		return styleFaint.Render("·")
 	}
 	for _, sev := range []finding.Severity{finding.SeverityCritical, finding.SeverityHigh, finding.SeverityMedium, finding.SeverityLow} {
 		if bySev[sev.String()] > 0 {
-			return sevRender(sev, fmt.Sprintf("[%d]", total))
+			return sevRender(sev, fmt.Sprintf("%d", total))
 		}
 	}
-	return output.Subheading.Render(fmt.Sprintf("[%d]", total))
+	return styleMuted.Render(fmt.Sprintf("%d", total))
 }
 
 // sevRender colors text by severity, routing through output.Style.Render so

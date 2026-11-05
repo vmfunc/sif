@@ -13,7 +13,7 @@
 [![apt](https://img.shields.io/badge/apt-cloudsmith-2A5ADF?style=flat-square&logo=debian&logoColor=white)](https://cloudsmith.io/~sif/repos/deb/packages/)
 [![discord](https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/Yksy9J2BvE)
 
-**[install](#install) · [usage](#usage) · [modules](#modules) · [docs](docs/) · [contribute](#contribute)**
+**[install](#install) · [picker](#interactive-picker) · [usage](#usage) · [modules](#modules) · [docs](docs/) · [contribute](#contribute)**
 
 *fast, concurrent recon to exploitation in one binary. every scanner shares one connection-pooled http client.*
 
@@ -108,9 +108,26 @@ cd sif
 makepkg -si
 ```
 
+## interactive picker
+
+new to sif? just give it a target and pick what to run from a menu — no need to know the flags:
+
+```bash
+./sif https://example.com
+```
+
+with no scan flags on a terminal, sif opens an interactive picker: a grouped checklist of scans (recon, web vulns, info, intel), each showing its flag and a one-line description, with presets (`quick`, `recon`, `web`, `full`, `passive`) on `p` and a live "equivalent command" line so you can graduate to flags. your last selection is remembered.
+
+it stays out of pipelines: any scan flag present runs directly, and `-silent`/`-api`/piped stdin or stdout never open it. force it on with `-i` (or `-pick`), off with `-no-tui`. see [docs/tui.md](docs/tui.md) for the full keybindings.
+
+<!-- asciinema/gif placeholder: docs/assets/tui.gif -->
+
 ## usage
 
 ```bash
+# interactive picker: pick scans from a menu
+./sif https://example.com
+
 # basic scan
 ./sif -u https://example.com
 

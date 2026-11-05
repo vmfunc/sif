@@ -1,15 +1,64 @@
 # the sif tui
 
-sif ships an interactive terminal ui built on [bubbletea](https://github.com/charmbracelet/bubbletea). it has two screens in one program:
+sif ships an interactive terminal ui built on [bubbletea](https://github.com/charmbracelet/bubbletea):
 
-1. an interactive **picker** to choose what to scan (coming in the next release)
+1. an interactive **picker** to choose what to scan
 2. a live **dashboard** that streams findings as the scan runs, ending on a **summary**
-
-this page documents the dashboard and summary. the picker section lands with the `sif <url>` drop-into-picker flow.
 
 <!-- asciinema/gif placeholder: docs/assets/tui.gif -->
 
-## how it works
+## the picker
+
+type a target with no scan flags and sif drops you into a menu instead of making you memorize the flag set:
+
+```bash
+sif https://example.com
+```
+
+the picker is a grouped, collapsible checklist of scans — Recon, Web vulns, Info/panels, Intel — each row showing its flag and a one-line description, so it teaches the CLI as you use it. a live "equivalent command" line at the bottom updates as you toggle, so you can graduate to flags.
+
+### when it opens
+
+the picker opens for `sif <url>` or `sif -u <url>` when **no scan flags** are set and stdin/stdout are both interactive terminals. it stays out of the way otherwise:
+
+- any scan flag present → runs directly (pipelines and muscle memory keep working)
+- `-silent`, `-api`, or piped stdin/stdout → never opens
+- `-i` / `-pick` → force it open even when scan flags are set
+- `-no-tui` → never open it
+
+your last selection is saved to `<user-config>/sif/tui.yaml` and restored next launch.
+
+### picker keys
+
+| key | action |
+| --- | --- |
+| `j` / `k` / `↑` / `↓` | move |
+| `space` | toggle the scan (on a sized scan, cycle off → small → medium → large) |
+| `←` / `→` | step a sized scan's level |
+| `a` | select/clear every scan in the focused group |
+| `tab` | collapse/expand the focused group |
+| `p` | cycle presets (quick, recon, web, full, passive) |
+| `/` | filter the list |
+| `c` | copy the equivalent command |
+| `enter` / `r` | run the selected scans |
+| `?` | toggle help |
+| `q` / `ctrl+c` | cancel without scanning |
+
+### presets
+
+`p` cycles bundles that map to the common flag combos:
+
+| preset | scans |
+| --- | --- |
+| quick | `-headers -framework` |
+| recon | `-dnslist small -ports common -crawl -passive` |
+| web | `-cors -xss -redirect -sql -lfi` |
+| full | `-dirlist small -dnslist small -ports common -headers -sh -cms -framework -git -whois` |
+| passive | `-passive` |
+
+## the dashboard
+
+> the live dashboard is a complete, tested component (`tui.Run`); auto-launching it as the picker's run screen is landing incrementally. today the picker configures the scan and runs it with sif's standard streaming output.
 
 the dashboard is a pure consumer of sif's scan event stream (`internal/event`). the scan engine runs in a background goroutine and emits events — target started, scanner started, each finding, scanner done, target done, run done — which the dashboard renders live. the engine does not know the tui exists; the tui is just one `event.Sink` among the console and report writers. quitting the dashboard cancels the scan context (reports still flush on the way out).
 
