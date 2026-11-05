@@ -28,6 +28,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif/internal/config"
 	"github.com/vmfunc/sif/internal/dnsx"
+	"github.com/vmfunc/sif/internal/event"
 	"github.com/vmfunc/sif/internal/finding"
 	"github.com/vmfunc/sif/internal/httpx"
 	"github.com/vmfunc/sif/internal/logger"
@@ -48,6 +49,41 @@ type App struct {
 	settings *config.Settings
 	targets  []string
 	logFiles []string
+
+	// sink receives the scan event stream (per-target, per-scanner, per-finding
+	// events and the run summary). It is nil until Run wires it up, so direct
+	// scanTarget callers (tests) pay nothing; emit guards the nil.
+	sink event.Sink
+}
+
+// emit sends one event to the attached sink, or drops it when no sink is wired.
+// scanTarget emits through this so the live console/TUI sinks and the run
+// summary are all driven by one stream without the engine knowing who listens.
+func (app *App) emit(e event.Event) {
+	if app.sink != nil {
+		app.sink.Emit(e)
+	}
+}
+
+// emitTarget streams one target's results as events: TargetStarted, then per
+// scanner a ScannerStarted / one FindingFound per normalized finding /
+// ScannerDone with the count, then TargetDone. Findings are flattened through
+// the same finding.Flatten path collectFindings uses, in the same module order,
+// so a live consumer sees exactly the findings the batch consumers report.
+func (app *App) emitTarget(url string, moduleResults []ModuleResult) {
+	if app.sink == nil {
+		return
+	}
+	app.emit(event.Event{Kind: event.TargetStarted, Target: url})
+	for _, mr := range moduleResults {
+		app.emit(event.Event{Kind: event.ScannerStarted, Target: url, Scanner: mr.Id})
+		fs := finding.Flatten(url, mr.Id, mr.Data)
+		for i := range fs {
+			app.emit(event.Event{Kind: event.FindingFound, Target: url, Scanner: mr.Id, Finding: &fs[i]})
+		}
+		app.emit(event.Event{Kind: event.ScannerDone, Target: url, Scanner: mr.Id, Count: len(fs)})
+	}
+	app.emit(event.Event{Kind: event.TargetDone, Target: url})
 }
 
 // Version is set by main to the resolved build version and shown on the banner.
@@ -323,6 +359,13 @@ func (app *App) Run() error {
 		}
 	}
 
+	// attach the event stream: a Collector aggregates findings and scanner
+	// labels for the run summary, and is the seam phase 6's TUI plugs into as a
+	// second sink. the batch consumers below still read the per-target results
+	// directly, so output/notify/diff/report are unchanged by the stream.
+	collector := event.NewCollector()
+	app.sink = event.NewMultiplexer(collector)
+
 	results, err := app.scanAllTargets(storeDir, wantReport)
 	if err != nil {
 		return err
@@ -338,6 +381,10 @@ func (app *App) Run() error {
 			reportResults = append(reportResults, ts.reportResults...)
 		}
 	}
+
+	// close the stream with the run summary, so a live sink can render totals
+	// without re-walking every finding.
+	app.emit(event.Event{Kind: event.RunDone, Summary: collector.Summary()})
 
 	return app.finishRun(scansRun, allFindings, reportResults, wantReport)
 }
@@ -816,6 +863,12 @@ func (app *App) scanTarget(url, storeDir string, wantReport bool) (targetScan, e
 		}
 		fmt.Println(string(marshalled))
 	}
+
+	// stream this target's results as events for any live consumer (console,
+	// TUI) before the batch consumers below run. emission is derived from the
+	// same moduleResults and finding.Flatten path, so the stream and the
+	// returned targetScan describe the identical findings.
+	app.emitTarget(url, moduleResults)
 
 	targetFindings := collectFindings(url, moduleResults)
 
