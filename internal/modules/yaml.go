@@ -41,6 +41,11 @@ type YAMLModule struct {
 	DNS         *DNSConfig         `yaml:"dns,omitempty"`
 	TCP         *TCPConfig         `yaml:"tcp,omitempty"`
 	Fingerprint *FingerprintConfig `yaml:"fingerprint,omitempty"`
+
+	// Tests holds inline fixtures exercised by `sif modules test`. They are
+	// metadata only: the loader and executor ignore them, so a module without
+	// tests runs exactly as before.
+	Tests []ModuleTest `yaml:"tests,omitempty"`
 }
 
 // YAMLModuleInfo contains module metadata

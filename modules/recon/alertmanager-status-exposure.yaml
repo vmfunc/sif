@@ -35,3 +35,28 @@ http:
       regex:
         - '"versionInfo"\s*:\s*\{[^}]*"version"\s*:\s*"([^"]+)"'
       group: 1
+
+tests:
+  - name: an exposed status is flagged with its version
+    response:
+      status: 200
+      headers:
+        Content-Type: application/json
+      body: >-
+        {"cluster":{"name":"01HXYZ","status":"ready"},"versionInfo":{"version":"0.27.0"},"config":{"original":"global:\n"},"uptime":"x"}
+    expect:
+      match: true
+      extracted:
+        alertmanager_version: "0.27.0"
+  - name: a configless status is not a leak
+    response:
+      status: 200
+      body: '{"cluster":{"name":"x"},"versionInfo":{"version":"0.27.0"},"uptime":"x"}'
+    expect:
+      match: false
+  - name: a 404 is not a leak
+    response:
+      status: 404
+      body: not found
+    expect:
+      match: false

@@ -23,6 +23,10 @@ sif \- blazing-fast pentesting suite
 .br
 .B sif
 .RB { patchnote | version }
+.br
+.B sif modules
+.RB { lint | test }
+.RI [ paths ...]
 .SH DESCRIPTION
 .B sif
 is a modular recon and exploitation suite. it runs multiple scan types
@@ -250,6 +254,21 @@ fetch the latest github release and print its notes. also available as
 .TP
 .B sif version
 print the sif version and exit.
+.TP
+.B sif modules lint \fR[\fIpaths\fR...]
+validate module yaml: schema, matcher and regex compilation, the
+.B {{BaseURL}}
+path convention, required info fields, and duplicate ids across the built\-in
+and user module directories. with no paths, lints both directories. exits
+non\-zero if any error\-level issue is found (warnings alone do not fail).
+.TP
+.B sif modules test \fR[\fIpaths\fR...]
+run each module's inline
+.B tests:
+fixtures: a canned response is served to the module's own matchers and
+extractors, and the resulting verdict is checked against the fixture. with no
+paths, tests every module that declares fixtures in both directories. exits
+non\-zero on any failing case. see docs/modules.md for the fixture format.
 .SH ENVIRONMENT
 .TP
 .B SHODAN_API_KEY

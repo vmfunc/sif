@@ -158,9 +158,17 @@ a couple of subcommands run without scanning:
 
 # show the latest release notes (also -pn)
 ./sif patchnote
+
+# validate every module (schema, matchers, regex, duplicate ids)
+./sif modules lint
+
+# run modules' inline test fixtures
+./sif modules test
 ```
 
 the first time you run a new release, sif prints that release's notes once. set `SIF_NO_PATCHNOTES=1` to turn that off.
+
+`sif modules lint` and `sif modules test` take optional file or directory paths; with none they cover the built-in and user module directories. both exit non-zero on failure, so they drop straight into CI. see [docs/modules.md](docs/modules.md#linting-modules) for details and the test-fixture format.
 
 ## modules
 

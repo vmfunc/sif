@@ -551,6 +551,80 @@ http:
 
 5. **test locally** - run your module against a test target before sharing
 
+## linting modules
+
+`sif modules lint` validates module yaml without sending any traffic. run it on
+the whole tree or on specific files/directories:
+
+```bash
+# lint the built-in and user module directories
+sif modules lint
+
+# lint a single file or a directory
+sif modules lint modules/recon/alertmanager-status-exposure.yaml
+sif modules lint ./my-modules/
+```
+
+it checks that every module:
+
+- parses and declares a known `type` (`http`, `dns`, `tcp`, `fingerprint`, `script`)
+- has the required info fields `name`, `severity` (one of `info`/`low`/`medium`/`high`/`critical`) and `description`
+- compiles every regex in its matchers and extractors
+- anchors every http path to `{{BaseURL}}` (or an absolute url) — a bare `/path` is relative and never dials
+- has a unique id across the built-in and user directories
+
+missing `author` or `tags` are reported as warnings. lint exits non-zero if any
+**error** is found; warnings alone keep a zero exit, so CI can gate on it without
+failing on style nits.
+
+## testing modules
+
+a module can carry inline fixtures under a top-level `tests:` key. each fixture
+is a canned response served to the module's *own* matchers and extractors, so a
+passing test proves the real module logic rather than a reimplementation of it.
+
+```bash
+# run every module's fixtures across both module directories
+sif modules test
+
+# test one module or a directory
+sif modules test modules/recon/alertmanager-status-exposure.yaml
+```
+
+### fixture format
+
+```yaml
+tests:
+  - name: an exposed status is flagged with its version
+    response:
+      status: 200                    # optional, defaults to 200
+      headers:                       # optional response headers
+        Content-Type: application/json
+      body: >-
+        {"cluster":{"name":"x"},"versionInfo":{"version":"0.27.0"},"config":{"original":"global:\n"}}
+    expect:
+      match: true                    # should the module report a finding?
+      extracted:                     # optional: assert extractor output
+        alertmanager_version: "0.27.0"
+  - name: a plain 200 is not a leak
+    response: {status: 200, body: "ok"}
+    expect: {match: false}
+```
+
+- **`response`** is the single response the fixture server returns to every
+  request the module makes during that case. `status` defaults to `200`; `body`
+  and `headers` default to empty.
+- **`expect.match`** is whether the module should produce a finding against that
+  response.
+- **`expect.extracted`** is an optional subset of extractor name/value pairs the
+  finding must carry. Extra extracted keys are ignored, so you only assert what
+  you care about.
+
+`tests:` is metadata: the loader and executor ignore it, so adding fixtures
+never changes how a module behaves in a real scan. fixtures are supported for
+`http` and `fingerprint` modules (both drive a local http server); `tcp` and
+`dns` fixtures are not yet supported.
+
 ## running modules
 
 ```bash
