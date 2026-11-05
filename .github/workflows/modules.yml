@@ -1,0 +1,30 @@
+name: modules
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "modules/**"
+      - "internal/modules/**"
+      - ".github/workflows/modules.yml"
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint modules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: set up go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.26"
+      - name: build sif
+        run: make
+      - name: lint modules
+        run: ./sif modules lint
+      - name: run module fixtures
+        run: ./sif modules test
