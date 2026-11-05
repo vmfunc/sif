@@ -19,6 +19,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif"
 	"github.com/vmfunc/sif/internal/config"
+	"github.com/vmfunc/sif/internal/modules"
 	"github.com/vmfunc/sif/internal/patchnotes"
 	ver "github.com/vmfunc/sif/internal/version"
 
@@ -42,6 +43,8 @@ func main() {
 		case "version", "-version", "--version":
 			fmt.Printf("sif %s\n", version)
 			return
+		case "modules", "module":
+			os.Exit(modules.RunCommand(os.Args[2:], os.Stdout, os.Stderr))
 		}
 	}
 
