@@ -36,7 +36,7 @@ download `sif-windows-amd64.exe` from releases and add to your PATH.
 
 ## from source
 
-requires go 1.25+
+requires go 1.26+
 
 ```bash
 git clone https://github.com/vmfunc/sif.git

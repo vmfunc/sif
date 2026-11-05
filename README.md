@@ -98,7 +98,7 @@ cd sif
 make
 ```
 
-requires go 1.25+
+requires go 1.26+
 
 ### aur (manual install)
 

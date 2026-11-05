@@ -4,7 +4,7 @@ setting up a development environment for sif.
 
 ## prerequisites
 
-- go 1.25 or later
+- go 1.26 or later
 - git
 - make
 
