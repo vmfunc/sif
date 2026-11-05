@@ -16,7 +16,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
         in
         {
-          default = pkgs.buildGoModule {
+          default = pkgs.buildGo126Module {
             pname = "sif";
             version = "unstable-${self.shortRev or self.dirtyShortRev or "dev"}";
             src = ./.;
@@ -50,7 +50,7 @@
         in
         {
           default = pkgs.mkShell {
-            buildInputs = with pkgs; [ go gopls ];
+            buildInputs = with pkgs; [ go_1_26 gopls ];
           };
         });
     };
