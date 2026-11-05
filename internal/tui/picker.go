@@ -19,7 +19,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/vmfunc/sif/internal/output"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // row is one navigable line in the flattened picker: either a group header
@@ -418,67 +418,159 @@ func sortedFlags(sel *Selection) []string {
 	return out
 }
 
-// View renders the picker: a header, the grouped checklist, the live
-// equivalent-command line, and the footer help.
+// picker column widths for the aligned checklist.
+const (
+	colCheck = 8  // checkbox / level pill column
+	colLabel = 16 // human label
+	colFlag  = 16 // -flag hint
+)
+
+// contentWidth is how wide the picker body renders, bounded so it stays tidy on
+// very wide terminals and never overflows narrow ones.
+func (m *pickerModel) contentWidth() int {
+	w := m.width
+	if w <= 0 {
+		w = 90
+	}
+	if w > 96 {
+		w = 96
+	}
+	if w < 48 {
+		w = 48
+	}
+	return w
+}
+
+// View renders the picker: a header bar, the grouped checklist, the live
+// equivalent-command panel, and the footer help.
 func (m *pickerModel) View() string {
+	w := m.contentWidth()
+
 	var b strings.Builder
-	b.WriteString(output.Highlight.Render(fmt.Sprintf("sif %s · configure scan for %s", m.version, m.spec.Target)))
-	b.WriteString(fmt.Sprintf("  (%d selected)\n\n", m.countSelected()))
+	b.WriteString(m.headerBar(w))
+	b.WriteString("\n\n")
 
 	for i, r := range m.rows {
-		cursor := "  "
-		if i == m.cursor {
-			cursor = "▸ "
-		}
-		if r.item == -1 {
-			g := m.spec.Groups[r.group]
-			glyph := "▾"
-			if m.collapsed[r.group] && m.filter == "" {
-				glyph = "▸"
-			}
-			b.WriteString(fmt.Sprintf("%s%s %s\n", cursor, glyph, output.Subheading.Render(g.Name)))
-			continue
-		}
-		it := m.spec.Groups[r.group].Items[r.item]
-		b.WriteString("  " + cursor + m.renderItem(&it) + "\n")
+		b.WriteString(m.renderRow(i, r, w))
+		b.WriteByte('\n')
 	}
 
-	b.WriteString("\n" + output.Subheading.Render("≡ "+m.equivalentCommand()) + "\n")
-	if m.status != "" {
-		b.WriteString(output.Status.Render(m.status) + "\n")
-	}
-	b.WriteString("\n" + m.footerHelp())
+	b.WriteString("\n")
+	b.WriteString(m.commandPanel(w))
+	b.WriteString("\n\n")
+	b.WriteString(m.footerHelp())
 	return b.String()
 }
 
-// renderItem renders one checklist item with its checkbox/level and flag hint.
-func (m *pickerModel) renderItem(it *Item) string {
+// headerBar is the top title strip: product/target on the left, selected count
+// on the right, filling the content width with a background accent.
+func (m *pickerModel) headerBar(w int) string {
+	onBar := lipgloss.NewStyle().Background(colorBarBg)
+	left := onBar.Foreground(colorText).Bold(true).Render(" sif "+m.version) +
+		onBar.Foreground(colorMuted).Render("  configure scan · ") +
+		onBar.Foreground(colorText).Render(m.spec.Target)
+	right := onBar.Foreground(colorText).Bold(true).Render(fmt.Sprintf("%d selected ", m.countSelected()))
+
+	gap := w - lipgloss.Width(left) - lipgloss.Width(right)
+	if gap < 1 {
+		gap = 1
+	}
+	return left + onBar.Render(spaces(gap)) + right
+}
+
+// renderRow renders one flattened row (group header or item), highlighting the
+// cursor row with a full-width background.
+func (m *pickerModel) renderRow(i int, r row, w int) string {
+	selected := i == m.cursor
+	cursor := "  "
+	if selected {
+		cursor = styleCursor.Render("▸ ")
+	}
+
+	var line string
+	if r.item == -1 {
+		g := m.spec.Groups[r.group]
+		caret := "▾"
+		if m.collapsed[r.group] && m.filter == "" {
+			caret = "▸"
+		}
+		line = cursor + styleGroup.Render(caret+" "+g.Name)
+	} else {
+		it := m.spec.Groups[r.group].Items[r.item]
+		line = "    " + cursor + m.renderItem(&it, w-6)
+	}
+
+	if selected {
+		return styleSelected.Width(w).Render(line)
+	}
+	return line
+}
+
+// renderItem renders one checklist item: a colored checkbox/level pill, the
+// label, its -flag, and a dim description truncated to fit the row.
+func (m *pickerModel) renderItem(it *Item, avail int) string {
 	var box string
 	switch it.Kind {
 	case KindToggle:
 		if m.sel.Toggles[it.Flag] {
-			box = "[x]"
+			box = styleOn.Render(padRight("◉ on", colCheck))
 		} else {
-			box = "[ ]"
+			box = styleFaint.Render(padRight("○ off", colCheck))
 		}
 	case KindSized:
 		lvl := m.sel.Sizes[it.Flag]
 		if lvl == "" {
-			box = "[ off ]"
+			box = styleFaint.Render(padRight("○ off", colCheck))
 		} else {
-			box = "[" + lvl + "]"
+			box = stylePill.Render(lvl) + spaces(max0(colCheck-len([]rune(lvl))-2))
 		}
 	}
-	return fmt.Sprintf("%s %-16s -%-14s %s", box, it.Label, it.Flag, output.Subheading.Render(it.Desc))
+
+	label := styleLabel.Render(padRight(it.Label, colLabel))
+	flag := styleFlag.Render(padRight("-"+it.Flag, colFlag))
+
+	used := colCheck + 1 + colLabel + 1 + colFlag + 1
+	descW := avail - used
+	if descW < 8 {
+		descW = 8
+	}
+	desc := styleDesc.Render(padRight(it.Desc, descW))
+	return box + " " + label + " " + flag + " " + desc
+}
+
+func max0(n int) int {
+	if n < 0 {
+		return 0
+	}
+	return n
+}
+
+// commandPanel shows the live equivalent command in a bordered box so users can
+// learn the flags their selection maps to.
+func (m *pickerModel) commandPanel(w int) string {
+	cmd := styleFaint.Render("≡ ") + styleCmd.Render(m.equivalentCommand())
+	if m.status != "" {
+		cmd += "\n" + styleOn.Render("» "+m.status)
+	}
+	return stylePanel.Width(w - 2).Render(cmd)
 }
 
 func (m *pickerModel) footerHelp() string {
 	if m.filtering {
-		return output.Status.Render("filter: "+m.filter+"▏") + "  (enter to apply, esc to clear)"
+		return styleKey.Render("filter ") + styleTitle.Render(m.filter+"▏") +
+			"  " + styleMuted.Render("enter apply · esc clear")
 	}
-	if m.showHelp {
-		return output.Subheading.Render(
-			"space toggle · ←/→ level · a all-in-group · tab collapse · p preset · / filter · c copy · enter run · q quit")
+	hints := []string{
+		keyHint("space", "toggle"), keyHint("←/→", "level"), keyHint("a", "group"),
+		keyHint("p", "preset"), keyHint("/", "filter"), keyHint("enter", "run"),
+		keyHint("?", "help"), keyHint("q", "quit"),
 	}
-	return output.Subheading.Render("space toggle · a all · p preset · / filter · enter run · ? help · q quit")
+	if !m.showHelp {
+		hints = []string{
+			keyHint("space", "toggle"), keyHint("p", "preset"),
+			keyHint("/", "filter"), keyHint("enter", "run"),
+			keyHint("?", "more"), keyHint("q", "quit"),
+		}
+	}
+	return strings.Join(hints, styleFaint.Render("  ·  "))
 }
