@@ -19,7 +19,7 @@ require (
 	github.com/projectdiscovery/utils v0.11.8
 	github.com/rocketlaunchr/google-search v1.1.6
 	github.com/tidwall/gjson v1.20.0
-	github.com/twmb/murmur3 v1.1.8
+	github.com/twmb/murmur3 v1.2.2
 	golang.org/x/net v0.59.0
 	golang.org/x/term v0.46.0
 	golang.org/x/time v0.15.0
