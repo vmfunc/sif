@@ -235,30 +235,105 @@ func (m *Model) expandView() string {
 	return b.String()
 }
 
-// summaryView is screen 3: totals by severity and the scanners that ran. It
-// does not auto-exit; the footer tells the user to quit or write a report.
+// summaryView is screen 3: totals by severity and the scanners that ran, then
+// the run's findings worst-first as a navigable list (j/k move, enter opens the
+// detail, s/'/' narrow it). It does not auto-exit.
 func (m *Model) summaryView() string {
 	s := m.summary
 	w := m.width
-	if w <= 0 || w > 80 {
+	if w <= 0 {
 		w = 80
 	}
-	var b strings.Builder
+	barW := w
+	if barW > 80 {
+		barW = 80
+	}
+	var top strings.Builder
 	onBar := lipgloss.NewStyle().Background(colorBarBg).Foreground(colorText).Bold(true)
-	b.WriteString(onBar.Width(w).Render(fmt.Sprintf(" sif %s · scan complete", m.version)) + "\n\n")
-	b.WriteString(styleTitle.Render(fmt.Sprintf("%d findings", s.Findings)) +
+	top.WriteString(onBar.Width(w).Render(fmt.Sprintf(" sif %s · scan complete", m.version)) + "\n\n")
+	top.WriteString(styleTitle.Render(fmt.Sprintf("%d findings", s.Findings)) +
 		styleMuted.Render(fmt.Sprintf(" across %d targets", s.Targets)) + "\n\n")
 
 	for _, sev := range []finding.Severity{finding.SeverityCritical, finding.SeverityHigh, finding.SeverityMedium, finding.SeverityLow, finding.SeverityInfo} {
 		if n := s.BySeverity[sev.String()]; n > 0 {
-			bar := strings.Repeat("█", minInt(n, w-20))
-			b.WriteString("  " + sevRender(sev, padRight(sev.String(), 9)) + " " +
+			bar := strings.Repeat("█", minInt(n, barW-20))
+			top.WriteString("  " + sevRender(sev, padRight(sev.String(), 9)) + " " +
 				sevRender(sev, bar) + " " + styleMuted.Render(fmt.Sprintf("%d", n)) + "\n")
 		}
 	}
-	b.WriteString("\n" + styleFaint.Render("scanners  ") + styleMuted.Render(strings.Join(s.ScansRun, ", ")) + "\n")
-	b.WriteString("\n" + keyHint("w", "write report") + styleFaint.Render("  ·  ") + keyHint("q", "quit"))
+	top.WriteString("\n" + styleFaint.Render("scanners  ") + styleMuted.Render(strings.Join(s.ScansRun, ", ")) + "\n\n")
+
+	foot := m.summaryFooter()
+	if m.expanded {
+		return top.String() + stylePanel.Width(w-2).Render(m.expandView()) + "\n" + foot
+	}
+
+	listH := m.height - lipgloss.Height(top.String()) - lipgloss.Height(foot) - 1
+	if listH < 3 {
+		listH = 3
+	}
+	return top.String() + styleGroup.Render("FINDINGS") + "\n" + m.summaryList(w, listH) + "\n" + foot
+}
+
+// summaryList renders a window of the visible findings that keeps the
+// selection on screen, with a position marker when the list overflows.
+func (m *Model) summaryList(width, height int) string {
+	vis := m.visibleFindings()
+	if len(vis) == 0 {
+		return styleMuted.Render("  no findings")
+	}
+	start := 0
+	if m.selFinding >= height {
+		start = m.selFinding - height + 1
+	}
+	end := start + height
+	if end > len(vis) {
+		end = len(vis)
+	}
+	var b strings.Builder
+	for i := start; i < end; i++ {
+		f := vis[i]
+		line := truncate(fmt.Sprintf("[%s] %s · %s · %s", f.Severity, f.Target, f.Module, f.Title), width-4)
+		line = sevRender(f.Severity, line)
+		if i == m.selFinding {
+			line = styleCursor.Render("▸ ") + line
+		} else {
+			line = "  " + line
+		}
+		b.WriteString(line)
+		if i < end-1 {
+			b.WriteByte('\n')
+		}
+	}
+	if len(vis) > height {
+		b.WriteString("\n" + styleFaint.Render(fmt.Sprintf("  %d/%d", m.selFinding+1, len(vis))))
+	}
 	return b.String()
+}
+
+// summaryFooter is the summary's state line plus the keys that apply there.
+func (m *Model) summaryFooter() string {
+	var state []string
+	if m.sevFloor > finding.SeverityUnknown {
+		state = append(state, styleKey.Render("floor:")+styleTitle.Render(m.sevFloor.String()))
+	}
+	if m.filtering {
+		state = append(state, styleKey.Render("filter ")+styleTitle.Render(m.filter+"▏"))
+	} else if m.filter != "" {
+		state = append(state, styleMuted.Render("filter:"+m.filter))
+	}
+	if m.status != "" {
+		state = append(state, styleMuted.Render(m.status))
+	}
+	hints := []string{
+		keyHint("j/k", "move"), keyHint("enter", "details"), keyHint("/", "filter"),
+		keyHint("s", "sev"), keyHint("w", "write report"), keyHint("q", "quit"),
+	}
+	line := strings.Join(hints, styleFaint.Render("  ·  "))
+	if len(state) > 0 {
+		line = strings.Join(state, styleFaint.Render("   ")) + "\n" + line
+	}
+	return line
 }
 
 func minInt(a, b int) int {

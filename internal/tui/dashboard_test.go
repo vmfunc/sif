@@ -13,6 +13,7 @@
 package tui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -184,5 +185,82 @@ func TestDashboardQuitKey(t *testing.T) {
 		t.Fatal("quit command produced no message")
 	} else if _, ok := msg.(tea.QuitMsg); !ok {
 		t.Errorf("q produced %T, want tea.QuitMsg", msg)
+	}
+}
+
+func TestDashboardSummaryNavigatesFindings(t *testing.T) {
+	m := newTestModel("t")
+	send(m, eventMsg{Kind: event.FindingFound, Target: "t", Finding: find(finding.SeverityLow, "t", "headers", "server banner")})
+	send(m, eventMsg{Kind: event.FindingFound, Target: "t", Finding: find(finding.SeverityCritical, "t", "sql", "sqli")})
+	send(m, eventMsg{Kind: event.FindingFound, Target: "t", Finding: find(finding.SeverityMedium, "t", "cors", "wildcard")})
+	send(m, eventMsg{Kind: event.RunDone, Summary: &event.Summary{
+		Targets: 1, Findings: 3,
+		BySeverity: map[string]int{"critical": 1, "medium": 1, "low": 1},
+	}})
+
+	// worst-first, selection on the top finding.
+	vis := m.visibleFindings()
+	if vis[0].Title != "sqli" || vis[2].Title != "server banner" {
+		t.Fatalf("summary order = %q,%q,%q; want worst first", vis[0].Title, vis[1].Title, vis[2].Title)
+	}
+	if view := m.View(); !strings.Contains(view, "FINDINGS") || !strings.Contains(view, "▸") {
+		t.Fatalf("summary should list findings with a cursor:\n%s", view)
+	}
+
+	send(m, keyRunes("j"))
+	if m.selFinding != 1 {
+		t.Fatalf("j on summary: selFinding = %d, want 1", m.selFinding)
+	}
+	send(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if view := m.View(); !strings.Contains(view, "wildcard") || !strings.Contains(view, "enter to close") {
+		t.Fatalf("enter should open the selected finding:\n%s", view)
+	}
+	send(m, tea.KeyMsg{Type: tea.KeyEnter})
+	send(m, keyRunes("G"))
+	if m.selFinding != 2 {
+		t.Errorf("G: selFinding = %d, want 2", m.selFinding)
+	}
+	send(m, keyRunes("g"))
+	if m.selFinding != 0 {
+		t.Errorf("g: selFinding = %d, want 0", m.selFinding)
+	}
+}
+
+func TestDashboardWriteReport(t *testing.T) {
+	m := newTestModel("t")
+	send(m, eventMsg{Kind: event.FindingFound, Target: "t", Finding: find(finding.SeverityHigh, "t", "cors", "reflected origin")})
+
+	var got []finding.Finding
+	m.writeReport = func(fs []finding.Finding) (string, error) {
+		got = fs
+		return "/tmp/r.json", nil
+	}
+	_, cmd := m.Update(keyRunes("w"))
+	if cmd == nil {
+		t.Fatal("w should start an async write")
+	}
+	send(m, cmd())
+	if len(got) != 1 || got[0].Title != "reflected origin" {
+		t.Fatalf("writer got %+v, want the one finding", got)
+	}
+	if !strings.Contains(m.status, "/tmp/r.json") {
+		t.Errorf("status = %q, want the written path", m.status)
+	}
+
+	m.writeReport = func([]finding.Finding) (string, error) { return "", errors.New("disk full") }
+	_, cmd = m.Update(keyRunes("w"))
+	send(m, cmd())
+	if !strings.Contains(m.status, "disk full") {
+		t.Errorf("status = %q, want the write error", m.status)
+	}
+}
+
+func TestDashboardWriteReportUnwired(t *testing.T) {
+	m := newTestModel("t")
+	if _, cmd := m.Update(keyRunes("w")); cmd != nil {
+		t.Fatal("w with no writer should not schedule work")
+	}
+	if !strings.Contains(m.status, "unavailable") {
+		t.Errorf("status = %q", m.status)
 	}
 }

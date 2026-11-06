@@ -13,6 +13,7 @@
 package tui
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -75,6 +76,16 @@ type Model struct {
 
 	// wait re-arms the event-drain command after each event; set by Run.
 	wait tea.Cmd
+
+	// writeReport backs the `w` key; nil when the caller wired no writer.
+	writeReport func([]finding.Finding) (string, error)
+	writing     bool // a write is in flight; debounces repeated `w`
+}
+
+// reportWrittenMsg carries the outcome of an async `w` report write.
+type reportWrittenMsg struct {
+	path string
+	err  error
 }
 
 // newModel builds an empty dashboard for the given targets.
@@ -123,6 +134,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.done = true
 		return m, nil
 
+	case reportWrittenMsg:
+		m.writing = false
+		if msg.err != nil {
+			m.status = "write failed: " + msg.err.Error()
+		} else {
+			m.status = "report written to " + msg.path
+		}
+		return m, nil
+
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spin, cmd = m.spin.Update(msg)
@@ -148,6 +168,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.help.ShowAll = !m.help.ShowAll
 		m.resize(m.width, m.height)
 	case key.Matches(msg, m.keys.Focus):
+		if m.inSummary() {
+			break // the summary has a single findings list
+		}
 		if m.focus == focusTargets {
 			m.focus = focusFindings
 		} else {
@@ -170,18 +193,52 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Copy):
 		m.status = m.copySelectedURL()
 	case key.Matches(msg, m.keys.Write):
-		m.status = "report writing is wired on quit"
+		cmd := m.startWrite()
+		return m, cmd
 	case key.Matches(msg, m.keys.Top):
 		m.vp.GotoTop()
 		m.follow = false
+		if m.inSummary() {
+			m.selFinding = 0
+		}
 	case key.Matches(msg, m.keys.Bottom):
 		m.vp.GotoBottom()
+		if m.inSummary() {
+			m.selFinding = len(m.visibleFindings()) - 1
+			m.refreshFindings() // clamps an empty list back to 0
+		}
 	case key.Matches(msg, m.keys.Up):
 		m.moveUp()
 	case key.Matches(msg, m.keys.Down):
 		m.moveDown()
 	}
 	return m, nil
+}
+
+// startWrite kicks off an async report write of every finding seen so far
+// (unfiltered: the report is the run, not the current view).
+func (m *Model) startWrite() tea.Cmd {
+	if m.writeReport == nil {
+		m.status = "report writing unavailable"
+		return nil
+	}
+	if m.writing {
+		return nil
+	}
+	m.writing = true
+	m.status = "writing report…"
+	fs := make([]finding.Finding, len(m.findings))
+	copy(fs, m.findings)
+	write := m.writeReport
+	return func() tea.Msg {
+		path, err := write(fs)
+		return reportWrittenMsg{path: path, err: err}
+	}
+}
+
+// inSummary reports whether the run is over and the summary screen is up.
+func (m *Model) inSummary() bool {
+	return m.done && m.summary != nil
 }
 
 // handleFilterKey captures text while the filter input is active.
@@ -281,6 +338,14 @@ func (m *Model) applyEvent(e event.Event) {
 	case event.RunDone:
 		m.summary = e.Summary
 		m.done = true
+		// the summary lists findings worst-first for review; arrival order only
+		// matters while the scan is live.
+		sort.SliceStable(m.findings, func(i, j int) bool {
+			return m.findings[i].Severity > m.findings[j].Severity
+		})
+		m.focus = focusFindings
+		m.follow = false
+		m.selFinding = 0
 	}
 }
 

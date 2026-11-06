@@ -19,6 +19,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -41,6 +42,7 @@ import (
 	"github.com/vmfunc/sif/internal/scan/frameworks"
 	jsscan "github.com/vmfunc/sif/internal/scan/js"
 	"github.com/vmfunc/sif/internal/store"
+	"github.com/vmfunc/sif/internal/tui"
 )
 
 // App represents the main application structure for sif.
@@ -369,13 +371,34 @@ func (app *App) Run() error {
 	}
 
 	// attach the event stream: a Collector aggregates findings and scanner
-	// labels for the run summary, and is the seam phase 6's TUI plugs into as a
-	// second sink. the batch consumers below still read the per-target results
+	// labels for the run summary. on an interactive terminal the live dashboard
+	// is a second sink on the same stream; otherwise the console chrome streams
+	// as before. the batch consumers below still read the per-target results
 	// directly, so output/notify/diff/report are unchanged by the stream.
 	collector := event.NewCollector()
-	app.sink = event.NewMultiplexer(collector)
+	runScan := func(sink event.Sink) ([]targetScan, error) {
+		app.sink = sink
+		results, err := app.scanAllTargets(storeDir, wantReport)
+		if err != nil {
+			return nil, err
+		}
+		// close the stream with the run summary, so a live sink can render
+		// totals without re-walking every finding.
+		app.emit(event.Event{Kind: event.RunDone, Summary: collector.Summary()})
+		return results, nil
+	}
 
-	results, err := app.scanAllTargets(storeDir, wantReport)
+	var results []targetScan
+	var err error
+	if app.useDashboard() {
+		results, err = app.runDashboard(collector, runScan)
+		if errors.Is(err, tui.ErrQuit) {
+			// the user quit mid-scan: treat it as an abort, not a partial report.
+			return nil
+		}
+	} else {
+		results, err = runScan(event.NewMultiplexer(collector))
+	}
 	if err != nil {
 		return err
 	}
@@ -390,10 +413,6 @@ func (app *App) Run() error {
 			reportResults = append(reportResults, ts.reportResults...)
 		}
 	}
-
-	// close the stream with the run summary, so a live sink can render totals
-	// without re-walking every finding.
-	app.emit(event.Event{Kind: event.RunDone, Summary: collector.Summary()})
 
 	return app.finishRun(scansRun, allFindings, reportResults, wantReport)
 }

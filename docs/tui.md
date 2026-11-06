@@ -58,9 +58,16 @@ your last selection is saved to `<user-config>/sif/tui.yaml` and restored next l
 
 ## the dashboard
 
-> the live dashboard is a complete, tested component (`tui.Run`); auto-launching it as the picker's run screen is landing incrementally. today the picker configures the scan and runs it with sif's standard streaming output.
+### when it opens
 
-the dashboard is a pure consumer of sif's scan event stream (`internal/event`). the scan engine runs in a background goroutine and emits events — target started, scanner started, each finding, scanner done, target done, run done — which the dashboard renders live. the engine does not know the tui exists; the tui is just one `event.Sink` among the console and report writers. quitting the dashboard cancels the scan context (reports still flush on the way out).
+the dashboard is the default view for any scan on an interactive terminal — after the picker, or straight away when scan flags are given. it only opens when stdin and stdout are both terminals with a usable size (and `TERM` isn't `dumb`); otherwise sif falls back to its normal streaming output:
+
+- `-silent`, `-api`, or piped stdin/stdout → plain output
+- `-no-tui` → plain output (also skips the picker)
+
+while the dashboard is up, sif's console chrome is suppressed (the dashboard shows the same findings); warnings and errors are buffered and printed when it closes. after you quit, the usual run steps — notify, `-sarif`/`-markdown`/`-json` reports and the run summary — happen on the normal screen. quitting mid-scan aborts the run without writing partial reports.
+
+the dashboard is a pure consumer of sif's scan event stream (`internal/event`). the scan engine runs in a background goroutine and emits events — target started, scanner started, each finding, scanner done, target done, run done — which the dashboard renders live. the engine does not know the tui exists; the tui is just one `event.Sink` among the console and report writers. quitting the dashboard before the scan finishes cancels it.
 
 ## dashboard layout
 
@@ -93,7 +100,7 @@ the dashboard is a pure consumer of sif's scan event stream (`internal/event`). 
 | `g` / `G` | jump to the top / bottom of the findings |
 | `enter` | expand the selected finding (target, module, evidence) |
 | `c` | copy the selected finding's url |
-| `w` | write a report now |
+| `w` | write a json report of every finding so far (to the `-json` path if given, else `sif-report-<timestamp>.json` in the current directory) |
 | `?` | toggle the full help |
 | `q` / `ctrl+c` | quit (cancels the scan) |
 
@@ -101,7 +108,17 @@ follow mode is on by default and auto-pauses the moment you scroll up, so a fast
 
 ## summary
 
-when the run finishes the dashboard switches to a summary: total findings, a per-severity breakdown, and the scanners that ran. it does **not** auto-exit — press `w` to write a report or `q` to quit.
+when the run finishes the dashboard switches to a summary: total findings, a per-severity breakdown, the scanners that ran, and every finding listed worst-first. it does **not** auto-exit.
+
+| key | action |
+| --- | --- |
+| `j` / `k` / `↑` / `↓` | move through the findings |
+| `g` / `G` | jump to the first / last finding |
+| `enter` | open the selected finding's detail (target, module, evidence); `enter` again closes it |
+| `s` | cycle the severity floor |
+| `/` | filter by title, module or target |
+| `w` | write a json report |
+| `q` | quit |
 
 ## color
 

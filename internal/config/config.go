@@ -92,7 +92,7 @@ type Settings struct {
 	Profile           string // -profile: named profile overlay from the config file
 	Interactive       bool   // -i/-pick: force the interactive scan picker
 	Pick              bool   // -pick: alias of -i
-	NoTUI             bool   // -no-tui: never open the picker
+	NoTUI             bool   // -no-tui: never open the picker or dashboard
 }
 
 // minThreads is the floor for the worker count. Threads feeds wg.Add across the
@@ -186,7 +186,7 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 		flagSet.StringVar(&settings.Template, "template", "", "Load scan settings from a template (preset minimal/recon/full, or a local yaml file)"),
 		flagSet.BoolVarP(&settings.Interactive, "interactive", "i", false, "Force the interactive scan picker (even when scan flags are set)"),
 		flagSet.BoolVar(&settings.Pick, "pick", false, "Alias of -i: force the interactive scan picker"),
-		flagSet.BoolVar(&settings.NoTUI, "no-tui", false, "Disable the interactive picker; run with the given flags only"),
+		flagSet.BoolVar(&settings.NoTUI, "no-tui", false, "Disable the interactive picker and live dashboard; plain output with the given flags only"),
 	)
 
 	flagSet.CreateGroup("config", "Config",

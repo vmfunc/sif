@@ -13,9 +13,13 @@
 package sif
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vmfunc/sif/internal/config"
+	"github.com/vmfunc/sif/internal/finding"
 	"github.com/vmfunc/sif/internal/tui"
 )
 
@@ -64,6 +68,34 @@ func TestShouldPicker(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := shouldPicker(tc.s, tc.stdoutTTY, tc.stdinTTY); got != tc.want {
 				t.Errorf("shouldPicker = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestShouldDashboard(t *testing.T) {
+	tty := termInfo{stdoutTTY: true, stdinTTY: true, width: 120, height: 40, term: "xterm-256color"}
+	with := func(f func(*termInfo)) termInfo { c := tty; f(&c); return c }
+	cases := []struct {
+		name string
+		s    *config.Settings
+		t    termInfo
+		want bool
+	}{
+		{"default on an interactive tty", &config.Settings{}, tty, true},
+		{"on a tty with scan flags", &config.Settings{CORS: true}, tty, true},
+		{"stdout piped", &config.Settings{}, with(func(t *termInfo) { t.stdoutTTY = false }), false},
+		{"stdin piped", &config.Settings{}, with(func(t *termInfo) { t.stdinTTY = false }), false},
+		{"zero-size pty", &config.Settings{}, with(func(t *termInfo) { t.width, t.height = 0, 0 }), false},
+		{"TERM=dumb", &config.Settings{}, with(func(t *termInfo) { t.term = "dumb" }), false},
+		{"-no-tui", &config.Settings{NoTUI: true}, tty, false},
+		{"-silent", &config.Settings{Silent: true}, tty, false},
+		{"-api", &config.Settings{ApiMode: true}, tty, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := shouldDashboard(tc.s, tc.t); got != tc.want {
+				t.Errorf("shouldDashboard = %v, want %v", got, tc.want)
 			}
 		})
 	}
@@ -122,5 +154,26 @@ func TestPickerSpecFlagsMapToSettings(t *testing.T) {
 	}
 	if s.Dnslist != "small" || s.Ports != "common" {
 		t.Errorf("sized flags did not map: dnslist=%q ports=%q", s.Dnslist, s.Ports)
+	}
+}
+
+func TestDashboardReportWritesFindings(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.json")
+	app := &App{settings: &config.Settings{JSONReport: path}}
+
+	got, err := app.dashboardReport([]finding.Finding{{Target: "https://a.com", Module: "cors", Title: "reflected origin", Severity: finding.SeverityHigh}})
+	if err != nil {
+		t.Fatalf("dashboardReport: %v", err)
+	}
+	if got != path {
+		t.Errorf("path = %q, want %q", got, path)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "reflected origin") {
+		t.Errorf("report missing finding:\n%s", data)
 	}
 }

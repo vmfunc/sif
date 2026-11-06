@@ -411,7 +411,7 @@ flags passed on the command line take precedence over the template, so `--templa
 
 ### -i, --interactive / -pick / --no-tui
 
-control the interactive scan picker. by default, running `sif <url>` (or `-u <url>`) with no scan flags on an interactive terminal opens a menu to choose scans from; see [the tui guide](tui.md). `-i` (alias `-pick`) forces the picker open even when scan flags are set; `--no-tui` disables it so sif runs with exactly the flags given:
+control the interactive tui (the scan picker and the live dashboard). by default, running `sif <url>` (or `-u <url>`) with no scan flags on an interactive terminal opens a menu to choose scans from; see [the tui guide](tui.md). `-i` (alias `-pick`) forces the picker open even when scan flags are set; `--no-tui` disables both the picker and the live dashboard so sif runs with exactly the flags given and prints its normal streaming output:
 
 ```bash
 sif https://example.com          # opens the picker
@@ -419,7 +419,7 @@ sif -u https://example.com -i    # force the picker even with other flags
 sif -u https://example.com -cors --no-tui   # never open it
 ```
 
-the picker never opens under `-silent`, `-api`, or when stdin/stdout is piped, so pipelines are unaffected.
+on an interactive terminal every scan runs under the live dashboard. neither the picker nor the dashboard opens under `-silent`, `-api`, or when stdin/stdout is piped or isn't a usable terminal, so pipelines are unaffected.
 
 ## http options
 

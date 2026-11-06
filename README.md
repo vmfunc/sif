@@ -118,7 +118,9 @@ new to sif? just give it a target and pick what to run from a menu — no need t
 
 with no scan flags on a terminal, sif opens an interactive picker: a grouped checklist of scans (recon, web vulns, info, intel), each showing its flag and a one-line description, with presets (`quick`, `recon`, `web`, `full`, `passive`) on `p` and a live "equivalent command" line so you can graduate to flags. your last selection is remembered.
 
-it stays out of pipelines: any scan flag present runs directly, and `-silent`/`-api`/piped stdin or stdout never open it. force it on with `-i` (or `-pick`), off with `-no-tui`. see [docs/tui.md](docs/tui.md) for the full keybindings.
+it stays out of pipelines: any scan flag present runs directly, and `-silent`/`-api`/piped stdin or stdout never open it. force it on with `-i` (or `-pick`), off with `-no-tui`.
+
+scans on an interactive terminal run under a live dashboard that streams findings as they land and ends on a browsable summary (`j`/`k` to move, `enter` for detail, `w` to write a report). anything non-interactive gets the plain streaming output, and `-no-tui` turns the dashboard off. see [docs/tui.md](docs/tui.md) for the full keybindings.
 
 <!-- asciinema/gif placeholder: docs/assets/tui.gif -->
 
