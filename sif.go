@@ -376,7 +376,7 @@ func (app *App) Run() error {
 	// as before. the batch consumers below still read the per-target results
 	// directly, so output/notify/diff/report are unchanged by the stream.
 	collector := event.NewCollector()
-	scan := func(sink event.Sink) ([]targetScan, error) {
+	runScan := func(sink event.Sink) ([]targetScan, error) {
 		app.sink = sink
 		results, err := app.scanAllTargets(storeDir, wantReport)
 		if err != nil {
@@ -391,13 +391,13 @@ func (app *App) Run() error {
 	var results []targetScan
 	var err error
 	if app.useDashboard() {
-		results, err = app.runDashboard(collector, scan)
+		results, err = app.runDashboard(collector, runScan)
 		if errors.Is(err, tui.ErrQuit) {
 			// the user quit mid-scan: treat it as an abort, not a partial report.
 			return nil
 		}
 	} else {
-		results, err = scan(event.NewMultiplexer(collector))
+		results, err = runScan(event.NewMultiplexer(collector))
 	}
 	if err != nil {
 		return err

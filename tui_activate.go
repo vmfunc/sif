@@ -216,7 +216,9 @@ func (app *App) useDashboard() bool {
 		term:      os.Getenv("TERM"),
 	}
 	if t.stdoutTTY {
-		if w, h, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
+		// stdout's fd is a small non-negative descriptor, so the uintptr->int
+		// conversion cannot overflow.
+		if w, h, err := term.GetSize(int(os.Stdout.Fd())); err == nil { //nolint:gosec // G115: fd fits in int
 			t.width, t.height = w, h
 		}
 	}

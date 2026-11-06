@@ -193,7 +193,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Copy):
 		m.status = m.copySelectedURL()
 	case key.Matches(msg, m.keys.Write):
-		return m, m.startWrite()
+		cmd := m.startWrite()
+		return m, cmd
 	case key.Matches(msg, m.keys.Top):
 		m.vp.GotoTop()
 		m.follow = false
