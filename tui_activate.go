@@ -13,14 +13,21 @@
 package sif
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/mattn/go-isatty"
 	"github.com/vmfunc/sif/internal/config"
+	"github.com/vmfunc/sif/internal/event"
+	"github.com/vmfunc/sif/internal/finding"
 	"github.com/vmfunc/sif/internal/output"
 	"github.com/vmfunc/sif/internal/tui"
+	"golang.org/x/term"
 )
 
 // pickerItems is the catalog the picker presents, grouped the way the roadmap
@@ -172,4 +179,115 @@ func (app *App) maybePick(ctx context.Context) (cancelled bool) {
 	}
 	applyScanSelection(app.settings, &sel)
 	return false
+}
+
+// shouldDashboard decides whether the scan runs under the live dashboard. It is
+// the default only on a genuinely interactive terminal: stdin and stdout both
+// ttys, a usable window size, and not TERM=dumb. -no-tui, -api and -silent opt
+// out. Anything else falls back to the plain console stream. Pure, so the
+// decision is unit-testable without a real tty.
+func shouldDashboard(s *config.Settings, t termInfo) bool {
+	if s.NoTUI || s.ApiMode || s.Silent {
+		return false
+	}
+	if !t.stdoutTTY || !t.stdinTTY {
+		return false
+	}
+	if t.term == "dumb" {
+		return false
+	}
+	// a tty that reports no size (some ptys, CI shells) can't lay out the
+	// dashboard; it would sit on its init screen forever.
+	return t.width > 0 && t.height > 0
+}
+
+// termInfo is the terminal state shouldDashboard decides on.
+type termInfo struct {
+	stdoutTTY, stdinTTY bool
+	width, height       int
+	term                string
+}
+
+// useDashboard applies shouldDashboard to the real terminal.
+func (app *App) useDashboard() bool {
+	t := termInfo{
+		stdoutTTY: output.IsTTY,
+		stdinTTY:  isatty.IsTerminal(os.Stdin.Fd()),
+		term:      os.Getenv("TERM"),
+	}
+	if t.stdoutTTY {
+		if w, h, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
+			t.width, t.height = w, h
+		}
+	}
+	return shouldDashboard(app.settings, t)
+}
+
+// runDashboard runs scan under the live dashboard. While the alt screen owns the
+// terminal the engine's console chrome is discarded (the dashboard renders the
+// same findings from the event stream) and log output is buffered, then
+// replayed once the terminal is restored so warnings and errors aren't lost.
+// It returns tui.ErrQuit when the user quit before the scan finished.
+func (app *App) runDashboard(collector *event.Collector, scan func(event.Sink) ([]targetScan, error)) ([]targetScan, error) {
+	prevOut := output.SetWriter(io.Discard)
+	logs := &syncBuffer{}
+	log.SetOutput(logs)
+	defer func() {
+		output.SetWriter(prevOut)
+		log.SetOutput(os.Stderr)
+		if logs.Len() > 0 {
+			_, _ = os.Stderr.Write(logs.Bytes())
+		}
+	}()
+
+	var results []targetScan
+	cfg := tui.Config{Version: Version, Targets: app.targets, WriteReport: app.dashboardReport}
+	err := tui.Run(context.Background(), cfg, func(_ context.Context, sink event.Sink) error {
+		var err error
+		results, err = scan(event.NewMultiplexer(collector, sink))
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// dashboardReport backs the dashboard's `w` key: it writes the findings seen so
+// far as a JSON report to the -json path when one was given, else to a
+// timestamped file in the working directory, and returns the path written.
+func (app *App) dashboardReport(findings []finding.Finding) (string, error) {
+	path := app.settings.JSONReport
+	if path == "" {
+		path = "sif-report-" + time.Now().Format("20060102-150405") + ".json"
+	}
+	if err := app.writeJSONReport(path, findings); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// syncBuffer is a bytes.Buffer safe for the concurrent writes -concurrency
+// workers make through the shared logger.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) Len() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Len()
+}
+
+func (b *syncBuffer) Bytes() []byte {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Bytes()
 }

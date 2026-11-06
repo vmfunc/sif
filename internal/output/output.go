@@ -150,6 +150,15 @@ func SetSilent(enabled bool) {
 	sink = os.Stdout
 }
 
+// SetWriter repoints the chrome sink at w and returns the previous writer so
+// the caller can restore it. The live dashboard uses it to silence the engine's
+// console chrome (io.Discard) while the alt screen owns the terminal.
+func SetWriter(w io.Writer) io.Writer {
+	prev := sink
+	sink = w
+	return prev
+}
+
 // Silent reports whether plain-sink mode is active. callers gate interactive
 // behaviour (spinners, prompts) on this.
 func Silent() bool {
