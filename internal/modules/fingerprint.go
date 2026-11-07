@@ -165,7 +165,7 @@ func scoreFingerprint(cfg *FingerprintConfig, body string, headers http.Header) 
 	if total == 0 {
 		return 0, ""
 	}
-	score := matched / total
+	score := clampUnit(matched / total)
 
 	version := ""
 	if cfg.Version != nil && score > 0 {
@@ -176,6 +176,25 @@ func scoreFingerprint(cfg *FingerprintConfig, body string, headers http.Header) 
 		}
 	}
 	return score, version
+}
+
+// clampUnit bounds a fraction to [0, 1]. Weights are validated non-negative
+// and finite at load time so this is a no-op on any real config; it only
+// guards a caller that skips validation and feeds scoreFingerprint a
+// negative or NaN weight. NaN needs its own check: every ordered comparison
+// against NaN is false, so the < 0 and > 1 checks below would silently let
+// it through otherwise.
+func clampUnit(f float32) float32 {
+	if math.IsNaN(float64(f)) {
+		return 0
+	}
+	if f < 0 {
+		return 0
+	}
+	if f > 1 {
+		return 1
+	}
+	return f
 }
 
 // headerContains reports whether pattern appears in any header name or value,
