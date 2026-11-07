@@ -245,7 +245,7 @@ func TestIdlePerHost(t *testing.T) {
 
 func TestBuildTransportTuning(t *testing.T) {
 	const threads = 32
-	tr, err := buildTransport("", threads)
+	tr, err := buildTransport("", threads, "")
 	if err != nil {
 		t.Fatalf("buildTransport: %v", err)
 	}
@@ -478,7 +478,7 @@ func BenchmarkConnReuse(b *testing.B) {
 
 	b.Run("tuned-drain", func(b *testing.B) {
 		resetBench()
-		tr, err := buildTransport("", 8)
+		tr, err := buildTransport("", 8, "")
 		if err != nil {
 			b.Fatalf("buildTransport: %v", err)
 		}

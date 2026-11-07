@@ -17,6 +17,7 @@ package httpx
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -27,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/proxy"
 	"golang.org/x/time/rate"
 )
@@ -86,6 +88,13 @@ type Options struct {
 	// Threads is the scan worker count; it sizes the per-host idle pool so
 	// concurrent workers hitting one target reuse conns instead of dialing fresh.
 	Threads int
+	// Fingerprint selects a uTLS ClientHello profile (chrome, firefox, safari,
+	// edge, ios, android). Empty = off, Go's own hello, the default.
+	//
+	// It is a deliberately narrow knob: the ClientHello matches the profile,
+	// the rest of the connection does not. See buildTransport for what that
+	// costs (HTTP/1.1 only).
+	Fingerprint string
 }
 
 // configured holds the package-level transport built once by Configure. nil
@@ -100,7 +109,7 @@ var (
 //
 //nolint:gocritic // signature is the package's stable startup api; called once.
 func Configure(opts Options) error {
-	base, err := buildTransport(opts.Proxy, opts.Threads)
+	base, err := buildTransport(opts.Proxy, opts.Threads, opts.Fingerprint)
 	if err != nil {
 		return err
 	}
@@ -143,9 +152,19 @@ func Client(timeout time.Duration) *http.Client {
 }
 
 // buildTransport clones the default transport, tunes its pool for the worker
-// count and applies the proxy. An empty proxy leaves the default behavior
-// (respects HTTP_PROXY env) intact.
-func buildTransport(proxyURL string, threads int) (*http.Transport, error) {
+// count, applies the proxy and, when a fingerprint is set, routes TLS through
+// uTLS.
+//
+// An empty proxy leaves the default behavior (respects HTTP_PROXY env) intact.
+// An empty fingerprint leaves the TLS stack untouched.
+//
+// Fingerprinting trades HTTP/2 for the ClientHello. net/http only negotiates h2
+// when it performs the handshake itself, so DialTLSContext below forces
+// HTTP/1.1: the hello says Chrome and the connection then behaves like Chrome's
+// HTTP/1.1, which is a real but partial match. A browser-coherent JA4 plus h2
+// (correct SETTINGS, WINDOW_UPDATE and priority frames) is a much larger change
+// and is deliberately not attempted here.
+func buildTransport(proxyURL string, threads int, fingerprint string) (*http.Transport, error) {
 	tr, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		// unreachable in practice, but never trust an assertion silently.
@@ -162,34 +181,74 @@ func buildTransport(proxyURL string, threads int) (*http.Transport, error) {
 	transport.IdleConnTimeout = idleConnTimeout
 	transport.ForceAttemptHTTP2 = true
 
-	if proxyURL == "" {
-		return transport, nil
-	}
-
-	parsed, err := url.Parse(proxyURL)
-	if err != nil {
-		return nil, fmt.Errorf("parse proxy url %q: %w", proxyURL, err)
-	}
-
-	switch parsed.Scheme {
-	case schemeHTTP, schemeHTTPS:
-		transport.Proxy = http.ProxyURL(parsed)
-	case schemeSOCKS5:
-		// socks5 needs a custom dialer. proxy.SOCKS5 takes a forward dialer, so
-		// hand it our own net.Dialer with keepalive set - the default
-		// proxy.Direct has none, which would kill os-level conn pooling.
-		fwd := &net.Dialer{Timeout: dialTimeout, KeepAlive: dialKeepAlive}
-		dialer, err := proxy.SOCKS5("tcp", parsed.Host, nil, fwd)
+	// resolve the fingerprint before touching the proxy: an unknown profile is a
+	// startup error the caller should see, not a run that quietly uses go's hello.
+	var hello utls.ClientHelloID
+	if fingerprint != "" {
+		id, err := clientHelloID(fingerprint)
 		if err != nil {
-			return nil, fmt.Errorf("socks5 proxy %q: %w", proxyURL, err)
+			return nil, err
 		}
-		ctxDialer, ok := dialer.(proxy.ContextDialer)
-		if !ok {
-			return nil, fmt.Errorf("socks5 proxy %q: dialer lacks context support", proxyURL)
+		hello = id
+	}
+
+	// base dials TCP. it starts as go's dialer with our keepalive; the socks5
+	// branch swaps in the proxy's, so the TLS layer below runs on top of either.
+	base := dialFunc((&net.Dialer{Timeout: dialTimeout, KeepAlive: dialKeepAlive}).DialContext)
+
+	if proxyURL != "" {
+		parsed, err := url.Parse(proxyURL)
+		if err != nil {
+			return nil, fmt.Errorf("parse proxy url %q: %w", proxyURL, err)
 		}
-		transport.DialContext = ctxDialer.DialContext
-	default:
-		return nil, fmt.Errorf("unsupported proxy scheme %q (want http/https/socks5)", parsed.Scheme)
+
+		switch parsed.Scheme {
+		case schemeHTTP, schemeHTTPS:
+			if fingerprint != "" {
+				// an http proxy terminates the CONNECT and then net/http performs
+				// the origin handshake from tls.Config, where DialTLSContext is
+				// never consulted - the hello would stay go's while the flag
+				// claimed otherwise. refuse rather than silently not fingerprint.
+				return nil, fmt.Errorf("tls fingerprint %q needs a direct connection or a %s proxy: an %s proxy performs the origin handshake itself",
+					fingerprint, schemeSOCKS5, parsed.Scheme)
+			}
+			transport.Proxy = http.ProxyURL(parsed)
+		case schemeSOCKS5:
+			// socks5 needs a custom dialer. proxy.SOCKS5 takes a forward dialer,
+			// so hand it our own net.Dialer with keepalive set - the default
+			// proxy.Direct has none, which would kill os-level conn pooling.
+			fwd := &net.Dialer{Timeout: dialTimeout, KeepAlive: dialKeepAlive}
+			dialer, err := proxy.SOCKS5("tcp", parsed.Host, nil, fwd)
+			if err != nil {
+				return nil, fmt.Errorf("socks5 proxy %q: %w", proxyURL, err)
+			}
+			ctxDialer, ok := dialer.(proxy.ContextDialer)
+			if !ok {
+				return nil, fmt.Errorf("socks5 proxy %q: dialer lacks context support", proxyURL)
+			}
+			transport.DialContext = ctxDialer.DialContext
+			base = ctxDialer.DialContext
+		default:
+			return nil, fmt.Errorf("unsupported proxy scheme %q (want http/https/socks5)", parsed.Scheme)
+		}
+	}
+
+	if fingerprint != "" {
+		// DialTLSContext takes over the handshake, which is the only way uTLS
+		// gets to send its hello. net/http negotiates h2 only when it drives the
+		// handshake, so the fingerprint path is HTTP/1.1 only - the documented
+		// gap, not an oversight.
+		transport.ForceAttemptHTTP2 = false
+		transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+		// the dialer captures this config by pointer, so give it one even when the
+		// caller configured nothing: a later in-place edit (roots, skip-verify)
+		// then still reaches the handshake instead of being silently ignored.
+		if transport.TLSClientConfig == nil {
+			transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		} else {
+			transport.TLSClientConfig = transport.TLSClientConfig.Clone()
+		}
+		transport.DialTLSContext = newTLSDialer(base, hello, transport.TLSClientConfig)
 	}
 
 	return transport, nil

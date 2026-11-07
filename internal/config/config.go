@@ -85,6 +85,7 @@ type Settings struct {
 	Cookie            string
 	RateLimit         int
 	MaxRetries        int    // -max-retries: retries on 429/503 (0 = off)
+	TLSFingerprint    string // -fingerprint: uTLS ClientHello profile ("" = go's default hello)
 	Notify            bool   // -notify: ship findings to configured providers
 	NotifySeverity    string // -notify-severity: minimum severity to send (info..critical)
 	NotifyConfig      string // -notify-config: path to a notify-compatible yaml file
@@ -200,6 +201,7 @@ func registerFlags(settings *Settings) *goflags.FlagSet {
 		flagSet.StringVar(&settings.Cookie, "cookie", "", "Cookie header to send with every request"),
 		flagSet.IntVar(&settings.RateLimit, "rate-limit", 0, "Max requests per second (0 = unlimited)"),
 		flagSet.IntVar(&settings.MaxRetries, "max-retries", 2, "Retries on 429/503 with Retry-After backoff (0 = off)"),
+		flagSet.StringVar(&settings.TLSFingerprint, "fingerprint", "", "Match a browser ClientHello in TLS (chrome, firefox, safari, edge, ios, android). Off by default; forces HTTP/1.1"),
 	)
 
 	flagSet.CreateGroup("output", "Output",

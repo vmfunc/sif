@@ -449,6 +449,20 @@ cookie header to send with every request:
 ./sif -u https://example.com -cookie "session=abc; theme=dark"
 ```
 
+### -fingerprint
+
+match a browser's TLS ClientHello (JA3/JA4 surface) on requests to the target. off by default. accepted values: `chrome`, `firefox`, `safari`, `edge`, `ios`, `android`.
+
+```bash
+./sif -u https://example.com -fingerprint chrome
+```
+
+this is the hello only, and it costs HTTP/2: net/http negotiates h2 only when it performs the handshake itself, and uTLS has to take that over to change the hello, so a fingerprinted run speaks HTTP/1.1. a browser-coherent stack (correct h2 SETTINGS and priority frames) is a much larger change and is not attempted here, which means a target that fingerprints on h2 behaviour will still see a mismatch.
+
+it needs a direct connection or a `socks5` proxy. an `http`/`https` proxy performs the origin handshake itself, where this hook is never consulted, so combining them is refused at startup rather than silently leaving the hello untouched.
+
+an unknown profile name is a startup error, not a warning: continuing would run with go's hello while the command line said otherwise.
+
 ### -rate-limit
 
 cap outbound requests per second (0 = unlimited, default 0):
