@@ -372,6 +372,11 @@ func TestTransportReusesConnections(t *testing.T) {
 	}
 }
 
+// bareControlBodySize is the response size the no-drain controls serve. it must
+// stay above net/http's post-close drain cap (256KiB as of go 1.27): at or below
+// it the transport drains the body itself and the control would reuse conns.
+const bareControlBodySize = 512 << 10
+
 func TestBareClientDoesNotReuse(t *testing.T) {
 	// since go 1.27 the transport itself drains an early-closed body when its
 	// Content-Length is unknown or <= 256KiB (net/http maxPostCloseReadBytes),
@@ -379,7 +384,7 @@ func TestBareClientDoesNotReuse(t *testing.T) {
 	// length past that cap skips the post-close drain entirely, which keeps
 	// this control deterministic on every go version. keep the size above the
 	// transport's cap if go ever raises it.
-	srv, distinct := countConns(t, strings.Repeat("x", 512<<10))
+	srv, distinct := countConns(t, strings.Repeat("x", bareControlBodySize))
 
 	// the control: a bare DefaultTransport client whose caller closes but never
 	// drains the body. go can't reuse a half-read conn, so each request dials
@@ -425,14 +430,15 @@ func TestBareClientDoesNotReuse(t *testing.T) {
 func BenchmarkConnReuse(b *testing.B) {
 	const requests = 50
 
-	run := func(b *testing.B, drain bool, client *http.Client) {
+	run := func(b *testing.B, drain bool, body string, client *http.Client) {
 		b.Helper()
 		var (
 			mu    sync.Mutex
 			conns = make(map[net.Conn]struct{})
 		)
 		srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			io.WriteString(w, strings.Repeat("x", 256))
+			w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+			io.WriteString(w, body)
 		}))
 		srv.Config.ConnState = func(c net.Conn, state http.ConnState) {
 			if state != http.StateNew {
@@ -482,11 +488,11 @@ func BenchmarkConnReuse(b *testing.B) {
 		if err != nil {
 			b.Fatalf("buildTransport: %v", err)
 		}
-		run(b, true, &http.Client{Timeout: 5 * time.Second, Transport: tr})
+		run(b, true, strings.Repeat("x", 256), &http.Client{Timeout: 5 * time.Second, Transport: tr})
 	})
 
 	b.Run("bare-noDrain", func(b *testing.B) {
-		run(b, false, &http.Client{
+		run(b, false, strings.Repeat("x", bareControlBodySize), &http.Client{
 			Timeout:   5 * time.Second,
 			Transport: http.DefaultTransport.(*http.Transport).Clone(),
 		})
