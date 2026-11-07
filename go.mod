@@ -13,7 +13,7 @@ require (
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/likexian/whois v1.15.7
 	github.com/mattn/go-isatty v0.0.22
-	github.com/projectdiscovery/goflags v0.2.0
+	github.com/projectdiscovery/goflags v0.2.1
 	github.com/projectdiscovery/nuclei/v3 v3.11.0
 	github.com/projectdiscovery/retryabledns v1.0.116
 	github.com/projectdiscovery/utils v0.11.8
