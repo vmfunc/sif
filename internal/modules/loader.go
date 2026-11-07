@@ -17,6 +17,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/log"
 	"github.com/vmfunc/sif/internal/output"
@@ -28,6 +29,10 @@ import (
 // reach a parent directory, and modules/ sits above this package). it stays nil
 // in builds and tests that don't import that package, so the loader simply falls
 // back to the filesystem as before.
+// sifModulePath is this project's go module path, used to recognise a source
+// checkout as the working directory. see inSifCheckout.
+const sifModulePath = "github.com/vmfunc/sif"
+
 var builtinFS fs.FS
 
 // SetBuiltinFS registers the embedded module filesystem. see builtinFS.
@@ -70,6 +75,11 @@ func resolveBuiltinDir() string {
 	if dir := firstExistingDir(builtinDirCandidates()); dir != "" {
 		return dir
 	}
+	if builtinFS != nil {
+		// an embedded set is the baseline; do not point the disk walk at the
+		// working directory just to have a path.
+		return ""
+	}
 	return "modules"
 }
 
@@ -77,19 +87,43 @@ func resolveBuiltinDir() string {
 // most specific first: next to the executable, the working directory (for
 // development), then the freedesktop system data dirs so packaged installs
 // (modules under /usr/share/sif) are found too.
+//
+// The bare "modules" candidate resolves against the working directory at
+// runtime, so it is only offered inside a sif checkout (or when the binary
+// carries no embedded set), keeping the edit-and-rerun flow without letting a
+// release binary trust a modules/ folder it happens to find.
 func builtinDirCandidates() []string {
 	candidates := make([]string, 0, 4)
 
 	if execPath, err := os.Executable(); err == nil {
 		candidates = append(candidates, filepath.Join(filepath.Dir(execPath), "modules"))
 	}
-	candidates = append(candidates, "modules")
+	if builtinFS == nil || inSifCheckout() {
+		candidates = append(candidates, "modules")
+	}
 
 	for _, dir := range dataDirs() {
 		candidates = append(candidates, filepath.Join(dir, "sif", "modules"))
 	}
 
 	return candidates
+}
+
+// inSifCheckout reports whether the working directory is a sif source tree, by
+// reading the module path out of its go.mod. It is what separates "the developer
+// is running from the repo" from "the binary happens to be sitting next to some
+// other project's modules/ dir".
+func inSifCheckout() bool {
+	data, err := os.ReadFile("go.mod")
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "module "); ok {
+			return strings.TrimSpace(rest) == sifModulePath
+		}
+	}
+	return false
 }
 
 // dataDirs returns the freedesktop base data directories, honoring
@@ -113,19 +147,16 @@ func firstExistingDir(candidates []string) string {
 // LoadAll discovers and loads all modules from both built-in
 // and user directories.
 func (l *Loader) LoadAll() error {
-	// Load built-in modules first, preferring an on-disk modules/ dir (dev tree
-	// or a release that ships the folder alongside the binary).
-	before := l.loaded
-	if err := l.loadDir(l.builtinDir, false); err != nil {
-		log.Debugf("No built-in modules found: %v", err)
-	}
-
-	// nothing on disk: fall back to the modules embedded in the binary so a bare
-	// `go install`ed sif still ships its built-in modules.
-	if l.loaded == before && l.embedded != nil {
+	// the embedded set is the baseline; the on-disk builtin dir layers over it.
+	// Register replaces by id rather than duplicating, so a disk module overrides
+	// only its own id and every other embedded module survives.
+	if l.embedded != nil {
 		if err := l.loadFS(l.embedded); err != nil {
 			log.Debugf("No embedded modules loaded: %v", err)
 		}
+	}
+	if err := l.loadDir(l.builtinDir, false); err != nil {
+		log.Debugf("No built-in modules found: %v", err)
 	}
 
 	// Load user modules (can override built-in)
@@ -143,11 +174,15 @@ func (l *Loader) LoadAll() error {
 	return nil
 }
 
-// loadDir loads modules from a directory.
+// loadDir loads modules from a directory. a per-entry error is logged and
+// skipped rather than returned: filepath.Walk aborts the whole walk on the
+// first error a walkFn returns, silently dropping every module sorted after
+// the bad entry.
 func (l *Loader) loadDir(dir string, userDefined bool) error {
 	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			log.Debugf("Skipping %s: %v", path, err)
+			return nil
 		}
 
 		if info.IsDir() {
