@@ -1,0 +1,37 @@
+id: nextcloud-version-exposure
+info:
+  name: Nextcloud Version Exposure
+  author: sif
+  severity: medium
+  description: Detects a Nextcloud instance that discloses its version over the unauthenticated status endpoint
+  tags: [nextcloud, storage, cloud, fingerprint, version, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/status.php"
+
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "\"productname\":\"Nextcloud\""
+
+    - type: word
+      part: body
+      words:
+        - "\"versionstring\""
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: nextcloud_version
+      part: body
+      regex:
+        - '"versionstring"\s*:\s*"([^"]+)"'
+      group: 1
