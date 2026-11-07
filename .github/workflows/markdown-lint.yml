@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "**/*.md"
+      - ".github/workflows/markdown-lint.yml"
 
 permissions:
   contents: read
