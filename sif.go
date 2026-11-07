@@ -332,7 +332,17 @@ func (app *App) Run() error {
 		RateLimit:  app.settings.RateLimit,
 		MaxRetries: app.settings.MaxRetries,
 		Threads:    app.settings.Threads,
+
+		Fingerprint: app.settings.TLSFingerprint,
 	}); err != nil {
+		// a proxy that cannot be parsed may still be a transient environment
+		// problem, so that case warns and continues. a mistyped fingerprint is
+		// pure user error and gets worse by continuing: the run would keep go's
+		// hello while the user believes otherwise.
+		if app.settings.TLSFingerprint != "" {
+			log.Errorf("tls fingerprint: %v", err)
+			return err
+		}
 		log.Warnf("http client config failed, continuing with defaults: %v", err)
 	}
 
