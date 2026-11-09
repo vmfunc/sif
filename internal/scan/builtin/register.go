@@ -19,6 +19,7 @@ import "github.com/vmfunc/sif/internal/modules"
 func Register() {
 	modules.Register(&ShodanModule{})
 	modules.Register(&FrameworksModule{})
+	modules.Register(&CDNModule{})
 	modules.Register(&NucleiModule{})
 	modules.Register(&WhoisModule{})
 	modules.Register(&SecurityTrailsModule{})
