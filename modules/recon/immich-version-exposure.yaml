@@ -1,0 +1,51 @@
+id: immich-version-exposure
+info:
+  name: Immich Version Exposure
+  author: sif
+  severity: medium
+  description: Detects an Immich photo server that discloses its version over the unauthenticated server version api, confirmed by the x-immich-session-token cors header immich alone advertises
+  tags: [immich, photos, media, fingerprint, version, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/server/version"
+
+  matchers:
+    - type: word
+      part: header
+      words:
+        - "x-immich-session-token"
+
+    - type: word
+      part: body
+      words:
+        - "\"major\""
+        - "\"minor\""
+        - "\"patch\""
+      condition: and
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: json
+      name: immich_major
+      part: body
+      json:
+        - "major"
+
+    - type: json
+      name: immich_minor
+      part: body
+      json:
+        - "minor"
+
+    - type: json
+      name: immich_patch
+      part: body
+      json:
+        - "patch"

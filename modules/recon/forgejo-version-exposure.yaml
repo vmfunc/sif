@@ -1,0 +1,32 @@
+id: forgejo-version-exposure
+info:
+  name: Forgejo Version Exposure
+  author: sif
+  severity: medium
+  description: Detects a Forgejo instance that discloses its version, distinguished from upstream Gitea by the +gitea- compatibility suffix Forgejo appends to its own version string, over the unauthenticated version api
+  tags: [forgejo, git, vcs, fingerprint, version, recon]
+
+type: http
+
+http:
+  method: GET
+  paths:
+    - "{{BaseURL}}/api/v1/version"
+
+  matchers:
+    - type: regex
+      part: body
+      regex:
+        - '"version"\s*:\s*"[^"]*\+gitea-[0-9]'
+
+    - type: status
+      status:
+        - 200
+
+  extractors:
+    - type: regex
+      name: forgejo_version
+      part: body
+      regex:
+        - '"version"\s*:\s*"([^"]+)"'
+      group: 1
