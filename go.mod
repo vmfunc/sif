@@ -380,6 +380,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zcalusic/sysinfo v1.1.3 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
+	github.com/zmap/rc2 v0.0.0-20190804163417-abaa70531248 // indirect
 	github.com/zmap/zcrypto v0.0.0-20260906180147-3ed30b1e9340 // indirect
 	github.com/zmap/zgrab2 v0.1.8 // indirect
 	gitlab.com/gitlab-org/api/client-go v1.9.1 // indirect
@@ -413,3 +414,7 @@ require (
 	moul.io/http2curl v1.0.0 // indirect
 	software.sslmate.com/src/go-pkcs12 v0.7.2 // indirect
 )
+
+// tlsx (via nuclei/httpx) still uses ClientHello.NextProtoNeg, which newer zcrypto removed.
+// Drop once tlsx supports zcrypto >= v0.0.0-20260906180147-3ed30b1e9340.
+replace github.com/zmap/zcrypto => github.com/zmap/zcrypto v0.0.0-20240803002437-3a861682ac77
